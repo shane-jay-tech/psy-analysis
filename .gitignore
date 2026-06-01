@@ -1,0 +1,36 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 虚拟环境 ----
+.venv/
+venv/
+env/
+
+# ---- 运行日志（运行时生成，不进版本库）----
+logs/
+*.log
+
+# ---- 操作系统垃圾 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- IDE ----
+.vscode/
+.idea/
+
+# ---- 临时 / 输出 ----
+*.tmp
+~$*
+
+# ---- 运行时锁与数据库临时文件 ----
+**/locks/
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal

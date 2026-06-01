@@ -1,0 +1,46 @@
+# LLM 提供商预设配置
+# 可在此文件中添加、删除或修改提供商，无需改动代码。
+
+deepseek:
+  name: "DeepSeek (国内可直接访问)"
+  base_url: "https://api.deepseek.com"
+  default_model: "deepseek-v4-pro"
+  models:
+    - "deepseek-v4-pro"
+    - "deepseek-chat"
+    - "deepseek-reasoner"
+  description: "DeepSeek V4 Pro，中文能力卓越，适合专业问卷设计。约 ¥1/百万token。"
+
+zhipu:
+  name: "智谱 GLM (国内可直接访问)"
+  base_url: "https://open.bigmodel.cn/api/paas/v4"
+  default_model: "glm-4-flash"
+  models:
+    - "glm-4-flash"
+    - "glm-4-plus"
+    - "glm-4-air"
+  description: "国产模型，免费额度充足，中文理解优秀。Flash版约 ¥0.1/百万token。"
+
+openai:
+  name: "OpenAI (需要 VPN)"
+  base_url: "https://api.openai.com/v1"
+  default_model: "gpt-4o-mini"
+  models:
+    - "gpt-4o-mini"
+    - "gpt-4o"
+    - "gpt-4.1-mini"
+  description: "质量最高，但国内需要 VPN。gpt-4o-mini 约 $0.15/百万token。"
+
+ollama:
+  name: "Ollama (本地，免费)"
+  base_url: "http://localhost:11434/v1"
+  default_model: "qwen2.5:7b"
+  models: []
+  description: "完全免费，无需网络。需先安装 Ollama 并拉取模型。推荐 qwen2.5 系列。"
+
+custom:
+  name: "自定义端点"
+  base_url: ""
+  default_model: ""
+  models: []
+  description: "接入任意 OpenAI 兼容 API（如硅基流动、阿里百炼等）。"

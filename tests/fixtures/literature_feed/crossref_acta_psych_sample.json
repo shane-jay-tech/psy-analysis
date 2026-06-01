@@ -1,0 +1,49 @@
+{
+  "status": "ok",
+  "message-type": "work-list",
+  "message-version": "1.0.0",
+  "message": {
+    "items": [
+      {
+        "DOI": "10.3724/SP.J.1041.2026.00500",
+        "title": [
+          "变革型领导对员工建言行为的影响：一个有调节的中介模型"
+        ],
+        "container-title": ["心理学报"],
+        "issn-type": [{"value": "0439-755X", "type": "print"}],
+        "publisher": "中国科学院心理研究所",
+        "author": [
+          {"family": "张", "given": "三"},
+          {"family": "李", "given": "四"}
+        ],
+        "abstract": "<jats:p>本研究基于社会交换理论，探讨变革型领导对员工建言行为的影响机制。通过对 320 名员工的两阶段问卷调查，结果表明变革型领导通过心理安全感正向预测员工建言行为，而组织公正感在其中起调节作用。</jats:p>",
+        "issued": {"date-parts": [[2026, 5, 1]]},
+        "subject": ["变革型领导", "建言行为", "心理安全感", "组织公正"],
+        "URL": "https://doi.org/10.3724/SP.J.1041.2026.00500"
+      },
+      {
+        "DOI": "10.3724/SP.J.1041.2026.00501",
+        "title": ["职场孤独感对工作绩效的影响研究"],
+        "container-title": ["心理学报"],
+        "publisher": "中国科学院心理研究所",
+        "author": [{"family": "王", "given": "五"}],
+        "abstract": "<jats:p>采用经验取样法考察职场孤独感对每日工作绩效的滞后效应。</jats:p>",
+        "issued": {"date-parts": [[2026, 4, 20]]},
+        "subject": ["职场孤独", "工作绩效"],
+        "URL": "https://doi.org/10.3724/SP.J.1041.2026.00501"
+      },
+      {
+        "DOI": "10.3724/SP.J.1041.2026.00502",
+        "title": ["时间感知的神经基础"],
+        "container-title": ["心理学报"],
+        "publisher": "中国科学院心理研究所",
+        "author": [{"family": "赵", "given": "六"}],
+        "issued": {"date-parts": [[2026, 4, 10]]},
+        "subject": ["时间感知", "fMRI"],
+        "URL": "https://doi.org/10.3724/SP.J.1041.2026.00502"
+      }
+    ],
+    "total-results": 3,
+    "items-per-page": 10
+  }
+}
