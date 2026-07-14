@@ -31,7 +31,8 @@ def _ensure_dir(path: Path) -> Path:
 def _sanitize_tag(tag: str) -> str:
     """清理标签为安全目录名"""
     safe = "".join(c for c in tag if c.isalnum() or c in "._-（）()")
-    return safe[:50] or "未分类"
+    safe = safe[:50].strip(".")
+    return safe or "未分类"
 
 
 def archive_analysis(

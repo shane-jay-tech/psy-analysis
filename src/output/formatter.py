@@ -203,7 +203,7 @@ def check_effect_size_required(output: Dict[str, Any]) -> Tuple[bool, str]:
     found_attrs = []
     for attr in effect_size_attrs:
         val = getattr(result, attr, None)
-        if val is not None and val != "" and val != 0:
+        if val is not None and val != "":
             found_attrs.append(f"{attr}={val}")
 
     # 检查 output 字典中的顶级效应量字段
