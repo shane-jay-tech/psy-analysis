@@ -227,7 +227,7 @@ def render_project_panel():
             st.download_button(
                 "📥 导出当前项目（JSON）",
                 data=ws_json,
-                file_name=f"{active.name}_{ts}.json",
+                file_name=__import__('src.utils.export_naming', fromlist=['export_filename']).export_filename("工作区", "json", title=active.name),
                 mime="application/json",
                 use_container_width=True,
                 key="proj_export_btn",

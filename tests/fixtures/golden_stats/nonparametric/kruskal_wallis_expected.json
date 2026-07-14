@@ -1,0 +1,17 @@
+{
+  "method_id": "kruskal_wallis",
+  "source": "scipy.stats.kruskal verified against R kruskal.test()",
+  "description": "Three groups with clear ordinal separation, n=6 each",
+  "tolerance": {
+    "statistic": 0.5,
+    "p_value": 0.001,
+    "effect_size": 0.05
+  },
+  "expected": {
+    "statistic_min": 12.0,
+    "p_value_max": 0.005,
+    "effect_size_name": "epsilon_squared",
+    "effect_size_min": 0.70,
+    "significant": true
+  }
+}

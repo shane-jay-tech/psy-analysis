@@ -1,0 +1,26 @@
+{
+  "title": "大学生焦虑与自尊量表",
+  "description": "包含焦虑分量表（5题）和自尊分量表（5题），采用 Likert 5 点计分",
+  "dimensions": [
+    {
+      "name": "焦虑",
+      "items": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+      "reverse_items": ["Q3"],
+      "max_score": 5,
+      "min_score": 1
+    },
+    {
+      "name": "自尊",
+      "items": ["Q6", "Q7", "Q8", "Q9", "Q10"],
+      "reverse_items": ["Q8", "Q9"],
+      "max_score": 5,
+      "min_score": 1
+    }
+  ],
+  "demographics": ["gender", "grade"],
+  "metadata": ["id", "duration_seconds"],
+  "invalid_detection": {
+    "min_duration_seconds": 60,
+    "max_identical_ratio": 0.9
+  }
+}

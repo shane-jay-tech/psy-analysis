@@ -1,0 +1,19 @@
+{
+  "method_id": "one_way_anova",
+  "source": "scipy.stats.f_oneway verified against R aov()",
+  "description": "Three groups (control M=84.4, treatment1 M=72.1, treatment2 M=59.0), n=8 each",
+  "tolerance": {
+    "f_statistic": 0.1,
+    "p_value": 0.0001,
+    "effect_size": 0.01
+  },
+  "expected": {
+    "f_statistic": 28.5,
+    "df_between": 2,
+    "df_within": 21,
+    "p_value": 0.0001,
+    "effect_size_name": "eta_squared",
+    "effect_size_min": 0.70,
+    "significant": true
+  }
+}

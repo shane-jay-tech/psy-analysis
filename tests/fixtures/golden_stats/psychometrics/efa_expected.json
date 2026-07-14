@@ -1,0 +1,16 @@
+{
+  "method_id": "exploratory_factor_analysis",
+  "reference_software": "factor_analyzer",
+  "data_description": "100 cases, 12 items (3 factors x 4 items each), clear factor structure",
+  "tolerance": {
+    "kmo": 0.1,
+    "variance_explained": 5.0
+  },
+  "expected": {
+    "n_factors": 3,
+    "kmo_gt": 0.5,
+    "bartlett_significant": true,
+    "total_variance_explained_gt": 50.0,
+    "items_per_factor": 4
+  }
+}

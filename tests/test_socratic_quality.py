@@ -19,6 +19,8 @@ from typing import Any, Dict, List
 
 import pytest
 
+pytestmark = pytest.mark.benchmark
+
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "socratic_benchmark.json"
 REPORT_DIR = Path(__file__).parent / "fixtures" / "_benchmark_reports"

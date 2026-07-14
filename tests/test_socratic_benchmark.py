@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+pytestmark = pytest.mark.benchmark
+
 from src.upstream.socratic_benchmark import (
     JudgeScore,
     _rule_evaluate,

@@ -1,0 +1,16 @@
+{
+  "method_id": "binary_logistic",
+  "reference_software": "statsmodels Logit",
+  "data_description": "20 cases, binary outcome, 3 continuous predictors",
+  "tolerance": {
+    "p_value": 0.1,
+    "or_ratio": 0.5
+  },
+  "expected": {
+    "model_converged": true,
+    "n_predictors": 3,
+    "has_or_values": true,
+    "has_ci_values": true,
+    "classification_accuracy_gt": 0.6
+  }
+}

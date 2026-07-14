@@ -1,6 +1,7 @@
 """论文写作系统 — 心理学报格式论文初稿生成"""
 
 from .paper_engine import PaperEngine, PaperState
+from .workflow_service import QuickPaperRequest, PaperResult, generate_paper_quick
 from .literature_manager import (
     LiteratureManager, LiteratureEntry, smart_search_literature,
     CitationCheckResult, cross_check_citations, cross_check_references_list,
@@ -20,6 +21,7 @@ from .literature_crawler import (
 
 __all__ = [
     "PaperEngine", "PaperState",
+    "QuickPaperRequest", "PaperResult", "generate_paper_quick",
     "LiteratureManager", "LiteratureEntry", "smart_search_literature",
     "CitationCheckResult", "cross_check_citations",
     "cross_check_references_list",

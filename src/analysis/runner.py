@@ -21,6 +21,10 @@ from . import correlation
 from . import chi_square
 from . import nonparametric
 from . import regression
+from . import logistic_regression
+from . import manova as manova_mod
+from . import hlm as hlm_mod
+from . import sem as sem_mod
 from . import reliability
 from . import factor_analysis
 from . import advanced
@@ -153,6 +157,23 @@ def _run_repeated_anova(df, plan, output):
     output["charts_data"]["paired_cols"] = (plan.dependent_vars[0], plan.dependent_vars[1])
 
 
+@_register("mixed_anova")
+def _run_mixed_anova(df, plan, output):
+    dv = plan.dependent_vars[0] if plan.dependent_vars else None
+    ivs = plan.independent_vars
+    if not dv or len(ivs) < 2:
+        output["errors"].append({"severity": "error", "message": "混合设计ANOVA需要指定因变量、组间因子和组内因子。请用长格式数据，并指定 subject 列。"})
+        return
+    between = ivs[0]
+    within = ivs[1]
+    subject_col = plan.grouping_var or "subject"
+    if subject_col not in df.columns:
+        output["errors"].append({"severity": "error", "message": f"未找到被试ID列「{subject_col}」。请通过 grouping_var 指定被试标识列。"})
+        return
+    result = anova.mixed_anova(df, dv, within=within, subject=subject_col, between=between)
+    output["result"] = result
+
+
 # ==================== 相关分析 ====================
 
 @_register("pearson_corr")
@@ -265,6 +286,89 @@ def _run_hierarchical_regression(df, plan, output):
     output["result"] = result
     all_ivs = [v for block in blocks for v in block]
     output["descriptive"] = descriptive.descriptive_stats(df, [dv] + all_ivs)
+
+
+# ==================== Logistic 回归 ====================
+
+@_register("binary_logistic")
+def _run_binary_logistic(df, plan, output):
+    dv = plan.dependent_vars[0] if plan.dependent_vars else None
+    ivs = plan.independent_vars
+    if not dv or not ivs:
+        output["errors"].append({"severity": "error", "message": "二元Logistic回归需要指定一个二分类因变量和至少一个自变量。"})
+        return
+    result = logistic_regression.binary_logistic(df, dv, ivs)
+    output["result"] = result
+    output["descriptive"] = descriptive.descriptive_stats(df, ivs)
+
+
+@_register("ordinal_logistic")
+def _run_ordinal_logistic(df, plan, output):
+    dv = plan.dependent_vars[0] if plan.dependent_vars else None
+    ivs = plan.independent_vars
+    if not dv or not ivs:
+        output["errors"].append({"severity": "error", "message": "有序Logistic回归需要指定一个有序因变量和至少一个自变量。"})
+        return
+    result = logistic_regression.ordinal_logistic(df, dv, ivs)
+    output["result"] = result
+    output["descriptive"] = descriptive.descriptive_stats(df, ivs)
+
+
+@_register("multinomial_logistic")
+def _run_multinomial_logistic(df, plan, output):
+    dv = plan.dependent_vars[0] if plan.dependent_vars else None
+    ivs = plan.independent_vars
+    if not dv or not ivs:
+        output["errors"].append({"severity": "error", "message": "多项Logistic回归需要指定一个多分类因变量和至少一个自变量。"})
+        return
+    result = logistic_regression.multinomial_logistic(df, dv, ivs)
+    output["result"] = result
+    output["descriptive"] = descriptive.descriptive_stats(df, ivs)
+
+
+# ==================== MANOVA ====================
+
+@_register("manova")
+def _run_manova(df, plan, output):
+    dvs = plan.dependent_vars
+    iv = plan.independent_vars[0] if plan.independent_vars else None
+    if not dvs or len(dvs) < 2 or not iv:
+        output["errors"].append({"severity": "error", "message": "MANOVA需要指定至少2个因变量和1个分组自变量。"})
+        return
+    covs = plan.covariates if plan.covariates else None
+    result = manova_mod.manova(df, dvs, iv, covariates=covs)
+    output["result"] = result
+    output["descriptive"] = result.descriptive
+
+
+# ==================== HLM 多层线性模型 ====================
+
+@_register("hlm")
+def _run_hlm(df, plan, output):
+    dv = plan.dependent_vars[0] if plan.dependent_vars else None
+    ivs = plan.independent_vars
+    group_col = plan.grouping_var
+    if not dv or not ivs or not group_col:
+        output["errors"].append({"severity": "error", "message": "多层线性模型需要指定因变量、固定效应预测变量和分组变量（grouping_var，如班级/学校）。"})
+        return
+    if group_col not in df.columns:
+        output["errors"].append({"severity": "error", "message": f"未找到分组列「{group_col}」。"})
+        return
+    result = hlm_mod.run_hlm(df, dv, group_col, ivs)
+    output["result"] = result
+
+
+# ==================== SEM 结构方程模型 ====================
+
+@_register("sem")
+def _run_sem(df, plan, output):
+    factor_structure = getattr(plan, "factor_structure", None)
+    structural_paths = getattr(plan, "structural_paths", None)
+    if not factor_structure or not structural_paths:
+        output["errors"].append({"severity": "error", "message": "SEM 需要指定因子结构（factor_structure）和结构路径（structural_paths，如 ['焦虑 ~ 自尊', '孤独 ~ 焦虑']）。"})
+        return
+    result = sem_mod.structural_equation_model(df, factor_structure, structural_paths)
+    output["result"] = result
 
 
 # ==================== 信度分析 ====================

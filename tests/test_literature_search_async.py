@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
+pytestmark = pytest.mark.online
+
 from src.paper_writer.literature_search_async import (
     search_literature_with_online,
     search_literature_async,

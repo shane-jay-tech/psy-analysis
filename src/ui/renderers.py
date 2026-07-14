@@ -445,7 +445,7 @@ def _render_ai_item_review(r: AIItemReviewResult):
         st.download_button(
             "📥 下载预审报告（Markdown）",
             data=r.summary_markdown.encode("utf-8"),
-            file_name=f"ai_pre_review_{fname_safe}_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+            file_name=__import__('src.utils.export_naming', fromlist=['export_filename']).export_filename("AI预审", "md", title=fname_safe),
             mime="text/markdown",
         )
 

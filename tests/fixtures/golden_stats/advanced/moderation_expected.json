@@ -1,0 +1,14 @@
+{
+  "method_id": "moderation",
+  "reference_software": "statsmodels OLS with interaction",
+  "data_description": "30 cases, X predicts Y, M moderates the relationship",
+  "tolerance": {
+    "p_value": 0.1,
+    "effect_size": 0.05
+  },
+  "expected": {
+    "has_interaction_term": true,
+    "has_simple_slopes": true,
+    "model_significant": true
+  }
+}

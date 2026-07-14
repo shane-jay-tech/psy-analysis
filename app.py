@@ -9,6 +9,7 @@ import threading
 import zipfile
 import base64
 from datetime import datetime
+from pathlib import Path
 from typing import Dict
 
 
@@ -27,39 +28,6 @@ import pandas as pd
 from config.settings import TEST_NAMES_ZH, VAR_ROLE_LABELS, get_test_name
 from src.data.loader import load_data, validate_data
 from src.data.inspector import inspect_dataframe
-from src.parser.intent_resolver import resolve as resolve_intent
-from src.analysis.runner import run_analysis
-from src.output.formatter import format_result_summary, build_apa7_report, check_effect_size_required
-from src.output.interpretation import generate_interpretation
-from src.ui.renderers import (
-    render_assumption, render_result_table, render_charts,
-    export_html, export_csv,
-)
-from src.questionnaire.design_engine import design_questionnaire
-from src.questionnaire.llm_engine import (
-    design_questionnaire_llm_async,
-    cancel_design_request,
-    CancelledLLMError,
-)
-from src.questionnaire.report_generator import (
-    generate_design_report, generate_design_summary,
-)
-from src.paper_writer import PaperEngine
-from src.experiment_design import ExperimentDesignEngine, format_power_report
-from src.data.demo_datasets import (
-    generate_demo_questionnaire_data,
-    generate_demo_experiment_data,
-    generate_demo_repeated_measures_data,
-    generate_demo_multi_group_data,
-    generate_demo_mediation_data,
-)
-from src.ui.undergrad_wizard import (
-    render_undergrad_wizard,
-    render_common_mistake_warnings,
-    render_assumption_failure_guidance,
-)
-from src.ui.experiment_design_ui import render_experiment_design_ui
-from src.ui.paper_writing_ui import render_paper_writing_ui
 from src.utils.memory_manager import (
     render_memory_manager_ui, cleanup_literature_cache, get_system_status,
 )
@@ -77,6 +45,12 @@ from src.utils.env_check import (
     render_env_health_banner, render_env_status_toasts, run_startup_check,
 )
 from src.ui.quick_entries import render_quick_entry_homepage, render_quick_entry_detail
+from src.utils.usage_hooks import (
+    on_page_visit, on_template_select, on_data_upload, on_method_recommend,
+    on_analysis_execute, on_table_generate, on_consistency_check,
+    on_privacy_precheck, on_export, on_error_display, on_diagnosis_run,
+    on_next_step_show, on_next_step_click, AnalysisTimer,
+)
 
 # ============================================================
 st.set_page_config(
@@ -488,22 +462,27 @@ with st.sidebar:
         st.rerun()
 
     if not st.session_state.undergrad_mode:
-        # v3.7 按真实科研时序排序（选题→设计→分析→写作）
         mode = st.radio(
             "按阶段进入",
             [
-                "🌱 选题与文献综述",      # v3.7 新增独立入口
-                "📡 文献雷达",            # v4.7 Phase 4f 新增
+                "🗂️ 模板中心",
+                "📚 文献与选题",
                 "📋 问卷设计",
-                "🧪 实验设计",
                 "📈 数据分析",
                 "📝 论文写作",
+                "📦 交付包导出",
             ],
             key="app_mode",
-            help="每个阶段可独立使用；阶段间数据自动共享（如选题阶段的研究问题会带入设计阶段）。",
+            help="每个阶段可独立使用；阶段间数据自动共享。",
         )
     else:
         mode = "📈 数据分析"  # 全流程模式下隐藏，但保持变量存在
+
+    # v5.4: 页面访问事件日志
+    _prev_mode = st.session_state.get("_last_logged_mode")
+    if mode != _prev_mode:
+        on_page_visit(mode)
+        st.session_state["_last_logged_mode"] = mode
 
     st.divider()
 
@@ -752,7 +731,38 @@ with st.sidebar:
             llm_icon = "✅" if es["llm_ok"] else "💡"
             st.caption(f"{semopy_icon} CFA/SEM  |  {fa_icon} EFA  |  {llm_icon} LLM")
 
-    st.caption("v4.6 · 单轨 LLM + 4 块侧栏 · 本地运行 · 数据不上传")
+        st.divider()
+        if st.button("🔧 运行系统诊断", key="_sidebar_diag", use_container_width=True):
+            from src.utils.environment_diagnosis import run_full_diagnosis, format_diagnosis_for_streamlit
+            _diag = run_full_diagnosis(project_root=Path("."))
+            _diag_results = format_diagnosis_for_streamlit(_diag)
+            _s = _diag.summary
+            on_diagnosis_run(_s["ok"], _s["warning"], _s["missing"] + _s["error"])
+            for _r in _diag_results:
+                st.write(f"{_r['icon']} {_r['name']}: {_r['detail']}")
+            if _diag.all_ok:
+                st.success("✅ 系统正常")
+            else:
+                st.error("部分组件异常，见上方详情")
+
+    # ── 🧹 缓存清理（隐私伦理模块）──
+    with st.expander("🧹 缓存清理", expanded=False):
+        from src.utils.privacy_ethics import get_cache_dirs, clear_cache
+        _cache_dirs = get_cache_dirs()
+        if _cache_dirs:
+            for _cd in _cache_dirs:
+                st.caption(f"• {_cd['label']}：{_cd['size_mb']} MB")
+            if st.button("🗑️ 一键清理所有缓存", key="_privacy_clear_cache", use_container_width=True):
+                _clear_result = clear_cache()
+                if _clear_result["cleared"]:
+                    st.success(f"✅ 已清理：{', '.join(_clear_result['cleared'])}")
+                if _clear_result["errors"]:
+                    st.error(f"部分失败：{'; '.join(_clear_result['errors'])}")
+        else:
+            st.caption("当前无可清理的缓存目录。")
+
+    from src.version import APP_VERSION_LABEL
+    st.caption(f"{APP_VERSION_LABEL} · 单轨 LLM + 4 块侧栏 · 本地运行 · 数据不上传")
 
 # ============================================================
 # 本科论文向导模式覆盖（v3.3：路由配置表查表分发）
@@ -818,6 +828,7 @@ if st.session_state.undergrad_mode:
         render_literature_review(tier=_tier)
         st.stop()
     elif _handler_id == "wizard":
+        from src.ui.undergrad_wizard import render_undergrad_wizard
         render_undergrad_wizard()
         st.stop()
     else:
@@ -828,6 +839,27 @@ if st.session_state.undergrad_mode:
 # 模式1: 数据分析
 # ============================================================
 if mode == "📈 数据分析":
+    # Lazy imports — these modules are heavy (~4s total: scipy, jieba, statsmodels)
+    from src.parser.intent_resolver import resolve as resolve_intent
+    from src.analysis.runner import run_analysis
+    from src.output.formatter import format_result_summary, build_apa7_report, check_effect_size_required
+    from src.output.interpretation import generate_interpretation
+    from src.ui.renderers import (
+        render_assumption, render_result_table, render_charts,
+        export_html, export_csv,
+    )
+    from src.data.demo_datasets import (
+        generate_demo_questionnaire_data,
+        generate_demo_experiment_data,
+        generate_demo_repeated_measures_data,
+        generate_demo_multi_group_data,
+        generate_demo_mediation_data,
+    )
+    from src.ui.undergrad_wizard import (
+        render_undergrad_wizard,
+        render_common_mistake_warnings,
+        render_assumption_failure_guidance,
+    )
     # ── 数据上传与状态信息（页面顶部，路由 stop() 前必须先渲染） ──
     # 之前在 sidebar；v3.7.x 移到主区，因为只有数据分析页才需要上传，
     # 也腾出 sidebar 空间留给工作区/语言/全局设置。
@@ -879,12 +911,47 @@ if mode == "📈 数据分析":
                     st.session_state.inspector = inspect_dataframe(df)
                     st.session_state.analysis_output = None
                     st.session_state.plan = None
+                    on_data_upload(len(df), len(df.columns), current_name.rsplit(".", 1)[-1])
             except Exception as e:
                 st.error(f"❌ 数据加载失败：{e}")
+                on_error_display("data_load_failed", "error")
                 st.session_state.df = None
 
     if not _has_df and st.session_state.df is None:
         st.info("👆 请上传数据文件以开始分析")
+        st.caption("或者试试示例数据：")
+        demo_col1, demo_col2, demo_col3, _ = st.columns([1, 1, 1, 3])
+        _demo_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "fixtures")
+        with demo_col1:
+            if st.button("📋 问卷数据", use_container_width=True, help="7维度心理量表 (N=50)"):
+                _p = os.path.join(_demo_dir, "sample_survey.csv")
+                if os.path.exists(_p):
+                    _demo_df, _demo_meta = load_data(_p)
+                    st.session_state.df = _demo_df
+                    st.session_state.meta = _demo_meta
+                    st.session_state.inspector = inspect_dataframe(_demo_df)
+                    st.session_state.file_name = "sample_survey.csv"
+                    st.rerun()
+        with demo_col2:
+            if st.button("📊 t 检验数据", use_container_width=True, help="两组对比数据"):
+                _p = os.path.join(_demo_dir, "sample_ttest.csv")
+                if os.path.exists(_p):
+                    _demo_df, _demo_meta = load_data(_p)
+                    st.session_state.df = _demo_df
+                    st.session_state.meta = _demo_meta
+                    st.session_state.inspector = inspect_dataframe(_demo_df)
+                    st.session_state.file_name = "sample_ttest.csv"
+                    st.rerun()
+        with demo_col3:
+            if st.button("🔬 方差分析数据", use_container_width=True, help="多组对比数据"):
+                _p = os.path.join(_demo_dir, "sample_anova.csv")
+                if os.path.exists(_p):
+                    _demo_df, _demo_meta = load_data(_p)
+                    st.session_state.df = _demo_df
+                    st.session_state.meta = _demo_meta
+                    st.session_state.inspector = inspect_dataframe(_demo_df)
+                    st.session_state.file_name = "sample_anova.csv"
+                    st.rerun()
 
     if st.session_state.df is not None:
         df = st.session_state.df
@@ -1010,10 +1077,34 @@ if mode == "📈 数据分析":
                     st.caption(f"📊 可用的数值变量：{', '.join(numeric_cols) if numeric_cols else '未检测到'}")
                     st.caption(f"📁 可用的分类变量：{', '.join(cat_cols) if cat_cols else '未检测到'}")
 
+    # ── 推荐方案预填 ──
+    from src.ui.state_keys import ANALYSIS_RECIPE_KEY, RECIPE_EXECUTED_KEY, ANALYSIS_CARDS_KEY
+    _recipe = st.session_state.get(ANALYSIS_RECIPE_KEY)
+    _recipe_used = False
+    if _recipe and not st.session_state.get(RECIPE_EXECUTED_KEY):
+        st.info(
+            f"🚀 **来自方法推荐的分析方案**: {_recipe.method_zh}\n\n"
+            f"变量角色: {', '.join(f'{k}={v}' for k, v in _recipe.variable_roles.items())}\n\n"
+            f"置信度: {_recipe.confidence} | 前提检查: {', '.join(_recipe.assumption_checks[:3]) or '无'}"
+        )
+        _rcol1, _rcol2, _rcol3 = st.columns([2, 2, 2])
+        with _rcol1:
+            _recipe_used = st.button("✅ 使用推荐方案", type="primary", key="use_recipe_prefill")
+        with _rcol2:
+            if st.button("✏️ 修改后使用", key="modify_recipe"):
+                st.session_state["_recipe_prefill_text"] = f"使用{_recipe.method_zh}分析"
+        with _rcol3:
+            if st.button("❌ 忽略推荐", key="dismiss_recipe"):
+                st.session_state[RECIPE_EXECUTED_KEY] = "dismissed"
+                st.rerun()
+
+    _prefill_text = st.session_state.pop("_recipe_prefill_text", "")
+
     col1, col2 = st.columns([3, 1])
     with col1:
         request = st.text_area(
             "请输入您的分析需求：",
+            value=_prefill_text,
             placeholder='例如："比较男女生在焦虑量表得分上的差异"\n'
                         '"分析焦虑得分与抑郁得分的相关性"\n'
                         '"比较三个年级在学业成绩上是否存在差异"',
@@ -1028,6 +1119,65 @@ if mode == "📈 数据分析":
     if clear_btn:
         st.session_state.analysis_output = None
         st.session_state.plan = None
+        st.rerun()
+
+    # ── 推荐方案直接执行 ──
+    if _recipe_used and _recipe and st.session_state.df is not None:
+        from src.parser.intent_resolver import AnalysisPlan
+        _method_to_test_type = {
+            "independent_ttest": "independent_ttest",
+            "paired_ttest": "paired_ttest",
+            "one_way_anova": "one_way_anova",
+            "repeated_anova": "repeated_anova",
+            "pearson_corr": "pearson_corr",
+            "spearman_corr": "spearman_corr",
+            "multiple_regression": "multiple_regression",
+            "binary_logistic": "binary_logistic",
+            "mediation": "mediation",
+            "moderation": "moderation",
+            "cronbach_alpha": "cronbach_alpha",
+            "chi_square_independence": "chi_square",
+            "chi_square": "chi_square",
+            "ancova": "ancova",
+            "mann_whitney": "mann_whitney",
+            "wilcoxon": "wilcoxon",
+            "kruskal_wallis": "kruskal_wallis",
+            "descriptive": "descriptive",
+        }
+        _test_type = _method_to_test_type.get(_recipe.method_id, _recipe.method_id)
+        _inspector = st.session_state.inspector or {}
+        _numeric_cols = [c for c, info in _inspector.items()
+                        if info.get("type") in ("continuous", "numeric", "float", "int")]
+        _cat_cols = [c for c, info in _inspector.items()
+                     if info.get("type") in ("categorical", "object", "string", "str")]
+        _dvs = _numeric_cols[:1] if _numeric_cols else []
+        _ivs = _cat_cols[:1] if _cat_cols else []
+        if "x" in _recipe.variable_roles and "y" in _recipe.variable_roles:
+            _dvs = _numeric_cols[:2] if len(_numeric_cols) >= 2 else _numeric_cols
+            _ivs = []
+        plan = AnalysisPlan(
+            test_type=_test_type,
+            dependent_vars=_dvs,
+            independent_vars=_ivs,
+            raw_request=f"[推荐方案] {_recipe.method_zh}",
+        )
+        st.session_state.plan = plan
+        with st.spinner("正在执行推荐方案分析..."):
+            with AnalysisTimer(_test_type):
+                output = run_analysis(st.session_state.df, plan)
+            st.session_state.analysis_output = output
+        on_method_recommend(_test_type, template_id=None)
+        st.session_state[RECIPE_EXECUTED_KEY] = _recipe.recommendation_id or "executed"
+        if not st.session_state.get(ANALYSIS_CARDS_KEY):
+            st.session_state[ANALYSIS_CARDS_KEY] = []
+        if isinstance(output, dict) and output.get("test_name_zh"):
+            st.session_state[ANALYSIS_CARDS_KEY].append({
+                "method": _test_type,
+                "method_zh": _recipe.method_zh,
+                "apa_text": output.get("apa_text", ""),
+                "recommendation_id": _recipe.recommendation_id,
+            })
+        st.success(f"✅ 已使用推荐方案执行 {_recipe.method_zh}，结果如下：")
         st.rerun()
 
     # 分析执行（含防呆检查）
@@ -1102,9 +1252,24 @@ if mode == "📈 数据分析":
                 else:
                     st.stop()
 
-        with st.spinner("正在执行统计分析..."):
-            output = run_analysis(st.session_state.df, plan)
-            st.session_state.analysis_output = output
+        # Cache key: data content hash + plan repr
+        import hashlib
+        _df_hash = hashlib.md5(
+            pd.util.hash_pandas_object(st.session_state.df).values.tobytes()
+        ).hexdigest()
+        _cache_key = hashlib.md5(
+            f"{_df_hash}|{plan}".encode()
+        ).hexdigest()
+        _prev_cache = st.session_state.get("_analysis_cache_key")
+        if _prev_cache == _cache_key and st.session_state.get("analysis_output") is not None:
+            output = st.session_state.analysis_output
+            st.toast("命中缓存，跳过重复计算", icon="⚡")
+        else:
+            with st.spinner("正在执行统计分析..."):
+                with AnalysisTimer(plan.test_type):
+                    output = run_analysis(st.session_state.df, plan)
+                st.session_state.analysis_output = output
+                st.session_state["_analysis_cache_key"] = _cache_key
 
             # ── 行为感知：记录分析历史（非向导模式） ──
             if not st.session_state.undergrad_mode:
@@ -1437,6 +1602,13 @@ if mode == "📈 数据分析":
             st.subheader("📉 可视化图表")
             render_charts(charts_data, df)
 
+        # v4.8.1: 统计结果卡（APA 文本 + 效应量 + 通俗解释）
+        try:
+            from src.ui.result_card_panel import render_result_card
+            render_result_card(output)
+        except Exception:
+            pass
+
         st.subheader("💡 结果解读")
         interpretation = generate_interpretation(output)
         st.markdown(interpretation)
@@ -1516,20 +1688,33 @@ if mode == "📈 数据分析":
 # 模式2: 问卷设计
 # ============================================================
 elif mode == "📋 问卷设计":
+    from src.questionnaire.design_engine import design_questionnaire
+    from src.questionnaire.llm_engine import (
+        design_questionnaire_llm_async,
+        cancel_design_request,
+        CancelledLLMError,
+    )
+    from src.questionnaire.report_generator import (
+        generate_design_report, generate_design_summary,
+    )
     st.title("📋 问卷设计工具")
     st.caption("输入研究问题 → 智能识别构念 → 生成信效度优秀的问卷 → 完整设计报告")
 
-    # v4.1: 子工作流——AI 反向生成 vs 上传现有题目
+    # v4.1: 子工作流——AI 反向生成 vs 上传现有题目 vs 导入清洗
     _q_sub_mode = st.radio(
         "选择工作流",
-        ["🆕 AI 设计新问卷", "📤 上传现有题目（预审 + 排版导出）"],
+        ["🆕 AI 设计新问卷", "📤 上传现有题目（预审 + 排版导出）", "📊 问卷数据导入与清洗"],
         horizontal=True,
         key="_q_sub_mode_radio",
     )
     if _q_sub_mode.startswith("📤"):
         from src.ui.items_upload_panel import render_items_upload_panel
         render_items_upload_panel()
-        st.stop()  # 不渲染 AI 设计流程
+        st.stop()
+    elif _q_sub_mode.startswith("📊"):
+        from src.ui.questionnaire_import_panel import render_questionnaire_import_panel
+        render_questionnaire_import_panel(st.session_state)
+        st.stop()
 
     # 侧边栏：LLM状态 + 快速指南
     with st.sidebar:
@@ -1587,12 +1772,26 @@ elif mode == "📋 问卷设计":
         - "我想研究青少年的学习动机"
         """)
 
+    # 快速模板
+    st.markdown("**快速模板** — 一键填入常用问卷类型：")
+    _tpl_cols = st.columns(4)
+    _templates = {
+        "📏 Likert-5 满意度": "设计一份员工工作满意度问卷，使用5点Likert量表（非常不同意~非常同意），包含工作内容、薪酬福利、发展机会、人际关系4个维度",
+        "📐 Likert-7 心理资本": "设计一份心理资本问卷，使用7点Likert量表，包含自我效能感、希望、韧性、乐观4个维度，每维度4-5题",
+        "👤 人口学变量": "设计人口学信息收集部分：性别、年龄、学历、工作年限、职位层级、所在行业、月收入区间，每题给出合理选项",
+        "💼 组织承诺": "设计一份组织承诺量表，包含情感承诺、持续承诺、规范承诺3个维度，使用5点Likert量表，参考Allen和Meyer经典框架",
+    }
+    for i, (label, prompt) in enumerate(_templates.items()):
+        with _tpl_cols[i]:
+            if st.button(label, key=f"_qtpl_{i}", use_container_width=True):
+                st.session_state["q_request_input"] = prompt
+                st.rerun()
+
     # 主区域
     col_q1, col_q2 = st.columns([3, 1])
     with col_q1:
         q_request = st.text_area(
             "请输入您想测量的心理学构念或研究问题：",
-            value=st.session_state.pop("_prefill_q_request", ""),
             placeholder='例如：\n'
                         '"调查大学生的社交焦虑水平及其影响因素"\n'
                         '"测量企业员工的工作满意度"\n'
@@ -2261,44 +2460,129 @@ pre {{ background: #f8f8f8; padding: 1rem; border-radius: 4px; white-space: pre-
     st.caption("💡 提示：生成的问卷为初稿，建议在此基础上根据具体研究目标和被试群体进行调整，并通过预测试检验题目质量。")
 
 # ============================================================
-# ============================================================
-# 模式3: 实验设计
-# ============================================================
-elif mode == "🧪 实验设计":
-    render_experiment_design_ui()
 
 # ============================================================
 # 模式4: 论文写作
 # ============================================================
 elif mode == "📝 论文写作":
-    render_paper_writing_ui()
+    from src.paper_writer import PaperEngine
+    from src.ui.paper_writing_ui import render_paper_writing_ui
+    _paper_tab_write, _paper_tab_preview, _paper_tab_evidence = st.tabs(["✍️ 写作", "📄 预览与导出", "📚 证据表"])
+    with _paper_tab_write:
+        render_paper_writing_ui()
+    with _paper_tab_preview:
+        try:
+            from src.ui.paper_preview_panel import render_paper_preview, render_export_panel
+            from src.ui.export_gate import render_export_gate
+            from src.ui.state_keys import PAPER_BUNDLE_KEY
+            _bundle = st.session_state.get(PAPER_BUNDLE_KEY)
+            if _bundle is not None:
+                render_paper_preview(_bundle)
+                st.divider()
+                if render_export_gate(st.session_state):
+                    render_export_panel(_bundle)
+            else:
+                st.info("暂无论文草稿。请先在「写作」标签页中生成论文内容。")
+        except Exception as _paper_prev_err:
+            st.error(f"预览面板加载失败：{_paper_prev_err}")
+    with _paper_tab_evidence:
+        try:
+            from src.ui.evidence_table_panel import render_evidence_table_panel
+            render_evidence_table_panel(st.session_state)
+        except Exception as _evi_err:
+            st.error(f"证据表加载失败：{_evi_err}")
 
 # ============================================================
-# v4.7 Phase 4f: 📡 文献雷达
+# 📚 文献与选题（合并：选题漏斗 + 文献雷达 + 文献审核）
 # ============================================================
-elif mode == "📡 文献雷达":
-    from src.literature_feed.ui import render_literature_feed
-    render_literature_feed()
-
-# ============================================================
-# v3.7 新增模式：🌱 选题与文献综述（非全流程模式独立入口）
-# ============================================================
-elif mode == "🌱 选题与文献综述":
-    st.title("🌱 选题与文献综述")
-    st.caption("非全流程模式：可独立进入选题漏斗或文献综述工作台。数据与全流程模式共享。")
-    _tab_funnel, _tab_lit = st.tabs(["选题漏斗", "文献综述工作台"])
+elif mode == "📚 文献与选题":
+    st.title("📚 文献与选题")
+    _tab_funnel, _tab_feed, _tab_review = st.tabs(["选题与综述", "文献雷达", "文献审核"])
     with _tab_funnel:
         from src.utils.workspace import get_upstream_state as _get_upstream_v37
-        from src.upstream.tier import ResearchTier as _RTier_v37
         _upstream_v37 = _get_upstream_v37(st.session_state)
         _tier_v37 = _upstream_v37.get("tier", "beginner")
-        # v3.7: 复用现有 render_funnel / render_advanced_skip_form
-        from src.ui.upstream_panel import render_advanced_skip_form, render_funnel
-        if _tier_v37 == "advanced":
-            render_advanced_skip_form()
+        _sub_tab_f, _sub_tab_l = st.tabs(["选题漏斗", "文献综述工作台"])
+        with _sub_tab_f:
+            from src.ui.upstream_panel import render_advanced_skip_form, render_funnel
+            if _tier_v37 == "advanced":
+                render_advanced_skip_form()
+            else:
+                render_funnel()
+        with _sub_tab_l:
+            from src.ui.literature_review_panel import render_literature_review
+            render_literature_review(tier=_tier_v37)
+    with _tab_feed:
+        try:
+            from src.literature_feed.ui import render_literature_feed
+            render_literature_feed()
+        except Exception as _feed_err:
+            st.error(f"文献雷达加载失败：{_feed_err}")
+    with _tab_review:
+        try:
+            from src.literature_feed.storage.feed_store import FeedStore as _ReviewFS
+            from src.ui.literature_review_queue_panel import render_review_queue
+            _review_store = _ReviewFS()
+            render_review_queue(_review_store)
+        except Exception as _review_err:
+            st.error(f"文献审核加载失败：{_review_err}")
+
+
+# ============================================================
+# v4.9: 📦 交付包导出
+# ============================================================
+elif mode == "📦 交付包导出":
+    st.title("📦 研究交付包导出中心")
+    st.caption("查看交付内容清单、导出前检查、选择导出模式（简版/标准版/完整版）。")
+
+    # --- 导出前隐私预检 ---
+    from src.utils.privacy_ethics import export_pre_check, DATA_GOVERNANCE_NOTICE
+    with st.expander("📋 数据治理声明", expanded=False):
+        st.info(DATA_GOVERNANCE_NOTICE)
+
+    # 对 session 中已有分析结果做敏感信息扫描
+    _export_text_parts = []
+    if st.session_state.get("analysis_output"):
+        _export_text_parts.append(str(st.session_state["analysis_output"]))
+    _paper_bundle = st.session_state.get("paper_bundle")
+    if _paper_bundle is not None:
+        _export_text_parts.append(str(_paper_bundle))
+    if _export_text_parts:
+        _pre_check_result = export_pre_check("\n".join(_export_text_parts), source="交付包")
+        on_privacy_precheck(
+            _pre_check_result.get("high_count", 0),
+            _pre_check_result.get("medium_count", 0),
+            _pre_check_result["safe"],
+        )
+        if not _pre_check_result["safe"]:
+            st.warning(
+                f"⚠️ 隐私预检发现 {_pre_check_result['high_count']} 项高风险敏感信息"
+                f"（共 {_pre_check_result['total_count']} 项）。建议在导出前检查并脱敏。"
+            )
+            with st.expander("查看详情"):
+                for _f in _pre_check_result["findings"]:
+                    _sev_icon = "🔴" if _f.severity == "high" else "🟡"
+                    st.markdown(f"{_sev_icon} **{_f.pattern_type}** — 位置: {_f.location} — 样本: `{_f.masked_sample}`")
         else:
-            render_funnel()
-    with _tab_lit:
-        from src.ui.literature_review_panel import render_literature_review
-        render_literature_review(tier=_tier_v37)
+            st.success("✅ 隐私预检通过，未发现高风险敏感信息。")
+
+    try:
+        from src.ui.deliverable_center_panel import render_deliverable_center_panel
+        render_deliverable_center_panel(st.session_state)
+    except Exception as _del_err:
+        st.error(f"交付包导出面板加载失败：{_del_err}")
+
+# ============================================================
+# v5.1: 🗂️ 模板中心
+# ============================================================
+elif mode == "🗂️ 模板中心":
+    st.title("🗂️ 研究模板中心")
+    st.caption("从研究模板快速开始新项目——选择模板、预览数据、一键创建。")
+    try:
+        from src.ui.template_center_panel import render_template_center_panel
+        render_template_center_panel()
+    except Exception as _tpl_err:
+        st.error(f"模板中心加载失败：{_tpl_err}")
+        on_error_display("template_center_load_failed", "error")
+
 

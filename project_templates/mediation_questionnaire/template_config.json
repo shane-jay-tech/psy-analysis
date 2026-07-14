@@ -1,0 +1,15 @@
+{
+  "id": "mediation_questionnaire",
+  "name": "中介模型问卷研究",
+  "description": "探索自变量通过中介变量影响因变量的间接效应",
+  "category": "高级回归",
+  "difficulty": "intermediate",
+  "research_question": "自我效能是否通过学业动机的中介作用影响学业表现？",
+  "variables": {
+    "independent": ["self_efficacy", "social_support"],
+    "mediator": ["academic_motivation"],
+    "dependent": ["academic_performance"]
+  },
+  "recommended_methods": ["pearson_correlation", "multiple_regression", "mediation_analysis"],
+  "expected_outputs": ["correlation_matrix", "regression_table", "mediation_path_diagram", "indirect_effect_bootstrap"]
+}

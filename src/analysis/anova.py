@@ -576,3 +576,130 @@ def welch_anova(
             "note": "Welch ANOVA 不要求方差齐性假设",
         },
     )
+
+
+def mixed_anova(
+    df: pd.DataFrame,
+    dv: str,
+    within: str,
+    subject: str,
+    between: str,
+    confidence: float = 0.95,
+) -> ANOVAResult:
+    """
+    混合设计方差分析（Split-plot ANOVA）。
+
+    同时包含组间因子和组内因子，如：
+    2(组间：实验组/对照组) × 3(组内：前测/后测/追踪)
+
+    参数：
+        df: 长格式数据框
+        dv: 因变量列名
+        within: 组内因子列名（如 'time'）
+        subject: 被试 ID 列名
+        between: 组间因子列名（如 'group'）
+        confidence: 置信水平
+    """
+    import pingouin as pg
+
+    cols = [dv, within, subject, between]
+    clean = df[cols].copy()
+    clean[dv] = pd.to_numeric(clean[dv], errors="coerce")
+    clean = clean.dropna()
+
+    n_between = clean[between].nunique()
+    n_within = clean[within].nunique()
+    n_subjects = clean[subject].nunique()
+
+    if n_between < 2:
+        raise ValueError(f"混合设计 ANOVA 要求组间因子至少 2 水平，当前「{between}」只有 {n_between} 水平。")
+    if n_within < 2:
+        raise ValueError(f"混合设计 ANOVA 要求组内因子至少 2 水平，当前「{within}」只有 {n_within} 水平。")
+
+    result = pg.mixed_anova(
+        data=clean, dv=dv, within=within, subject=subject, between=between,
+        correction=True,
+    )
+
+    table_rows = []
+    for _, row in result.iterrows():
+        source = str(row["Source"])
+        p_col = "p-unc" if "p-unc" in row.index else "p_unc"
+        p_gg = row.get("p-GG-corr", row.get("p_GG_corr", None))
+        table_rows.append({
+            "来源": source,
+            "SS": round(float(row.get("SS", 0)), 3) if pd.notna(row.get("SS")) else "-",
+            "df1": int(row.get("DF1", row.get("ddof1", 0))),
+            "df2": int(row.get("DF2", row.get("ddof2", 0))),
+            "MS": round(float(row.get("MS", 0)), 3) if pd.notna(row.get("MS")) else "-",
+            "F": round(float(row["F"]), 3),
+            "p": round(float(row[p_col]), 4),
+            "p (GG校正)": round(float(p_gg), 4) if pd.notna(p_gg) else "-",
+            "ηp²": round(float(row["np2"]), 4),
+            "ε": round(float(row.get("eps", 1.0)), 3) if pd.notna(row.get("eps")) else "-",
+        })
+
+    anova_table = pd.DataFrame(table_rows)
+
+    interaction_row = result[result["Source"].str.contains(":", na=False)]
+    if not interaction_row.empty:
+        main_eta = float(interaction_row.iloc[0]["np2"])
+    else:
+        main_eta = float(result.iloc[0]["np2"]) if len(result) > 0 else 0.0
+
+    sphericity = None
+    within_rows = result[result["Source"] == within]
+    if not within_rows.empty:
+        wr = within_rows.iloc[0]
+        w_val = wr.get("W_spher", wr.get("W-spher", None))
+        p_sph = wr.get("p_spher", wr.get("p-spher", None))
+        sph_pass = wr.get("sphericity", None)
+        if pd.notna(w_val) and pd.notna(p_sph):
+            sphericity = {
+                "passed": bool(sph_pass) if pd.notna(sph_pass) else (float(p_sph) > 0.05),
+                "W": round(float(w_val), 4),
+                "p": round(float(p_sph), 4),
+                "note": "Mauchly's 球形检验" + ("通过" if (pd.notna(sph_pass) and sph_pass) else "不通过，已用 Greenhouse-Geisser 校正"),
+            }
+
+    post_hoc = None
+    interaction_p = None
+    if not interaction_row.empty:
+        ir = interaction_row.iloc[0]
+        p_col_int = "p-unc" if "p-unc" in ir.index else "p_unc"
+        interaction_p = float(ir[p_col_int])
+
+    if interaction_p is not None and interaction_p < 0.05:
+        try:
+            ph = pg.pairwise_tests(
+                data=clean, dv=dv, within=within, between=between,
+                subject=subject, padjust="bonferroni",
+            )
+            post_rows = []
+            for _, row in ph.iterrows():
+                contrast = row.get("Contrast", "")
+                a_val = row.get("A", "")
+                b_val = row.get("B", "")
+                post_rows.append({
+                    "对比": f"{contrast}: {a_val} vs {b_val}",
+                    "T": round(float(row.get("T", 0)), 3),
+                    "p": round(float(row.get("p-unc", 1)), 4),
+                    "p (校正)": round(float(row.get("p-corr", row.get("p-unc", 1))), 4),
+                    "Cohen's d": round(float(row.get("cohen", row.get("hedges", 0))), 3),
+                })
+            post_hoc = pd.DataFrame(post_rows)
+        except Exception:
+            pass
+
+    warning = ""
+    if n_subjects < n_between * n_within * 5:
+        warning = f"⚠ 样本量偏小（{n_subjects} 名被试），建议每条件至少 5 名。"
+
+    return ANOVAResult(
+        test_type="mixed",
+        table=anova_table,
+        effect_size=round(main_eta, 4),
+        effect_size_name="ηp²",
+        post_hoc=post_hoc,
+        assumption_sphericity=sphericity,
+    )

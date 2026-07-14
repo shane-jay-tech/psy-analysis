@@ -42,6 +42,8 @@ class AnalysisPlan:
     construct_name: Optional[str] = None   # 构念名
     construct_definition: Optional[str] = None  # 构念定义
     n_personas: int = 4                    # 模拟专家数
+    # v3.9 新增：SEM 结构路径
+    structural_paths: Optional[List[str]] = None  # 结构路径如 ["焦虑 ~ 自尊", "孤独 ~ 焦虑 + 自尊"]
 
 
 def _score_test_types(tokens: list, col_types: dict) -> list:

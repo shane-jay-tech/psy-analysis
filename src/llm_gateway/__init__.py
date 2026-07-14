@@ -8,6 +8,7 @@
 """
 
 from .gateway import (
+    CancelledLLMError,
     FallbackResult,
     LLMResponse,
     LLMTrace,
@@ -30,6 +31,7 @@ from .gateway import (
 )
 
 __all__ = [
+    "CancelledLLMError",
     "FallbackResult",
     "LLMResponse",
     "LLMTrace",

@@ -28,6 +28,7 @@ desktop.ini
 # ---- 临时 / 输出 ----
 *.tmp
 ~$*
+test_artifacts/
 
 # ---- 运行时锁与数据库临时文件 ----
 **/locks/

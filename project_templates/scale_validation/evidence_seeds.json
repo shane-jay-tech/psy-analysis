@@ -1,0 +1,17 @@
+[
+  {
+    "citation_key": "cronbach1951",
+    "claim": "Cronbach α 系数是评估内部一致性信度的常用指标",
+    "source": "Cronbach (1951)"
+  },
+  {
+    "citation_key": "hu1999",
+    "claim": "CFI≥.95 和 RMSEA≤.06 是 CFA 拟合良好的参考标准",
+    "source": "Hu & Bentler (1999)"
+  },
+  {
+    "citation_key": "fornell1981",
+    "claim": "AVE≥.50 和 CR≥.70 是聚合效度的基本阈值",
+    "source": "Fornell & Larcker (1981)"
+  }
+]

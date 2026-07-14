@@ -9,6 +9,7 @@
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
+from src.output.learning_card import generate_learning_card
 
 
 @dataclass
@@ -29,6 +30,7 @@ class AnalysisReasoning:
     analysis_steps: List[str] = field(default_factory=list)
     interpretation_guide: str = ""
     alternatives: List[str] = field(default_factory=list)
+    learning_card: Any = None
 
 
 # ===========================================================================
@@ -446,6 +448,8 @@ def generate_reasoning(output: Dict[str, Any]) -> AnalysisReasoning:
         # 在解读指南后附加DQ信息
         pass  # DQ警告已在output["errors"]中展示
 
+    card = generate_learning_card(test_type, test_name_zh)
+
     return AnalysisReasoning(
         test_type=test_type,
         test_name_zh=test_name_zh,
@@ -455,6 +459,7 @@ def generate_reasoning(output: Dict[str, Any]) -> AnalysisReasoning:
         analysis_steps=steps,
         interpretation_guide=guide,
         alternatives=alternatives,
+        learning_card=card,
     )
 
 

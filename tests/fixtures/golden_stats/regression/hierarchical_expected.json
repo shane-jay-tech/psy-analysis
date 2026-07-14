@@ -1,0 +1,16 @@
+{
+  "method_id": "hierarchical_regression",
+  "reference_software": "statsmodels OLS",
+  "data_description": "Block 1: age+gender (demographics); Block 2: stress+coping+support (psychological)",
+  "tolerance": {
+    "r_squared": 0.01,
+    "delta_r2": 0.02,
+    "p_value": 0.05
+  },
+  "expected": {
+    "n_blocks": 2,
+    "block2_delta_r2_positive": true,
+    "final_r2_gt": 0.5,
+    "final_adj_r2_gt": 0.3
+  }
+}

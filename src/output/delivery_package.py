@@ -7,9 +7,12 @@ from __future__ import annotations
 
 import io
 import zipfile
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -95,6 +98,7 @@ def build_delivery_package(spec: DeliverySpec) -> bytes:
                     except KaleidoMissingError:
                         break
                     except Exception:
+                        logger.debug("图表导出失败: %s", filename, exc_info=True)
                         continue
                 inventory.append(f"📁 图表集/（共 {fig_count} 张论文版 PNG，{spec.figure_palette} 配色）")
         else:

@@ -1,0 +1,22 @@
+{
+  "method": "cfa",
+  "description": "4因子12题CFA金标准 — 200样本",
+  "reference_tool": "R lavaan 0.6-18",
+  "model_spec": "F1 =~ q1 + q2 + q3; F2 =~ q4 + q5 + q6; F3 =~ q7 + q8 + q9; F4 =~ q10 + q11 + q12",
+  "expected": {
+    "chi2_range": [60, 120],
+    "df": 48,
+    "CFI_min": 0.92,
+    "TLI_min": 0.90,
+    "RMSEA_max": 0.08,
+    "SRMR_max": 0.08,
+    "loadings_min": 0.50,
+    "loadings_max": 0.95
+  },
+  "tolerance": {
+    "CFI": 0.05,
+    "TLI": 0.05,
+    "RMSEA": 0.03,
+    "SRMR": 0.03
+  }
+}

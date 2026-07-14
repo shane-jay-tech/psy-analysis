@@ -1,15 +1,17 @@
 """工作区序列化与恢复工具：将 session_state 关键数据持久化为 JSON"""
+from __future__ import annotations
 
 import json
 import base64
 import io
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 
 import pandas as pd
 import streamlit as st
 
-from src.parser.intent_resolver import AnalysisPlan
+if TYPE_CHECKING:
+    from src.parser.intent_resolver import AnalysisPlan
 
 
 # v3.2 上游漏斗默认状态
@@ -132,6 +134,7 @@ def _serialize_plan(plan: Any) -> Optional[Dict]:
     """将 AnalysisPlan 或字典序列化为可 JSON 的字典"""
     if plan is None:
         return None
+    from src.parser.intent_resolver import AnalysisPlan
     if isinstance(plan, AnalysisPlan):
         return {
             "__type__": "AnalysisPlan",
@@ -160,6 +163,7 @@ def _deserialize_plan(data: Dict) -> Any:
         return None
     t = data.get("__type__")
     if t == "AnalysisPlan":
+        from src.parser.intent_resolver import AnalysisPlan
         return AnalysisPlan(
             test_type=data.get("test_type", "descriptive"),
             dependent_vars=data.get("dependent_vars", []),

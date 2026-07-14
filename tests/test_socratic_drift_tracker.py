@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.benchmark
+
 
 def _fake_report(*, model: str, replies: dict[str, str]) -> dict:
     """构造一份 benchmark 报告，replies = {case_id: llm_reply}。"""

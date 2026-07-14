@@ -7,12 +7,15 @@ import json
 import threading
 import time
 import uuid
+import logging
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, Generator, List, Optional
 
 from .active_config import get_active_llm_config, is_llm_active
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +31,11 @@ class LLMUnavailableError(RuntimeError):
         super().__init__(reason or "LLM 调用失败")
         self.reason = reason
         self.cause = cause
+
+
+class CancelledLLMError(RuntimeError):
+    """用户主动取消了 LLM 请求。调用方应丢弃部分结果，不写入 UI。"""
+    pass
 
 
 @dataclass
@@ -150,7 +158,7 @@ def _record_trace(trace: LLMTrace) -> None:
                 traces = traces[-100:]
             st.session_state["llm_traces"] = traces
     except Exception:
-        pass
+        logger.debug("LLM trace 记录失败", exc_info=True)
 
 
 def _estimate_tokens(text: str) -> int:
@@ -333,7 +341,7 @@ def _get_default_backend() -> Callable:
                 if forced is not None:
                     temperature = forced
             except Exception:
-                pass
+                logger.debug("quick_model temperature 查询失败", exc_info=True)
         return _chat(
             messages,
             provider=cfg.get("provider", ""),
@@ -534,6 +542,8 @@ def llm_chat(
             )
         except Exception as exc:
             last_err = exc
+            if attempt < retries:
+                time.sleep(min(2 ** attempt, 8))
             continue
 
     elapsed = (time.time() - start) * 1000
@@ -645,9 +655,9 @@ def llm_chat_async_stream(
                     try:
                         callback(chunk)
                     except Exception:
-                        pass
-        except LLMUnavailableError:
-            pass
+                        logger.debug("stream callback 异常", exc_info=True)
+        except Exception:
+            logger.debug("LLM stream 中断", exc_info=True)
         finally:
             with _cancel_lock:
                 _cancel_flags.pop(cancel_id, None)
@@ -691,7 +701,7 @@ def llm_chat_async(
     def _runner() -> LLMResponse:
         try:
             return llm_chat(messages, cancel_id=cancel_id, **kwargs)
-        except LLMUnavailableError as exc:
+        except Exception as exc:
             return LLMResponse(content="", error=str(exc))
         finally:
             with _cancel_lock:

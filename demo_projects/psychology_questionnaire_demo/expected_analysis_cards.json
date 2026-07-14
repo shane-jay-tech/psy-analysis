@@ -1,0 +1,41 @@
+[
+  {
+    "method_id": "cronbach_alpha",
+    "description": "焦虑分量表信度分析",
+    "expected": {
+      "alpha_range": [0.70, 0.95],
+      "n_items": 5
+    }
+  },
+  {
+    "method_id": "cronbach_alpha",
+    "description": "自尊分量表信度分析",
+    "expected": {
+      "alpha_range": [0.70, 0.95],
+      "n_items": 5
+    }
+  },
+  {
+    "method_id": "descriptive",
+    "description": "各维度描述统计",
+    "expected": {
+      "has_mean": true,
+      "has_std": true
+    }
+  },
+  {
+    "method_id": "pearson_corr",
+    "description": "焦虑与自尊的相关分析",
+    "expected": {
+      "direction": "negative",
+      "significant": true
+    }
+  },
+  {
+    "method_id": "independent_ttest",
+    "description": "性别差异比较（焦虑）",
+    "expected": {
+      "groups": ["男", "女"]
+    }
+  }
+]

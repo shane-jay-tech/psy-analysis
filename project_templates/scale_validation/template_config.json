@@ -1,0 +1,20 @@
+{
+  "id": "scale_validation",
+  "name": "量表信效度检验研究",
+  "description": "对自编或修订量表进行信度和效度的全面检验",
+  "category": "心理测量",
+  "difficulty": "advanced",
+  "research_question": "新编学业自我效能量表是否具有良好的信度和结构效度？",
+  "variables": {
+    "items": ["item1", "item2", "item3", "item4", "item5", "item6", "item7", "item8", "item9", "item10", "item11", "item12"],
+    "factors": {
+      "F1_能力信念": ["item1", "item2", "item3"],
+      "F2_努力信念": ["item4", "item5", "item6"],
+      "F3_策略信念": ["item7", "item8", "item9"],
+      "F4_环境信念": ["item10", "item11", "item12"]
+    },
+    "criterion": ["criterion_score"]
+  },
+  "recommended_methods": ["cronbach_alpha", "mcdonalds_omega", "efa", "cfa", "ave_cr", "criterion_validity"],
+  "expected_outputs": ["reliability_table", "factor_loading_table", "model_fit_table", "ave_cr_table", "criterion_correlation"]
+}

@@ -1,0 +1,17 @@
+{
+  "method_id": "two_way_anova",
+  "source": "statsmodels OLS verified against R aov(score ~ factor_a * factor_b)",
+  "description": "2x2 factorial: factor_a (low/high) x factor_b (male/female), n=5 per cell",
+  "tolerance": {
+    "f_statistic": 0.5,
+    "p_value": 0.001,
+    "effect_size": 0.02
+  },
+  "expected": {
+    "main_effect_a_significant": true,
+    "main_effect_b_significant": true,
+    "interaction_significant": false,
+    "main_effect_a_f_min": 80.0,
+    "main_effect_b_f_min": 15.0
+  }
+}

@@ -1,8 +1,11 @@
 """统一数据加载：CSV / Excel / SPSS，自动检测编码"""
 
 import os
+import logging
 import pandas as pd
 from typing import Tuple, Optional, BinaryIO
+
+logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE_MB = 50
 
@@ -172,7 +175,7 @@ def load_jspsych_json(file_obj) -> Tuple[pd.DataFrame, dict]:
         df = _flatten_json_data_column(df, warnings)
         df = _normalize_jspsych_columns(df)
     except Exception:
-        pass
+        logger.debug("jsPsych JSON 高级解析跳过", exc_info=True)
 
     meta = {
         "source_type": "jspsych_json",

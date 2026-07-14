@@ -1,0 +1,32 @@
+[
+  {
+    "id": "lit001",
+    "citation_key": "wang2023",
+    "title": "大学生焦虑与学业倦怠的关系研究",
+    "authors": ["王磊", "李明"],
+    "year": "2023",
+    "journal": "心理学报",
+    "status": "approved",
+    "relevance": "核心：验证焦虑与学业表现的关联"
+  },
+  {
+    "id": "lit002",
+    "citation_key": "li2022",
+    "title": "自尊在焦虑与学业倦怠间的中介作用",
+    "authors": ["李华"],
+    "year": "2022",
+    "journal": "心理科学",
+    "status": "approved",
+    "relevance": "核心：支持自尊中介假设"
+  },
+  {
+    "id": "lit003",
+    "citation_key": "zhang2021",
+    "title": "SAS 焦虑自评量表中文版的信效度检验",
+    "authors": ["张伟"],
+    "year": "2021",
+    "journal": "中国心理卫生杂志",
+    "status": "approved",
+    "relevance": "方法：支持量表工具选择"
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "method": "hlm",
+  "description": "30班×20人随机截距模型 — ICC≈0.12",
+  "reference_tool": "R lme4 1.1-35",
+  "model_spec": "y ~ x1 + x2 + (1 | class_id)",
+  "expected": {
+    "n": 600,
+    "groups": 30,
+    "avg_group_size": 20,
+    "icc_range": [0.08, 0.18],
+    "fixed_effects": {
+      "intercept": {"estimate_range": [1.5, 2.5]},
+      "x1": {"estimate_range": [0.25, 0.45], "p_max": 0.01},
+      "x2": {"estimate_range": [0.12, 0.32], "p_max": 0.05}
+    },
+    "random_effects": {
+      "group_variance_range": [0.08, 0.35],
+      "residual_variance_range": [1.0, 1.8]
+    },
+    "fit": {
+      "aic_range": [1600, 2000],
+      "bic_range": [1620, 2050]
+    }
+  },
+  "tolerance": {
+    "fixed_effects": 0.15,
+    "variance": 0.10,
+    "icc": 0.05,
+    "fit": 50.0
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "method_id": "independent_ttest",
+  "source": "scipy.stats.ttest_ind verified against R t.test()",
+  "description": "Two groups (A: M=26.5, SD=3.03; B: M=20.0, SD=2.58), n=10 each",
+  "tolerance": {
+    "t_statistic": 0.01,
+    "p_value": 0.0001,
+    "effect_size": 0.01,
+    "mean_diff": 0.01
+  },
+  "expected": {
+    "t_statistic": 5.16,
+    "df": 18,
+    "p_value": 0.0001,
+    "mean_diff": 6.5,
+    "effect_size": 2.31,
+    "effect_size_name": "Cohen's d",
+    "direction": "A > B"
+  }
+}

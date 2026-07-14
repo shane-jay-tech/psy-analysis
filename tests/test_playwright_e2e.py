@@ -18,6 +18,10 @@ import os
 import signal
 import threading
 from pathlib import Path
+
+pytestmark = pytest.mark.e2e
+
+pytest.importorskip("playwright", reason="playwright 未安装，跳过浏览器 E2E 测试")
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import logging
 import re
 import sqlite3
 import unicodedata
@@ -22,6 +23,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
+
+logger = logging.getLogger(__name__)
 
 from ..paths import DB_PATH, ensure_dirs
 
@@ -192,6 +195,7 @@ class FeedStore:
             yield self._conn
             self._conn.commit()
         except Exception:
+            logger.debug("feed_store: transaction 失败，回滚", exc_info=True)
             with contextlib.suppress(sqlite3.Error):
                 self._conn.rollback()
             raise
@@ -200,6 +204,9 @@ class FeedStore:
         sql = SCHEMA_PATH.read_text(encoding="utf-8")
         # PRAGMA 必须在事务外；executescript 自动 commit
         self._conn.executescript(sql)
+        # 幂等迁移：补齐老库缺失的新列/新表
+        from .migrations import run_migrations
+        run_migrations(self._conn)
 
     # ------------------------------------------------------------------ #
     # sources

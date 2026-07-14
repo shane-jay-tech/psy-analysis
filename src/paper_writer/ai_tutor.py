@@ -207,6 +207,19 @@ class TutorAPIError(RuntimeError):
         self.status_code = status_code
 
 
+def _openai_chat_url(base_url: str) -> str:
+    """拼 OpenAI 兼容的 chat/completions 端点，幂等处理已含 /v1 的 base_url。
+
+    .env.local 里四组 base_url 均以 ``/v1`` 结尾（与 D:\\code 协作系统约定一致），
+    若直接再拼 ``/v1/chat/completions`` 会得到 ``/v1/v1/...`` → 404。
+    本函数确保最终恰好一个 ``/v1``，无论 base_url 是否自带。
+    """
+    base = base_url.rstrip("/")
+    if base.endswith("/v1"):
+        base = base[: -len("/v1")].rstrip("/")
+    return f"{base}/v1/chat/completions"
+
+
 def chat_with_tutor(
     messages: List[Dict[str, str]],
     *,
@@ -254,7 +267,7 @@ def chat_with_tutor(
             raise TutorAPIError(f"Ollama 返回格式异常：{e}")
 
     # OpenAI 兼容
-    url = f"{base_url.rstrip('/')}/v1/chat/completions"
+    url = _openai_chat_url(base_url)
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": model,
@@ -349,7 +362,7 @@ def chat_with_tutor_stream(
         return
 
     # OpenAI 兼容
-    url = f"{base_url.rstrip('/')}/v1/chat/completions"
+    url = _openai_chat_url(base_url)
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": model,

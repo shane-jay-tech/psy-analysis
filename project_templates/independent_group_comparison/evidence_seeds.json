@@ -1,0 +1,23 @@
+[
+  {
+    "id": "kabat2020",
+    "citation_key": "kabat2020",
+    "title": "Mindfulness-based stress reduction for anxiety: A meta-analysis",
+    "relevance": "正念训练对焦虑有中等效应量 (d = 0.58)",
+    "year": 2020
+  },
+  {
+    "id": "chen2022",
+    "citation_key": "chen2022",
+    "title": "正念冥想对中国大学生焦虑干预效果的随机对照试验",
+    "relevance": "4 周正念训练显著降低焦虑 (p < .01)",
+    "year": 2022
+  },
+  {
+    "id": "liu2021",
+    "citation_key": "liu2021",
+    "title": "状态焦虑量表在大学生中的信效度研究",
+    "relevance": "STAI-S 中文版 Cronbach's alpha = .91",
+    "year": 2021
+  }
+]

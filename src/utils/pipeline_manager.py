@@ -5,18 +5,20 @@
 - 复跑整个 pipeline（重新执行所有分析步骤）
 - 导出/导入 pipeline（JSON）
 """
+from __future__ import annotations
 
 import json
 import base64
 import io
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 import pandas as pd
 import streamlit as st
 
-from src.parser.intent_resolver import AnalysisPlan
-from src.analysis.runner import run_analysis
+if TYPE_CHECKING:
+    from src.parser.intent_resolver import AnalysisPlan
+
 from src.utils.workspace import _serialize_plan, _deserialize_plan
 
 
@@ -99,6 +101,7 @@ def replay_pipeline(df: pd.DataFrame = None) -> List[Dict]:
     results = []
     for i, step in enumerate(pipeline.steps):
         try:
+            from src.analysis.runner import run_analysis
             output = run_analysis(df, step.plan)
             results.append({
                 "step": i + 1,

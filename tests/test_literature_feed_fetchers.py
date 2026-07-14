@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
+pytestmark = pytest.mark.online
+
 
 FIXTURES = Path(__file__).parent / "fixtures" / "literature_feed"
 

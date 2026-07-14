@@ -1,0 +1,19 @@
+{
+  "template_id": "independent_group_comparison",
+  "name": "独立样本组间比较",
+  "research_type": "experimental",
+  "recommended_method": "independent_ttest",
+  "variable_roles": {
+    "dv": "焦虑后测得分",
+    "iv": "组别（实验/对照）"
+  },
+  "design": {
+    "purpose": "difference",
+    "dv_type": "continuous",
+    "iv_type": "categorical",
+    "sample_relation": "independent",
+    "n_groups": 2
+  },
+  "sample_size_hint": "每组 N >= 30",
+  "paper_sections": ["引言", "方法", "结果", "讨论", "参考文献"]
+}

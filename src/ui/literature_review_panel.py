@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 
 import streamlit as st
 
+from src.utils.export_naming import export_filename as _efn
+
 from src.literature_review.completeness import calculate_completeness
 from src.literature_review.matrix import (
     add_literature_to_matrix,
@@ -52,6 +54,10 @@ from src.literature_review.themes import (
     generate_gap_report,
     identify_gaps,
 )
+from src.literature_review.ingest import ingest_files
+from src.literature_review.summarize import summarize_papers
+from src.literature_review.synthesize import synthesize_review
+from src.output.docx_exporter import build_review_docx
 from src.utils.concurrency import SessionLock, ensure_tab_id
 from src.utils.workspace import (
     LITERATURE_REVIEW_SESSION_KEY,
@@ -97,6 +103,9 @@ def render_literature_review(tier: str = "beginner") -> None:
 
     # v3.5: 修订研究问题入口（跨 phase 反向修订）
     _render_revise_research_q_button(upstream, lr_state)
+
+    # v4.7: 丢文献 → 自动写综述（常驻，无需先有文献）
+    _render_drop_and_review_section(upstream)
 
     # 顶部：搜索栏
     _render_search_bar(upstream, lr_state)
@@ -649,7 +658,7 @@ def _render_export_tab(items: List[LiteratureItem], lr_state: Dict[str, Any]) ->
             st.download_button(
                 "📥 导出自审版（带 [REVIEW:...] 标记）",
                 data=review_md,
-                file_name="文献综述_自审版.md",
+                file_name=_efn("文献综述_自审版", "md"),
                 mime="text/markdown",
                 key="_lr_dl_review",
             )
@@ -679,7 +688,7 @@ def _render_export_tab(items: List[LiteratureItem], lr_state: Dict[str, Any]) ->
     st.download_button(
         "📥 阅读笔记（Markdown）",
         data=notes_md,
-        file_name="阅读笔记.md",
+        file_name=_efn("阅读笔记", "md"),
         mime="text/markdown",
         key="_lr_dl_notes",
     )
@@ -689,7 +698,7 @@ def _render_export_tab(items: List[LiteratureItem], lr_state: Dict[str, Any]) ->
     st.download_button(
         "📥 文献矩阵（CSV）",
         data=matrix_csv,
-        file_name="文献矩阵.csv",
+        file_name=_efn("文献矩阵", "csv"),
         mime="text/csv",
         key="_lr_dl_matrix",
     )
@@ -705,7 +714,7 @@ def _render_export_tab(items: List[LiteratureItem], lr_state: Dict[str, Any]) ->
     st.download_button(
         "📥 文献综述草稿（Markdown）",
         data=summary_md,
-        file_name="文献综述草稿.md",
+        file_name=_efn("文献综述草稿", "md"),
         mime="text/markdown",
         type="primary",
         key="_lr_dl_review",
@@ -755,6 +764,134 @@ def _get_llm_config() -> Optional[Dict[str, Any]]:
     out = dict(cfg)
     out.setdefault("timeout", 60)
     return out
+
+
+# ---------------------------------------------------------------------------
+# v4.7 丢文献 → 自动写综述
+# ---------------------------------------------------------------------------
+
+# session_state 键（结果跨 rerun 持久，避免点下载按钮后丢失）
+_DROP_SUMMARIES_KEY = "_lr_drop_summaries"   # List[PaperSummary.__dict__-like]
+_DROP_REVIEW_KEY = "_lr_drop_review"         # dict: markdown/title/warnings/ok
+_DROP_TOPIC_KEY = "_lr_drop_topic"
+
+
+def _render_drop_and_review_section(upstream: Dict[str, Any]) -> None:
+    """上传文献 → 逐篇摘要 → 合成综述 → 导出 Word 的自包含区块。"""
+    with st.expander("📥 丢文献 → 自动写综述（上传 PDF / Word / txt）", expanded=False):
+        from src.llm_gateway.active_config import is_llm_active
+
+        st.caption(
+            "上传一批文献，系统先对每篇生成结构化摘要，再合成一篇连贯的中文文献综述，可导出 Word。"
+            "给定研究主题时会围绕主题组织。"
+        )
+
+        default_topic = (upstream.get("research_question") or "").strip()
+        topic = st.text_input(
+            "研究主题（可选）",
+            value=st.session_state.get(_DROP_TOPIC_KEY, default_topic),
+            placeholder="例如：工作压力与员工敬业度的关系",
+            key="_lr_drop_topic_input",
+        )
+
+        uploaded = st.file_uploader(
+            "选择文献文件（可多选）",
+            type=["pdf", "docx", "txt"],
+            accept_multiple_files=True,
+            key="_lr_drop_uploader",
+        )
+
+        if not is_llm_active():
+            st.warning("⚠️ 尚未激活 AI 模型（见左上「🤖 AI 模型」）。未激活时只能解析文件，无法生成摘要/综述。")
+
+        run = st.button(
+            "🚀 开始：逐篇摘要 + 合成综述",
+            type="primary",
+            disabled=not uploaded,
+            key="_lr_drop_run",
+        )
+
+        if run and uploaded:
+            files = [(f.name, f.getvalue()) for f in uploaded]
+            with st.spinner(f"正在解析 {len(files)} 个文件……"):
+                docs = ingest_files(files)
+
+            # 解析告警
+            for d in docs:
+                if d.warnings:
+                    st.warning(f"「{d.source_filename}」：{'；'.join(d.warnings)}")
+
+            with st.spinner("正在逐篇生成摘要……（依赖网络，文献多时较慢）"):
+                summaries = summarize_papers(docs, topic=topic, model=None)
+            with st.spinner("正在合成综述正文……"):
+                review = synthesize_review(summaries, topic=topic, model=None)
+
+            # 持久化到 session_state
+            st.session_state[_DROP_TOPIC_KEY] = topic
+            st.session_state[_DROP_SUMMARIES_KEY] = [
+                {"title": s.title, "structured": s.structured, "ok": s.ok, "error": s.error}
+                for s in summaries
+            ]
+            st.session_state[_DROP_REVIEW_KEY] = {
+                "markdown": review.markdown, "title": review.title,
+                "warnings": review.warnings, "ok": review.ok, "error": review.error,
+            }
+
+        _render_drop_results()
+
+
+def _render_drop_results() -> None:
+    """展示已生成的逐篇摘要 + 综述 + 下载按钮（从 session_state 读）。"""
+    summaries = st.session_state.get(_DROP_SUMMARIES_KEY)
+    review = st.session_state.get(_DROP_REVIEW_KEY)
+    if not summaries and not review:
+        return
+
+    st.divider()
+
+    # 逐篇摘要
+    if summaries:
+        st.markdown(f"#### 📄 逐篇摘要（共 {len(summaries)} 篇）")
+        for i, s in enumerate(summaries, start=1):
+            ok_mark = "✅" if s.get("ok") else "⚠️"
+            with st.expander(f"{ok_mark} [{i}] {s.get('title') or '无标题'}", expanded=False):
+                structured = s.get("structured") or {}
+                if structured:
+                    for k, v in structured.items():
+                        st.markdown(f"**{k}**：{v}")
+                if not s.get("ok") and s.get("error"):
+                    st.caption(f"说明：{s['error']}")
+
+    # 综述正文
+    if review:
+        st.markdown("#### 📝 文献综述")
+        for w in (review.get("warnings") or []):
+            st.warning(w)
+        if not review.get("ok"):
+            st.info(f"未能生成完整综述正文（{review.get('error') or 'LLM 不可用'}），以下为可用内容：")
+        md = review.get("markdown") or ""
+        if md:
+            st.markdown(md)
+            try:
+                docx_bytes = build_review_docx(
+                    review.get("title") or "文献综述",
+                    md,
+                    date=datetime.now().strftime("%Y-%m-%d"),
+                )
+                st.download_button(
+                    "📥 导出综述（Word）",
+                    data=docx_bytes,
+                    file_name=_efn("文献综述", "docx", title=review.get('title')),
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    type="primary",
+                    key="_lr_drop_dl_docx",
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.caption(f"Word 导出暂不可用：{exc}")
+        if st.button("🗑️ 清空本次结果", key="_lr_drop_clear"):
+            for k in (_DROP_SUMMARIES_KEY, _DROP_REVIEW_KEY):
+                st.session_state.pop(k, None)
+            st.rerun()
 
 
 def _build_review_summary_md(

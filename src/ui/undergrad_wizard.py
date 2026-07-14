@@ -50,6 +50,7 @@ from src.paper_writer.defense_qa import (
 from src.ui.cleaning_wizard import (
     cleaning_log_to_method_paragraph, render_cleaning_wizard,
 )
+from src.ui.export_gate import run_export_gate
 
 
 def _render_status_badges():
@@ -175,7 +176,8 @@ def _render_reviewer_mode(default_draft: str, ctx: dict) -> None:
                 st.rerun()
 
     if gen_btn:
-        with st.spinner("AI 正在审阅..."):
+        from src.utils.llm_timer import llm_status
+        with llm_status("AI 正在审阅"):
             try:
                 from src.llm_gateway.gateway import _resolve_llm_config
                 cfg = _resolve_llm_config()
@@ -426,13 +428,17 @@ def _render_delivery_package_top_card():
                 try:
                     zip_bytes = build_delivery_package(spec)
                     st.session_state["_delivery_zip"] = zip_bytes
-                    st.session_state["_delivery_filename"] = (
-                        f"{title or '论文交付包'}_{datetime.now().strftime('%Y%m%d')}.zip"
+                    from src.utils.export_naming import export_filename
+                    st.session_state["_delivery_filename"] = export_filename(
+                        "论文交付包", "zip", title=title
                     )
                 except Exception as e:
                     st.error(f"打包失败：{e}")
 
         if st.session_state.get("_delivery_zip"):
+            allowed, gate_reasons, _ = run_export_gate(st.session_state)
+            if not allowed:
+                st.warning("导出门禁提示: " + "; ".join(gate_reasons[:2]))
             st.download_button(
                 "⬇ 下载论文交付包 ZIP",
                 data=st.session_state["_delivery_zip"],
@@ -538,7 +544,8 @@ def _render_ai_tutor(output: dict, ctx: dict, *, location: str = "step7"):
 
             # 调用 LLM
             with st.chat_message("assistant"):
-                with st.spinner("AI 助教思考中..."):
+                from src.utils.llm_timer import llm_status
+                with llm_status("AI 助教思考中"):
                     try:
                         tc = context_from_analysis(output, ctx)
                         sys_prompt = build_tutor_system_prompt(tc, has_result=output is not None)
@@ -742,6 +749,9 @@ def _render_collection_manager():
                 st.session_state["_collection_zip_count"] = len(specs)
 
             if st.session_state.get("_collection_zip"):
+                _coll_allowed, _coll_reasons, _ = run_export_gate(st.session_state)
+                if not _coll_allowed:
+                    st.warning("导出门禁提示: " + "; ".join(_coll_reasons[:2]))
                 st.download_button(
                     "⬇ 下载论文图表集 ZIP",
                     data=st.session_state["_collection_zip"],
@@ -809,8 +819,9 @@ def _render_defense_handbook_download(items, ctx: dict):
                     )
                 st.session_state["_handbook_pdf"] = pdf_bytes
                 version_suffix = "_重点版" if version_label == "focused" else ""
-                st.session_state["_handbook_filename"] = (
-                    f"{title or '答辩备战手册'}{version_suffix}.pdf"
+                from src.utils.export_naming import export_filename
+                st.session_state["_handbook_filename"] = export_filename(
+                    f"答辩备战手册{version_suffix}", "pdf", title=title
                 )
             except Exception as e:
                 st.error(f"PDF 生成失败：{e}")
@@ -1315,6 +1326,59 @@ def _render_defense_qa_section(plan, output: dict, ctx: dict):
             st.success("✅ 已保存。下次导出 Word 时，可在「附录 A」中包含答辩问题。")
 
 
+def _render_ai_paper_generation(output: dict, ctx: dict, wiz_data: dict):
+    """v4.7: 通过 workflow_service 提供 AI 增强论文生成（可选）。"""
+    from src.llm_gateway import is_llm_available
+
+    if not is_llm_available():
+        return
+
+    with st.expander("🤖 AI 增强论文生成（可选）", expanded=False):
+        st.caption(
+            "使用 AI 基于你的分析结果和研究设计生成更完整的方法/结果段落。"
+            "生成后可替换上方模板文本，也可仅作参考。"
+        )
+        if st.button("🚀 AI 生成增强版论文段落", key="_ai_paper_gen"):
+            with st.spinner("AI 正在生成（可能需要 30-60 秒）..."):
+                try:
+                    from src.paper_writer.workflow_service import (
+                        QuickPaperRequest,
+                        generate_paper_quick,
+                    )
+                    req = QuickPaperRequest(
+                        topic=wiz_data.get("title_hint", ""),
+                        title_hint=wiz_data.get("title_hint", ""),
+                        participants_desc=wiz_data.get("sample_desc", ""),
+                        df=st.session_state.get("uploaded_df"),
+                        analysis_results=output or {},
+                    )
+                    result = generate_paper_quick(req)
+                    if result.sections:
+                        ai_method = result.sections.get("methods", "")
+                        ai_result = result.sections.get("results", "")
+                        if ai_method:
+                            st.session_state["_ai_method_md"] = ai_method
+                        if ai_result:
+                            st.session_state["_ai_result_md"] = ai_result
+                        st.success("✅ AI 增强版已生成，下方 Word 导出将使用 AI 版本。")
+                        if ai_method:
+                            with st.expander("预览 AI 方法段", expanded=False):
+                                st.markdown(ai_method)
+                        if ai_result:
+                            with st.expander("预览 AI 结果段", expanded=False):
+                                st.markdown(ai_result)
+                    else:
+                        st.warning("AI 未生成有效内容，将继续使用模板版本。")
+                except Exception as e:
+                    st.error(f"AI 生成失败（将使用模板版本）：{e}")
+
+        if st.session_state.get("_ai_method_md") or st.session_state.get("_ai_result_md"):
+            if st.button("🔄 恢复使用模板版本", key="_ai_paper_reset"):
+                st.session_state.pop("_ai_method_md", None)
+                st.session_state.pop("_ai_result_md", None)
+                st.rerun()
+
+
 def _render_docx_download(method_md: str, result_md: str, output: dict,
                           ctx: dict, wiz_data: dict):
     """向导第 7 步：Word 一键导出控件。
@@ -1440,13 +1504,17 @@ def _render_docx_download(method_md: str, result_md: str, output: dict,
                             defense_qa_md=qa_md,
                         )
                     st.session_state["_docx_bytes"] = docx_bytes
-                    st.session_state["_docx_filename"] = (
-                        f"{thesis_title or '论文初稿'}.docx"
+                    from src.utils.export_naming import export_filename
+                    st.session_state["_docx_filename"] = export_filename(
+                        "论文初稿", "docx", title=thesis_title
                     )
                 except Exception as e:
                     st.error(f"生成失败：{e}")
 
         if st.session_state.get("_docx_bytes"):
+            allowed, gate_reasons, _ = run_export_gate(st.session_state)
+            if not allowed:
+                st.warning("导出门禁提示: " + "; ".join(gate_reasons[:2]))
             st.download_button(
                 "⬇ 下载 Word 文档",
                 data=st.session_state["_docx_bytes"],
@@ -1549,6 +1617,7 @@ def _render_figures_zip_download(output: dict, ctx: dict, wiz_data: dict):
         )
         if st.button("📦 生成 ZIP 包", type="secondary",
                      use_container_width=True, key="zip_gen"):
+            from src.utils.export_naming import export_filename
             specs = _build_figure_specs(output, ctx, wiz_data)
             if not specs:
                 st.warning("当前分析没有可导出的图表。")
@@ -1565,10 +1634,13 @@ def _render_figures_zip_download(output: dict, ctx: dict, wiz_data: dict):
                     st.error(f"打包失败：{e}")
 
         if st.session_state.get("_figures_zip"):
+            _fig_allowed, _fig_reasons, _ = run_export_gate(st.session_state)
+            if not _fig_allowed:
+                st.warning("导出门禁提示: " + "; ".join(_fig_reasons[:2]))
             st.download_button(
                 "⬇ 下载 ZIP 包",
                 data=st.session_state["_figures_zip"],
-                file_name=f"论文图表_{ctx.get('test_name_zh', '分析')}.zip",
+                file_name=export_filename("论文图表", "zip", title=ctx.get('test_name_zh', '分析')),
                 mime="application/zip",
                 key="zip_dl",
                 use_container_width=True,
@@ -2460,6 +2532,36 @@ def render_undergrad_wizard():
 
         st.divider()
 
+        # 最近数据集快照（可一键恢复）
+        from src.utils.recent_files import load_index, save_dataset, restore_dataset, clear_all
+        recent = load_index()
+        if recent:
+            with st.expander("📂 最近使用的数据集（点击可恢复）", expanded=False):
+                for rf in recent:
+                    cols_hint = "、".join(rf.get("columns", [])[:5])
+                    shape = rf.get("shape", [0, 0])
+                    col1, col2 = st.columns([4, 1])
+                    col1.caption(
+                        f"**{rf.get('display_name', '?')}** — "
+                        f"{shape[0]}行×{shape[1]}列 — "
+                        f"{rf.get('created_at', '')}\n\n"
+                        f"列: {cols_hint or '—'}"
+                    )
+                    if col2.button("恢复", key=f"restore_{rf['dataset_id']}"):
+                        restored_df = restore_dataset(rf["dataset_id"])
+                        if restored_df is not None:
+                            wiz.df = restored_df
+                            wiz.file_name = rf.get("display_name", "restored")
+                            wiz.meta = {"row_count": len(restored_df), "col_count": len(restored_df.columns)}
+                            wiz.inspector = inspect_dataframe(restored_df)
+                            wiz.analysis_output = None
+                            wiz.plan = None
+                            wiz_data["data_loaded"] = True
+                            st.rerun()
+                if st.button("🗑️ 清除所有最近数据", key="clear_recent_datasets"):
+                    clear_all()
+                    st.rerun()
+
         uploaded_file = st.file_uploader(
             "拖拽数据文件到此处或点击上传",
             type=["csv", "xlsx", "xls", "sav", "json", "jsonl", "docx", "md", "markdown"],
@@ -2480,6 +2582,7 @@ def render_undergrad_wizard():
                         wiz.analysis_output = None
                         wiz.plan = None
                         wiz_data["data_loaded"] = True
+                        save_dataset(df, current_name)
                 except Exception as e:
                     st.error(f"❌ 数据加载失败：{e}")
                     wiz.df = None
@@ -3034,6 +3137,32 @@ def render_undergrad_wizard():
                     st.markdown("**🎓 教学式解读：**")
                     st.info(reasoning.interpretation_guide)
 
+            if reasoning.learning_card is not None:
+                card = reasoning.learning_card
+                with st.expander("📖 方法学习卡片 — 学会这个方法，SPSS也能用", expanded=False):
+                    tab_decision, tab_steps, tab_spss, tab_tips = st.tabs(
+                        ["🧭 选择逻辑", "📋 通用步骤", "🖥️ SPSS操作", "⚠️ 避坑指南"]
+                    )
+                    with tab_decision:
+                        st.markdown(card.decision_logic)
+                    with tab_steps:
+                        for step in card.methodology_steps:
+                            st.markdown(step)
+                    with tab_spss:
+                        st.markdown(f"**菜单路径：** `{card.spss_path}`")
+                        if card.spss_steps:
+                            for i, s in enumerate(card.spss_steps, 1):
+                                st.markdown(f"{i}. {s}")
+                    with tab_tips:
+                        if card.common_mistakes:
+                            st.markdown("**常见误区：**")
+                            for m in card.common_mistakes:
+                                st.markdown(f"- ❌ {m}")
+                        if card.key_concepts:
+                            st.markdown("**关键概念：**")
+                            for k, v in card.key_concepts.items():
+                                st.markdown(f"- **{k}**：{v}")
+
         st.divider()
         st.subheader("📥 导出结果")
         col_exp1, col_exp2, col_exp3 = st.columns(3)
@@ -3324,10 +3453,15 @@ def render_undergrad_wizard():
             wiz_data["method_text"] = method_text
             wiz_data["result_text"] = result_text
 
+            # ── v4.7: AI 增强论文生成（通过 workflow_service）──
+            _render_ai_paper_generation(
+                output=output, ctx=ctx, wiz_data=wiz_data,
+            )
+
             # ── Word 一键导出 ──
             _render_docx_download(
-                method_md=method_text,
-                result_md=result_text,
+                method_md=st.session_state.get("_ai_method_md", method_text),
+                result_md=st.session_state.get("_ai_result_md", result_text),
                 output=output,
                 ctx=ctx,
                 wiz_data=wiz_data,
@@ -3375,7 +3509,8 @@ def render_undergrad_wizard():
                         st.session_state.polished_draft = None
                     if st.button("✨ 开始AI润色", type="secondary", use_container_width=True,
                                  key="polish_draft_btn"):
-                        with st.spinner("AI正在润色论文草稿..."):
+                        from src.utils.llm_timer import llm_status
+                        with llm_status("AI 正在润色论文草稿"):
                             try:
                                 import requests
                                 api_url = _polish_cfg["base_url"]

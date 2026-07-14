@@ -72,10 +72,13 @@ def _ask_socratic_with_streaming(
     placeholder.markdown("_AI 正在反问..._")
 
     buffer: list = []
+    _chunk_count = [0]
 
     def _on_chunk(chunk: str) -> None:
         buffer.append(chunk)
-        placeholder.markdown(f"🤖 {''.join(buffer)}▌")
+        _chunk_count[0] += 1
+        if _chunk_count[0] % 15 == 0 or len(chunk) > 20:
+            placeholder.markdown(f"🤖 {''.join(buffer)}▌")
 
     full = ask_socratic_stream(
         stage=stage,
@@ -606,7 +609,8 @@ def _render_stage_5(upstream: Dict[str, Any]) -> None:
     # 可选：调 AI 反问做最后一次审视
     if st.button("💬 让 AI 看看这个问题", key="_funnel_stage5_ask"):
         history: List[ChatMessage] = []
-        with st.spinner("AI 正在审视..."):
+        from src.utils.llm_timer import llm_status
+        with llm_status("AI 正在审视"):
             reply = ask_socratic(
                 stage=5,
                 user_input=rq,

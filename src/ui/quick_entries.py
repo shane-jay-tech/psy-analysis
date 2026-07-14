@@ -653,7 +653,8 @@ def _render_ai_item_review_form(df, numeric_cols, cat_cols):
             else:
                 dep_vars = items_from_cols
 
-            with st.spinner("正在调用 4 位 AI 专家评分（约 30-60 秒）..."):
+            from src.utils.llm_timer import llm_status
+            with llm_status("正在调用 4 位 AI 专家评分", timeout_hint=60):
                 _run_quick_analysis(df, "ai_item_review",
                                      dv_list=dep_vars,
                                      **plan_kwargs)

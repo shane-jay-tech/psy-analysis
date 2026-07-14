@@ -1,0 +1,16 @@
+{
+  "id": "moderation_questionnaire",
+  "name": "调节模型问卷研究",
+  "description": "探索调节变量如何改变自变量与因变量之间关系的强度或方向",
+  "category": "高级回归",
+  "difficulty": "intermediate",
+  "research_question": "心理韧性是否调节工作压力对工作满意度的影响？",
+  "variables": {
+    "independent": ["work_stress"],
+    "moderator": ["resilience"],
+    "dependent": ["job_satisfaction"],
+    "covariate": ["gender"]
+  },
+  "recommended_methods": ["pearson_correlation", "hierarchical_regression", "moderation_analysis"],
+  "expected_outputs": ["correlation_matrix", "regression_table", "interaction_plot", "simple_slopes"]
+}

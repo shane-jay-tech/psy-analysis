@@ -1,0 +1,19 @@
+{
+  "method_id": "paired_ttest",
+  "source": "scipy.stats.ttest_rel verified against R t.test(paired=TRUE)",
+  "description": "Pre-post design, 10 subjects, consistent improvement of ~4.4 points",
+  "tolerance": {
+    "t_statistic": 0.01,
+    "p_value": 0.0001,
+    "effect_size": 0.01
+  },
+  "expected": {
+    "t_statistic": -7.33,
+    "df": 9,
+    "p_value": 0.0001,
+    "mean_diff": -4.4,
+    "effect_size": 2.32,
+    "effect_size_name": "Cohen's dz",
+    "direction": "post > pre"
+  }
+}

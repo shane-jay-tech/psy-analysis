@@ -218,15 +218,9 @@ class LLMIntentStrategy(IntentStrategy):
 
 
 def _call_llm_for_intent(question: str, config: Dict) -> List[IntentCandidate]:
-    """调用 LLM 识别研究问题中的心理学构念"""
+    """调用 LLM 识别研究问题中的心理学构念（通过 gateway）"""
     import json
     import re
-    from openai import OpenAI
-
-    client = OpenAI(
-        api_key=config["api_key"],
-        base_url=config.get("base_url", "https://api.deepseek.com"),
-    )
 
     system_prompt = (
         "你是一位心理学测量学专家。请分析以下研究问题，识别其中最核心的心理学构念（construct）。\n\n"
@@ -241,16 +235,15 @@ def _call_llm_for_intent(question: str, config: Dict) -> List[IntentCandidate]:
     )
 
     try:
-        response = client.chat.completions.create(
-            model=config.get("model", "deepseek-chat"),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"研究问题：{question}"},
-            ],
-            temperature=0.1,
-            max_tokens=1024,
-        )
-        content = response.choices[0].message.content.strip()
+        from src.llm_gateway.gateway import llm_chat
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"研究问题：{question}"},
+        ]
+        resp = llm_chat(messages, temperature=0.1, max_tokens=1024, retries=1)
+        if not resp.ok:
+            return []
+        content = resp.content.strip()
         if content.startswith("```"):
             content = re.sub(r"^```\w*\n?", "", content)
             content = re.sub(r"\n```$", "", content)

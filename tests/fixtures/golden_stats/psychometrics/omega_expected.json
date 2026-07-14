@@ -1,0 +1,16 @@
+{
+  "method_id": "mcdonald_omega",
+  "reference_software": "factor_analyzer single-factor ML",
+  "data_description": "60 cases, 6 items, unidimensional scale with moderate inter-item correlations",
+  "tolerance": {
+    "omega": 0.05,
+    "ci_width": 0.2
+  },
+  "expected": {
+    "omega_gt": 0.7,
+    "omega_lt": 1.0,
+    "ci_lower_gt": 0.5,
+    "n_items": 6,
+    "n_cases": 60
+  }
+}

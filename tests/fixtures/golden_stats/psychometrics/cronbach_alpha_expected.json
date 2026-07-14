@@ -1,0 +1,16 @@
+{
+  "method_id": "cronbach_alpha",
+  "source": "Manual computation verified against R psych::alpha()",
+  "description": "5-item Likert scale, 20 respondents, high internal consistency",
+  "tolerance": {
+    "alpha": 0.01,
+    "item_total_correlation": 0.05
+  },
+  "expected": {
+    "alpha_min": 0.90,
+    "alpha_max": 0.98,
+    "n_items": 5,
+    "n_respondents": 20,
+    "all_item_total_above": 0.70
+  }
+}

@@ -18,12 +18,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 PROJECTS_DIR = Path.home() / ".psy_analysis" / "projects"
@@ -82,6 +85,7 @@ def _read_index() -> List[Project]:
             return []
         return [Project.from_dict(d) for d in data if isinstance(d, dict)]
     except Exception:
+        logger.debug("project_manager: 操作失败", exc_info=True)
         return []
 
 
@@ -163,6 +167,7 @@ def delete_project(project_id: str) -> bool:
         try:
             target.file_path.unlink()
         except Exception:
+            logger.debug("project_manager: 操作失败", exc_info=True)
             pass
     projects = [p for p in projects if p.id != project_id]
     _write_index(projects)
@@ -208,6 +213,7 @@ def save_workspace(project_id: str, workspace: Dict[str, Any]) -> bool:
         touch_project(project_id)
         return True
     except Exception:
+        logger.debug("project_manager: 操作失败", exc_info=True)
         return False
 
 
@@ -219,6 +225,7 @@ def load_workspace(project_id: str) -> Optional[Dict[str, Any]]:
         with open(proj.file_path, encoding="utf-8") as f:
             return json.load(f)
     except Exception:
+        logger.debug("project_manager: 操作失败", exc_info=True)
         return None
 
 
@@ -238,6 +245,7 @@ def migrate_legacy_autosave() -> Optional[Project]:
         with open(legacy_file, encoding="utf-8") as f:
             ws = json.load(f)
     except Exception:
+        logger.debug("project_manager: 操作失败", exc_info=True)
         return None
 
     proj = create_project(name="自动恢复的工作区", note="从 v3.0 autosave 迁移")

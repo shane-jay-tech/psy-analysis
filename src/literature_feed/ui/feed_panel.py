@@ -170,14 +170,63 @@ def _render_daily_tab(store: FeedStore) -> None:
 
     st.divider()
 
-    # ── 高优先级候选 ──
+    # ── 高优先级候选（快速审核） ──
     st.markdown("### 🔥 高优先级候选（待审）")
     pending = store.list_candidates(status="pending", limit=20)
     if not pending:
         st.caption("当前没有待审候选。LLM 抽取还没跑过，或全部已审。")
     else:
-        rows = []
-        for c in pending:
+        total_pending = store.count_candidates(status="pending")
+        high_conf = [c for c in pending if (c.get("confidence") or 0) >= 0.8]
+
+        # ── 批量操作栏 ──
+        batch_col1, batch_col2, batch_col3 = st.columns([2, 2, 4])
+        with batch_col1:
+            if high_conf and st.button(
+                f"⚡ 一键批准高置信 ({len(high_conf)})",
+                use_container_width=True,
+                help="批准置信度 >= 0.8 的全部候选",
+            ):
+                for c in high_conf:
+                    store.update_candidate_status(
+                        c["candidate_id"], status="approved", reviewer="batch_high_conf"
+                    )
+                st.toast(f"已批准 {len(high_conf)} 条高置信度候选", icon="⚡")
+                st.rerun()
+        with batch_col2:
+            _reject_key = "_confirm_batch_reject"
+            if st.session_state.get(_reject_key):
+                st.warning(f"确定拒绝全部 {len(pending)} 条候选？")
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("确认拒绝", type="primary", use_container_width=True):
+                        for c in pending:
+                            store.update_candidate_status(
+                                c["candidate_id"], status="rejected", reviewer="batch_reject"
+                            )
+                        st.session_state[_reject_key] = False
+                        st.toast(f"已拒绝全部 {len(pending)} 条候选", icon="🗑️")
+                        st.rerun()
+                with c2:
+                    if st.button("取消", use_container_width=True):
+                        st.session_state[_reject_key] = False
+                        st.rerun()
+            else:
+                if st.button("🗑️ 全部拒绝", use_container_width=True, type="secondary"):
+                    st.session_state[_reject_key] = True
+                    st.rerun()
+        with batch_col3:
+            st.caption(f"共 {total_pending} 条待审 · 显示前 20 · 高置信(>=0.8): {len(high_conf)} 条")
+
+        # ── 逐条审核卡片 ──
+        for idx, c in enumerate(pending):
+            cid = c["candidate_id"]
+            kind_label = "构念" if c["kind"] == "construct" else "方法"
+            conf = round(c.get("confidence") or 0, 2)
+            priority = round(c.get("priority_score") or 0, 3)
+            definition = c.get("definition") or c.get("method_category") or ""
+            evidence = (c.get("evidence_quote") or "")[:80]
+
             iohr_raw = c.get("iohr_hits_json") or "[]"
             try:
                 import json as _json
@@ -186,30 +235,38 @@ def _render_daily_tab(store: FeedStore) -> None:
                     iohr_list = []
             except (TypeError, ValueError):
                 iohr_list = []
-            rows.append({
-                "kind": "构念" if c["kind"] == "construct" else "方法",
-                "name": c["name"],
-                "定义/类别": c.get("definition") or c.get("method_category") or "",
-                "证据": (c.get("evidence_quote") or "")[:60],
-                "置信度": round(c.get("confidence") or 0, 2),
-                "域加分": round(c.get("domain_score") or 0, 2),
-                "命中标签": ", ".join(iohr_list[:5]) if iohr_list else "",
-                "优先级": round(c.get("priority_score") or 0, 3),
-            })
-        st.dataframe(rows, use_container_width=True, hide_index=True,
-                     column_config={
-                         "kind": st.column_config.TextColumn("类型", width="small"),
-                         "name": st.column_config.TextColumn("名称", width="medium"),
-                         "定义/类别": st.column_config.TextColumn(width="large"),
-                         "置信度": st.column_config.NumberColumn(format="%.2f", width="small"),
-                         "域加分": st.column_config.NumberColumn(format="%.2f", width="small",
-                                                                 help="DomainWeights 命中累加；priority 公式中的 (1+domain_score) 项"),
-                         "命中标签": st.column_config.TextColumn("命中标签", width="medium",
-                                                                 help="文章 iohr_hits 列表前 5 个 canonical（IO/HR/OB 域）"),
-                         "优先级": st.column_config.NumberColumn(format="%.3f", width="small",
-                                                                 help="priority = decay × confidence × (1+domain_score) × (1+method_score)"),
-                     })
-        st.caption(f"共 {store.count_candidates(status='pending')} 条 pending；显示按 priority 排序前 20。")
+
+            with st.container(border=True):
+                top_l, top_r = st.columns([5, 1])
+                with top_l:
+                    st.markdown(
+                        f"**{c['name']}** &nbsp; `{kind_label}` &nbsp; "
+                        f"置信 {conf} · 优先级 {priority}"
+                    )
+                with top_r:
+                    if conf >= 0.8:
+                        st.success("高置信", icon="✅")
+                    elif conf >= 0.5:
+                        st.info("中置信", icon="ℹ️")
+                    else:
+                        st.warning("低置信", icon="⚠️")
+
+                if definition:
+                    st.caption(definition[:120])
+                if evidence:
+                    st.text(f"证据: {evidence}")
+                if iohr_list:
+                    st.caption(f"域命中: {', '.join(iohr_list[:5])}")
+
+                btn_l, btn_r, _ = st.columns([1, 1, 4])
+                with btn_l:
+                    if st.button("✅ 批准", key=f"approve_{cid}_{idx}", use_container_width=True):
+                        store.update_candidate_status(cid, status="approved", reviewer="manual")
+                        st.rerun()
+                with btn_r:
+                    if st.button("❌ 拒绝", key=f"reject_{cid}_{idx}", use_container_width=True, type="secondary"):
+                        store.update_candidate_status(cid, status="rejected", reviewer="manual")
+                        st.rerun()
 
     st.divider()
 

@@ -591,6 +591,9 @@ class DailyRunner:
             logger.info("budget 已耗尽，跳过 LLM 抽取")
             return
         extractor = self._build_extractor()
+        if extractor is None:
+            logger.warning("headless LLM 未配置可用模型，跳过本轮 LLM 抽取")
+            return
         for aid in article_ids:
             try:
                 stats = extractor.extract_for_article(aid)
@@ -610,10 +613,24 @@ class DailyRunner:
             summary.extracted_constructs += stats.constructs_kept
             summary.extracted_methods += stats.methods_kept
 
-    def _build_extractor(self) -> LLMExtractor:
+    def _build_extractor(self) -> Optional[LLMExtractor]:
         if self._extractor_factory is not None:
             return self._extractor_factory(self.store, self.budget)
-        return LLMExtractor(self.store, self.budget)
+        # 无头/调度路径：从 .env.local 解析默认模型，绕开只有 UI 才有的
+        # session_state。解析不到（四组 key 全缺）返回 None，调用方优雅跳过。
+        # 懒导入：避免调度层在模块加载期就拉起 llm_gateway 依赖链。
+        from ..extract.headless_llm import make_headless_llm_chat, resolve_headless_model
+
+        cfg = resolve_headless_model()
+        if cfg is None:
+            return None
+        return LLMExtractor(
+            self.store,
+            self.budget,
+            llm_chat_fn=make_headless_llm_chat(cfg),
+            model=cfg.get("model") or "deepseek-chat",
+            temperature=0.3,  # 结构化 JSON 抽取偏好低温（DeepSeek #4）
+        )
 
 
 # ---------------------------------------------------------------------------

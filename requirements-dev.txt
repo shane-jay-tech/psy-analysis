@@ -1,0 +1,4 @@
+# 开发/测试依赖（不混入生产 lock 文件）
+# 用法：pip install -r requirements-dev.txt
+pytest>=7.4.0
+pytest-cov>=4.1.0

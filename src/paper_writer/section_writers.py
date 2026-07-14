@@ -932,11 +932,10 @@ def write_discussion_deep(
         else:
             base_discussion = base_discussion + "\n\n" + unusual_section
 
-    # 4. LLM深度讨论（可选）
+    # 4. LLM深度讨论（可选，通过 gateway）
     if use_deep_discussion and llm_api_key:
         try:
-            import openai
-            client = openai.OpenAI(api_key=llm_api_key, base_url=llm_base_url)
+            from src.llm_gateway.gateway import llm_chat, LLMUnavailableError
             stat_summary = _extract_stat_summary(analysis_results)
 
             prompt = f"""你是一位心理学研究方法专家。请基于以下统计结果，对讨论部分进行深度扩展。
@@ -955,20 +954,20 @@ def write_discussion_deep(
 
 请用学术中文输出，格式为Markdown。输出内容应以"> **AI辅助生成**"开头。"""
 
-            response = client.chat.completions.create(
-                model=llm_model,
-                messages=[{"role": "user", "content": prompt}],
+            resp = llm_chat(
+                [{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=2048,
+                retries=1,
             )
-            enhanced = response.choices[0].message.content
-
-            base_discussion += (
-                f"\n\n### 4.6 AI辅助深度分析\n\n"
-                f"> **AI辅助生成，请核实：** 以下内容由大语言模型基于实际统计结果生成，"
-                f"所有统计数值均保持原样，理论解释部分需研究者逐一核实。\n\n"
-                f"{enhanced}"
-            )
+            if resp.ok:
+                enhanced = resp.content
+                base_discussion += (
+                    f"\n\n### 4.6 AI辅助深度分析\n\n"
+                    f"> **AI辅助生成，请核实：** 以下内容由大语言模型基于实际统计结果生成，"
+                    f"所有统计数值均保持原样，理论解释部分需研究者逐一核实。\n\n"
+                    f"{enhanced}"
+                )
         except Exception:
             pass  # LLM不可用时静默回退
 

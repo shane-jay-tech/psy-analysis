@@ -1,0 +1,17 @@
+{
+  "method_id": "mann_whitney",
+  "source": "scipy.stats.mannwhitneyu verified against R wilcox.test()",
+  "description": "Two groups: experimental (M=14.5) vs control (M=8.0), n=8 each, clear separation",
+  "tolerance": {
+    "statistic": 1.0,
+    "p_value": 0.001,
+    "effect_size": 0.05
+  },
+  "expected": {
+    "statistic_min": 55.0,
+    "p_value_max": 0.005,
+    "effect_size_name": "r",
+    "effect_size_min": 0.60,
+    "significant": true
+  }
+}

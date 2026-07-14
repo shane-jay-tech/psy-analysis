@@ -53,6 +53,15 @@ TEST_NAMES_ZH = {
     "known_groups_validity": "已知组别效度",
     # v3.8：AI 题目预审（非正式 CVI）
     "ai_item_review": "AI 题目预审（非正式 CVI）",
+    # v3.9：Logistic 回归
+    "binary_logistic": "二元Logistic回归",
+    "ordinal_logistic": "有序Logistic回归",
+    "multinomial_logistic": "多项Logistic回归",
+    # MANOVA
+    "manova": "多元方差分析（MANOVA）",
+    "mixed_anova": "混合设计方差分析",
+    "hlm": "多层线性模型（HLM）",
+    "sem": "结构方程模型（SEM）",
 }
 
 

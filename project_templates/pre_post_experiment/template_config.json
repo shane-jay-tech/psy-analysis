@@ -1,0 +1,18 @@
+{
+  "template_id": "pre_post_experiment",
+  "name": "前后测实验",
+  "research_type": "pre_post",
+  "recommended_method": "paired_ttest",
+  "variable_roles": {
+    "dv": "社交焦虑得分",
+    "iv": "时间点（前测/后测）"
+  },
+  "design": {
+    "purpose": "difference",
+    "dv_type": "continuous",
+    "sample_relation": "paired",
+    "time_points": 2
+  },
+  "sample_size_hint": "N >= 30",
+  "paper_sections": ["引言", "方法", "结果", "讨论", "参考文献"]
+}

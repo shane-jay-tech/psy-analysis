@@ -12,12 +12,15 @@ v3.1 行为变化：
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 # 旧 v3.0 路径（保留只做一次性迁移检测）
@@ -70,6 +73,7 @@ def trigger_autosave(session_state: Any, workspace_builder, *, force: bool = Fal
             return False  # 还没有项目，跳过
         ws = workspace_builder()
     except Exception:
+        logger.debug("autosave: workspace 构建失败", exc_info=True)
         return False
 
     try:
@@ -79,6 +83,7 @@ def trigger_autosave(session_state: Any, workspace_builder, *, force: bool = Fal
             session_state[SESSION_LAST_SAVE_KEY] = now
         return ok
     except Exception:
+        logger.debug("autosave: 保存到项目失败", exc_info=True)
         return False
 
 

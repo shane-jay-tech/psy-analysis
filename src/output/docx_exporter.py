@@ -13,9 +13,12 @@
 from __future__ import annotations
 
 import io
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 from docx import Document
@@ -84,6 +87,7 @@ def plotly_figs_to_figure_items(
         except KaleidoMissingError:
             break  # kaleido 不可用，停止后续生成
         except Exception:
+            logger.debug("docx_exporter: 图表导出失败", exc_info=True)
             continue
     return items
 
@@ -321,6 +325,38 @@ def _apply_three_line_borders(table):
             set_cell_border(cell, "right", False)
             set_cell_border(cell, "insideH", False)
             set_cell_border(cell, "insideV", False)
+
+
+def _remove_table_vertical_borders(table):
+    """移除表格竖线，保留上下横线（APA 风格）。"""
+    try:
+        from docx.oxml.ns import qn
+        tbl = table._tbl
+        tblPr = tbl.find(qn("w:tblPr"))
+        if tblPr is None:
+            tblPr = tbl.makeelement(qn("w:tblPr"), {})
+            tbl.insert(0, tblPr)
+        borders = tblPr.find(qn("w:tblBorders"))
+        if borders is None:
+            borders = tblPr.makeelement(qn("w:tblBorders"), {})
+            tblPr.append(borders)
+        # Set top and bottom to single, left/right/insideV to none
+        for edge in ("top", "bottom"):
+            el = borders.find(qn(f"w:{edge}"))
+            if el is None:
+                el = borders.makeelement(qn(f"w:{edge}"), {})
+                borders.append(el)
+            el.set(qn("w:val"), "single")
+            el.set(qn("w:sz"), "4")
+            el.set(qn("w:color"), "000000")
+        for edge in ("left", "right", "insideV"):
+            el = borders.find(qn(f"w:{edge}"))
+            if el is None:
+                el = borders.makeelement(qn(f"w:{edge}"), {})
+                borders.append(el)
+            el.set(qn("w:val"), "none")
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------------------- #
@@ -1023,6 +1059,188 @@ def build_questionnaire_docx(
     thank_p.paragraph_format.space_before = Pt(12)
     run = thank_p.add_run("—— 问卷结束，感谢您的参与 ——")
     _set_run_font(run, size=S.SIZE_BODY, bold=True)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def build_review_docx(
+    title: str,
+    markdown_body: str,
+    *,
+    author: str = "",
+    date: str = "",
+) -> bytes:
+    """把一篇文献综述（markdown 正文）导出为 .docx 字节流（v4.7）。
+
+    复用本模块的 _setup_page / _add_paragraph / _render_markdown，
+    标题居中加粗，作者/日期可选，正文按简易 Markdown 渲染。
+
+    Args:
+        title: 综述标题
+        markdown_body: 综述正文（# / ## / ### 标题、**bold**、- 列表）
+        author: 可选作者
+        date: 可选日期
+
+    Returns:
+        .docx 字节流
+    """
+    doc = Document()
+    _setup_page(doc)
+
+    # 标题（居中，16pt 加粗黑体）
+    title_p = doc.add_paragraph()
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_p.paragraph_format.space_after = Pt(18)
+    run = title_p.add_run(title or "文献综述")
+    _set_run_font(run, size=S.SIZE_TITLE, bold=True, cjk=S.FONT_HEADING_CJK)
+
+    if author:
+        _add_paragraph(doc, author, align="center")
+    if date:
+        _add_paragraph(doc, date, align="center")
+
+    _add_paragraph(doc, "")
+    _render_markdown(doc, markdown_body or "")
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+# ─── ResearchDeliverableBundle → Word 导出 ────────────────────────
+
+
+def build_deliverable_docx(
+    bundle,
+    mode: str = "standard",
+) -> bytes:
+    """从 ResearchDeliverableBundle 生成 Word (.docx) 字节流。
+
+    Args:
+        bundle: ResearchDeliverableBundle 实例
+        mode: "basic" / "standard" / "full"
+    """
+    doc = Document()
+    _setup_page(doc)
+
+    _add_paragraph(doc, bundle.title or "研究交付包", level=1, align="center")
+    _add_paragraph(doc, f"导出模式: {mode} | 生成时间: {bundle.created_at}", align="center")
+    _add_paragraph(doc, "")
+
+    if bundle.paper_bundle:
+        for key, sec in bundle.paper_bundle.sections.items():
+            _add_paragraph(doc, sec.name, level=2)
+            _render_markdown(doc, sec.markdown)
+            _add_paragraph(doc, "")
+
+    if mode in ("standard", "full") and bundle.analysis_cards:
+        doc.add_page_break()
+        _add_paragraph(doc, "统计结果卡", level=2)
+        for card in bundle.analysis_cards:
+            if hasattr(card, "to_markdown"):
+                _render_markdown(doc, card.to_markdown())
+            elif isinstance(card, dict):
+                _add_paragraph(doc, f"• {card.get('method', '')}：{card.get('apa_text', '')}")
+
+    # APA Tables (auto-generated from result cards)
+    if mode in ("standard", "full") and bundle.analysis_cards:
+        from src.output.apa_tables import generate_tables_from_card, APATable
+        apa_tables = []
+        for card in bundle.analysis_cards:
+            card_dict = card if isinstance(card, dict) else (card.__dict__ if hasattr(card, '__dict__') else {})
+            try:
+                tables = generate_tables_from_card(card_dict)
+                apa_tables.extend(tables)
+            except Exception:
+                pass
+
+        if apa_tables:
+            doc.add_page_break()
+            _add_paragraph(doc, "统计表格", level=2)
+            for tbl_idx, apa_tbl in enumerate(apa_tables, 1):
+                apa_tbl.apa_number = tbl_idx
+                # Table title
+                _add_paragraph(doc, f"Table {tbl_idx}", align="left")
+                p = _add_paragraph(doc, "")
+                run = p.add_run(apa_tbl.title)
+                _set_run_font(run, italic=True)
+
+                # Build Word table
+                if apa_tbl.rows:
+                    cols = apa_tbl.columns if apa_tbl.columns else list(apa_tbl.rows[0].keys())
+                    n_rows = len(apa_tbl.rows) + 1  # header + data
+                    n_cols = len(cols)
+                    word_table = doc.add_table(rows=n_rows, cols=n_cols)
+                    word_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+                    # Header row
+                    for j, col_name in enumerate(cols):
+                        cell = word_table.rows[0].cells[j]
+                        cell.text = col_name
+                        for paragraph in cell.paragraphs:
+                            for run in paragraph.runs:
+                                run.bold = True
+
+                    # Data rows
+                    for i, row_data in enumerate(apa_tbl.rows):
+                        for j, col_name in enumerate(cols):
+                            cell = word_table.rows[i + 1].cells[j]
+                            cell.text = str(row_data.get(col_name, ""))
+
+                    # Remove vertical borders (APA style)
+                    _remove_table_vertical_borders(word_table)
+
+                # Table note
+                if apa_tbl.note:
+                    note_p = _add_paragraph(doc, "")
+                    run = note_p.add_run(f"Note. {apa_tbl.note}")
+                    _set_run_font(run, italic=True, size=S.SIZE_BODY - 1)
+                _add_paragraph(doc, "")  # spacing
+
+    if mode in ("standard", "full") and bundle.figures:
+        doc.add_page_break()
+        _add_paragraph(doc, "图表", level=2)
+        _fig_num = 0
+        for fig_item in bundle.figures:
+            _fig_num += 1
+            if hasattr(fig_item, "png_bytes") and fig_item.png_bytes:
+                _fig_stream = io.BytesIO(fig_item.png_bytes)
+                doc.add_picture(_fig_stream, width=Cm(12))
+                last_para = doc.paragraphs[-1]
+                last_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption = getattr(fig_item, "caption", "") or f"Figure {_fig_num}"
+            _add_paragraph(doc, f"Figure {_fig_num}. {caption}", align="center")
+
+    if mode in ("standard", "full") and bundle.evidence_records:
+        doc.add_page_break()
+        _add_paragraph(doc, "文献证据表", level=2)
+        for rec in bundle.evidence_records:
+            if isinstance(rec, dict):
+                _add_paragraph(doc, f"[{rec.get('citation_key', '')}] {rec.get('claim', '')}")
+
+    if mode in ("standard", "full") and bundle.data_cleaning_log:
+        doc.add_page_break()
+        _add_paragraph(doc, "数据清洗日志", level=2)
+        for entry in bundle.data_cleaning_log:
+            if isinstance(entry, dict):
+                _add_paragraph(doc, f"• {entry.get('step', '')}：{entry.get('action', '')}")
+
+    if mode == "full":
+        if bundle.method_recommendations:
+            doc.add_page_break()
+            _add_paragraph(doc, "方法推荐记录", level=2)
+            for rec in bundle.method_recommendations:
+                if isinstance(rec, dict):
+                    _add_paragraph(doc, f"• {rec.get('recommendation', '')}")
+
+        if bundle.health_report:
+            doc.add_page_break()
+            _add_paragraph(doc, "项目健康报告", level=2)
+            for issue in bundle.health_report:
+                if isinstance(issue, dict):
+                    _add_paragraph(doc, f"[{issue.get('level', '')}] {issue.get('message', '')}")
 
     buf = io.BytesIO()
     doc.save(buf)

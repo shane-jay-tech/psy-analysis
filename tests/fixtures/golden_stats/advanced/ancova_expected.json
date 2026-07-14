@@ -1,0 +1,16 @@
+{
+  "method_id": "ancova",
+  "reference_software": "statsmodels OLS type III",
+  "data_description": "2 groups x 8 subjects, DV=score, covariate=pretest",
+  "tolerance": {
+    "f_value": 0.5,
+    "p_value": 0.05,
+    "effect_size": 0.05
+  },
+  "expected": {
+    "group_effect_significant": true,
+    "covariate_significant": true,
+    "eta_sq_partial_gt": 0.1,
+    "has_adjusted_means": true
+  }
+}

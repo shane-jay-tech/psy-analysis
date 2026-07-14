@@ -1,0 +1,15 @@
+{
+  "method_id": "wilcoxon_signed_rank",
+  "reference_software": "scipy.stats.wilcoxon",
+  "data_description": "10 paired observations, post > pre consistently",
+  "tolerance": {
+    "statistic": 1.0,
+    "p_value": 0.05,
+    "effect_size": 0.2
+  },
+  "expected": {
+    "p_less_than": 0.05,
+    "effect_size_positive": true,
+    "n_pairs": 10
+  }
+}

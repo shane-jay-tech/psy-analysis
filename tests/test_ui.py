@@ -9,6 +9,8 @@ import pytest
 import pandas as pd
 import numpy as np
 
+pytestmark = pytest.mark.ui
+
 
 # ============================================================
 # Case 1: 数据上传 → 列识别 → 分析执行流程

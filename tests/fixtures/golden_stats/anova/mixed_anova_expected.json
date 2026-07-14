@@ -1,0 +1,20 @@
+{
+  "method_id": "mixed_anova",
+  "reference_software": "pingouin mixed_anova",
+  "data_description": "2 groups (exp/ctrl) x 3 time points (pre/post/follow), 6 subjects per group",
+  "tolerance": {
+    "f_value": 1.0,
+    "p_value": 0.05,
+    "effect_size": 0.05
+  },
+  "expected": {
+    "interaction_significant": true,
+    "time_main_effect_significant": true,
+    "group_main_effect_significant": true,
+    "has_sphericity_test": true,
+    "n_sources": 3
+  },
+  "notes": [
+    "Greenhouse-Geisser correction expected when sphericity is violated"
+  ]
+}

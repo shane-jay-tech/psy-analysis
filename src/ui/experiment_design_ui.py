@@ -395,7 +395,8 @@ def render_experiment_design_ui():
                     with st.spinner("正在生成 Word 文档..."):
                         docx_bytes = build_experiment_protocol_docx(d, researcher=researcher)
                     st.session_state["_exp_protocol_docx"] = docx_bytes
-                    st.session_state["_exp_protocol_filename"] = f"{title_safe}_实验程序文档.docx"
+                    from src.utils.export_naming import export_filename
+                    st.session_state["_exp_protocol_filename"] = export_filename("实验设计", "docx", title=title_safe)
                 except Exception as e:
                     st.error(f"生成失败：{e}")
 

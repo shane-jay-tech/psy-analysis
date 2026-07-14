@@ -1,0 +1,20 @@
+{
+  "method": "mediation",
+  "description": "中介效应分析金标准 — Bootstrap 5000次",
+  "reference_tool": "PROCESS macro (Hayes, Model 4)",
+  "expected": {
+    "a_path": 0.45,
+    "b_path": 0.38,
+    "c_prime": 0.12,
+    "indirect_effect": 0.171,
+    "total_effect": 0.291,
+    "indirect_significant": true
+  },
+  "tolerance": {
+    "a_path": 0.15,
+    "b_path": 0.15,
+    "c_prime": 0.15,
+    "indirect_effect": 0.10,
+    "total_effect": 0.15
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "method_id": "multiple_regression",
+  "source": "statsmodels OLS verified against R lm(y ~ x1 + x2 + x3)",
+  "description": "3 predictors, n=20, strong multicollinearity between x1 and x2",
+  "tolerance": {
+    "r_squared": 0.01,
+    "f_stat": 0.5,
+    "p_value": 0.001,
+    "coefficients": 0.5
+  },
+  "expected": {
+    "r_squared_min": 0.95,
+    "adj_r_squared_min": 0.94,
+    "f_stat_min": 80.0,
+    "model_significant": true,
+    "n_predictors": 3
+  }
+}

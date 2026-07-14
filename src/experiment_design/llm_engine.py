@@ -81,30 +81,22 @@ def _call_llm(
     if cancel_id is not None and _is_cancelled(cancel_id):
         raise CancelledLLMError("LLM 请求已被用户取消")
     try:
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
+        from src.llm_gateway.gateway import llm_chat, LLMUnavailableError
+        cancel_str = str(cancel_id) if cancel_id is not None else None
+        resp = llm_chat(
+            messages,
             temperature=temperature,
             max_tokens=max_tokens,
+            cancel_id=cancel_str,
+            retries=1,
         )
-        if cancel_id is not None and _is_cancelled(cancel_id):
+        if resp.cancelled:
             raise CancelledLLMError("LLM 请求已被用户取消")
-        content = response.choices[0].message.content
-        if content is None:
-            raise LLMResponseParseError("LLM 返回了空内容")
-        return content.strip()
-
-    except AuthenticationError:
-        raise LLMEngineError("API Key 无效，请检查后重试。")
-    except RateLimitError:
-        raise LLMEngineError("API 调用频率超限，请稍后重试。")
-    except APITimeoutError:
-        raise LLMEngineError("LLM 响应超时，已自动回退。")
-    except APIConnectionError:
-        raise LLMEngineError("无法连接到 LLM 服务，请检查网络或 Base URL。")
-    except APIStatusError as e:
-        raise LLMEngineError(f"LLM 服务返回错误 ({e.status_code})，已自动回退。")
+        if not resp.ok:
+            raise LLMResponseParseError(resp.error or "LLM 返回了空内容")
+        return resp.content.strip()
+    except LLMUnavailableError as e:
+        raise LLMEngineError(str(e))
     except LLMResponseParseError:
         raise
     except CancelledLLMError:

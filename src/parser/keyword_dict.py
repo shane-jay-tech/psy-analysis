@@ -98,6 +98,60 @@ TEST_KEYWORDS = {
         ],
         "requires": {"dv": 1, "ivs_min": 2},
     },
+    "binary_logistic": {
+        "triggers": [
+            "logistic", "逻辑回归", "logit", "二元logistic",
+            "二分类回归", "是否", "发生概率", "二元回归",
+            "分类预测", "logistic回归", "逻辑斯蒂",
+        ],
+        "requires": {"dv": 1, "iv": 1, "dv_binary": True},
+    },
+    "ordinal_logistic": {
+        "triggers": [
+            "有序logistic", "有序回归", "累积logit",
+            "比例优势", "等级回归", "有序分类",
+        ],
+        "requires": {"dv": 1, "iv": 1, "dv_ordinal": True},
+    },
+    "multinomial_logistic": {
+        "triggers": [
+            "多项logistic", "多分类回归", "多元logistic",
+            "无序分类", "多项回归", "multinomial",
+        ],
+        "requires": {"dv": 1, "iv": 1, "dv_multinomial": True},
+    },
+    "manova": {
+        "triggers": [
+            "manova", "多元方差分析", "多因变量",
+            "多元anova", "mancova", "多变量方差",
+            "多个因变量", "多元差异",
+        ],
+        "requires": {"dvs_min": 2, "iv": 1},
+    },
+    "mixed_anova": {
+        "triggers": [
+            "混合设计", "混合方差分析", "split-plot",
+            "组间组内", "mixed anova", "混合anova",
+            "前测后测", "重复测量分组",
+        ],
+        "requires": {"dv": 1, "ivs_min": 2},
+    },
+    "hlm": {
+        "triggers": [
+            "多层", "hlm", "混合效应", "嵌套",
+            "多水平", "多层线性", "分层线性",
+            "班级嵌套", "学校嵌套", "multilevel",
+        ],
+        "requires": {"dv": 1, "iv": 1, "grouping": True},
+    },
+    "sem": {
+        "triggers": [
+            "结构方程", "sem", "路径分析", "潜变量路径",
+            "结构模型", "路径模型", "因果模型",
+            "潜变量回归",
+        ],
+        "requires": {"factor_structure": True, "structural_paths": True},
+    },
     "chi_square_independence": {
         "triggers": [
             "卡方", "χ²", "chi", "独立性检验", "列联表",

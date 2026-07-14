@@ -1,0 +1,17 @@
+{
+  "template_id": "questionnaire_correlation",
+  "name": "问卷相关研究",
+  "research_type": "correlational",
+  "recommended_method": "pearson_corr",
+  "variable_roles": {
+    "x": "焦虑得分",
+    "y": "自尊得分"
+  },
+  "design": {
+    "purpose": "correlation",
+    "dv_type": "continuous",
+    "sample_relation": "independent"
+  },
+  "sample_size_hint": "N >= 50",
+  "paper_sections": ["引言", "方法", "结果", "讨论", "参考文献"]
+}
