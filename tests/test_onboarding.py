@@ -6,13 +6,17 @@ import pytest
 import streamlit as st
 
 from src.ui.onboarding import (
-    is_first_visit, mark_onboarding_done, skip_onboarding,
-    ONBOARDING_KEY, ONBOARDING_STAGE_KEY, SKIP_KEY,
+    is_first_visit, mark_onboarding_done, restart_onboarding, skip_onboarding,
+    FORCE_SHOW_KEY, ONBOARDING_KEY, ONBOARDING_STAGE_KEY, SKIP_KEY,
 )
 
 
 @pytest.fixture(autouse=True)
-def clean_session():
+def clean_session(tmp_path, monkeypatch):
+    from src.utils import user_prefs
+    prefs_dir = tmp_path / ".psy_analysis"
+    monkeypatch.setattr(user_prefs, "PREFS_DIR", prefs_dir)
+    monkeypatch.setattr(user_prefs, "PREFS_FILE", prefs_dir / "user_prefs.json")
     st.session_state.clear()
     yield
     st.session_state.clear()
@@ -56,3 +60,13 @@ def test_skip_onboarding_marks_both_flags():
     assert st.session_state.get(SKIP_KEY) is True
     assert st.session_state.get(ONBOARDING_KEY) is True
     assert is_first_visit() is False
+
+
+def test_restart_onboarding_forces_show_even_with_existing_data():
+    import pandas as pd
+    st.session_state[ONBOARDING_KEY] = True
+    st.session_state[SKIP_KEY] = True
+    st.session_state.df = pd.DataFrame({"x": [1]})
+    restart_onboarding()
+    assert st.session_state[FORCE_SHOW_KEY] is True
+    assert is_first_visit() is True

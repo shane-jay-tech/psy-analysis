@@ -16,7 +16,9 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import Optional, Any
 
-_LOG_DIR = Path("logs")
+from src.utils.app_paths import LOG_DIR
+
+_LOG_DIR = LOG_DIR
 _ENABLED = True
 
 

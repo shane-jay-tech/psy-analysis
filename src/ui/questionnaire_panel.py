@@ -113,7 +113,7 @@ def render_questionnaire_page():
     }
     for i, (label, prompt) in enumerate(_templates.items()):
         with _tpl_cols[i]:
-            if st.button(label, key=f"_qtpl_{i}", use_container_width=True):
+            if st.button(label, key=f"_qtpl_{i}", width="stretch"):
                 st.session_state["q_request_input"] = prompt
                 st.rerun()
 
@@ -147,9 +147,9 @@ def render_questionnaire_page():
         )
         design_btn = st.button(
             "🔍 开始设计" if not premium_mode else "⭐ 开始高质量设计",
-            type="primary", use_container_width=True,
+            type="primary", width="stretch",
         )
-        q_clear_btn = st.button("🗑 清空", use_container_width=True)
+        q_clear_btn = st.button("🗑 清空", width="stretch")
 
     if q_clear_btn:
         st.session_state.questionnaire_design = None
@@ -194,7 +194,7 @@ def render_questionnaire_page():
 
         col_cancel, _ = st.columns([1, 3])
         with col_cancel:
-            if st.button("❌ 取消生成", use_container_width=True, key="cancel_q_design"):
+            if st.button("❌ 取消生成", width="stretch", key="cancel_q_design"):
                 cancel_design_request(pending["cancel_id"])
                 try:
                     pending["future"].cancel()
@@ -741,7 +741,7 @@ def render_questionnaire_page():
             export_clicked = st.button(
                 "📥 下载报告",
                 type="primary",
-                use_container_width=True,
+                width="stretch",
                 key="export_btn",
             )
 

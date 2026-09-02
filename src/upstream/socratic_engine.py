@@ -233,7 +233,7 @@ def ask_socratic_stream(
     user_input: str,
     history: Optional[List[ChatMessage]] = None,
     *,
-    llm_config: Dict[str, Any],
+    llm_config: Optional[Dict[str, Any]],
     requests_module: Any = None,
     history_limit: int = 6,
     topic_hint: str = "",
@@ -245,6 +245,10 @@ def ask_socratic_stream(
 
     若流式完成后校验不过 → 静默重试或 fallback（不再走流式 UI）。
     """
+    # v5.8 L5: llm_config 允许为 None（LLM 未启用时直接走 fallback，不再依赖调用方 gate）
+    if llm_config is None:
+        return get_fallback_question(stage, topic=topic_hint)
+
     from src.llm_gateway import LLMUnavailableError, llm_chat_stream
 
     history = list(history or [])
@@ -323,7 +327,7 @@ def ask_socratic(
     user_input: str,
     history: Optional[List[ChatMessage]] = None,
     *,
-    llm_config: Dict[str, Any],
+    llm_config: Optional[Dict[str, Any]],
     requests_module: Any = None,
     history_limit: int = 6,
     topic_hint: str = "",
@@ -345,7 +349,12 @@ def ask_socratic(
 
     Returns:
         反问字符串。LLM 失败/校验不过 → fallback 模板，永远不抛异常。
+        llm_config 为 None（LLM 未启用）时直接返回 fallback，永不 crash。
     """
+    # v5.8 L5: 类型签名不再是 lie——None 早返回 fallback，绕过 gate 也安全
+    if llm_config is None:
+        return get_fallback_question(stage, topic=topic_hint)
+
     history = list(history or [])
     asked_themes = list(asked_themes or [])
     ctx = TutorContext(
@@ -422,6 +431,8 @@ def _safe_chat(
     v3.5: 通过 LLM 网关调用（gateway 内部仍委托 chat_with_tutor，行为一致）；
     保留 LLMUnavailableError 捕获作为降级入口。
     """
+    if llm_config is None:
+        return None  # 双保险：即使上层漏判也能安全降级
     try:
         from src.llm_gateway import LLMUnavailableError, llm_chat
         response = llm_chat(

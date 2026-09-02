@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 
 import pytest
+from unittest.mock import MagicMock
 
 SRC_DIR = Path(__file__).parent.parent / "src"
 APP_FILE = Path(__file__).parent.parent / "app.py"
@@ -113,6 +114,41 @@ class TestExportGateGlobalScan:
     def test_undergrad_wizard_gated(self):
         """undergrad_wizard 已完成迁移，在门禁名单中。"""
         assert "src/ui/undergrad_wizard.py" in GATED_EXPORTS
+
+    def test_undergrad_wizard_hides_official_download_when_gate_blocks(self, monkeypatch):
+        """不能只检查 import：门禁失败后下载控件必须不存在。"""
+        from src.ui import undergrad_wizard
+
+        fake_st = MagicMock()
+        fake_st.session_state = {"df": object(), "_delivery_zip": b"sensitive"}
+        monkeypatch.setattr(undergrad_wizard, "st", fake_st)
+        monkeypatch.setattr(
+            undergrad_wizard,
+            "run_export_gate",
+            lambda _state: (False, ["[PRIVACY_HIGH] 敏感信息"], []),
+        )
+
+        shown = undergrad_wizard._render_official_download(
+            "正式交付",
+            artifact_state_keys=("_delivery_zip",),
+            data=b"x",
+            file_name="x.zip",
+            mime="application/zip",
+        )
+
+        assert shown is False
+        fake_st.download_button.assert_not_called()
+        fake_st.error.assert_called_once()
+        assert "_delivery_zip" not in fake_st.session_state
+
+    def test_four_formal_artifact_blocks_use_gated_helper(self):
+        """锁住四个正式调用点，避免未来又直接改回 download_button。"""
+        source = (SRC_DIR / "ui" / "undergrad_wizard.py").read_text(encoding="utf-8")
+        for state_key in ("_delivery_zip", "_collection_zip", "_docx_bytes", "_figures_zip"):
+            marker = f'if st.session_state.get("{state_key}"):'
+            start = source.index(marker)
+            block = source[start:start + 700]
+            assert "_render_official_download(" in block, state_key
 
     def test_no_pending_migrations(self):
         """待迁移名单为空。"""

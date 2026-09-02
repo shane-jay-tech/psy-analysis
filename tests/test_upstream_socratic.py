@@ -12,6 +12,7 @@ from src.upstream.socratic_engine import (
     _truncate_to_first_questions,
     _validate_socratic_output,
     ask_socratic,
+    ask_socratic_stream,
 )
 from src.upstream.topic_funnel_kb import FALLBACK_QUESTIONS, get_fallback_question
 
@@ -203,6 +204,29 @@ class TestAskSocratic:
         args, kwargs = mock_req.post.call_args
         payload = kwargs["json"]
         assert payload["temperature"] == 0.3
+
+    def test_none_llm_config_falls_back_instantly(self):
+        """v5.8 L5：llm_config=None（LLM 未启用/绕过 gate）应直接走 fallback，永不 crash。"""
+        result = ask_socratic(
+            stage=2,
+            user_input="我想研究压力",
+            llm_config=None,
+            requests_module=MagicMock(),  # 若误用 mock 会崩，None 早返回必须发生在任何调用前
+        )
+        assert result is not None and len(result) > 0
+        assert result in FALLBACK_QUESTIONS[2] or any(
+            f.replace("{topic}", "") in result for f in FALLBACK_QUESTIONS[2]
+        )
+
+    def test_none_llm_config_stream_falls_back_instantly(self):
+        """ask_socratic_stream 同样支持 None 早返回。"""
+        result = ask_socratic_stream(
+            stage=3,
+            user_input="我想研究焦虑",
+            llm_config=None,
+            requests_module=MagicMock(),
+        )
+        assert result is not None and len(result) > 0
 
 
 class TestFallbackCoversAllStages:

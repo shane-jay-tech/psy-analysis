@@ -33,13 +33,56 @@ def bar_with_error(
     iv: str,
     title: str = "各组均值比较",
 ) -> go.Figure:
-    """分组柱状图 + 标准误误差线"""
+    """分组柱状图 + 标准误误差线。
+
+    v5.9 修复：独立 t 检验的 group_stats（组别/N/M/SD）没有 SEM 列，
+    旧实现 data.get("SEM", [0]*n).tolist() 对 list 调 .tolist() 直接崩，
+    导致**每个独立样本 t 检验**在图表渲染阶段抛 AttributeError。
+    现在：SEM 缺失时由 SD/√N 推导；列名兼容 组别/组/group；输入可为
+    DataFrame 或 list[dict]；数值统一 pd.to_numeric 归一。
+    """
+    if isinstance(data, pd.DataFrame):
+        table = data
+    else:
+        try:
+            table = pd.DataFrame(data)
+        except Exception:
+            table = pd.DataFrame()
+
+    if table.empty:
+        return go.Figure()
+
+    group_col = next(
+        (c for c in ("组别", "组", "group", "Group", "分组") if c in table.columns),
+        table.columns[0],
+    )
+    x = table[group_col].astype(str).tolist()
+
+    if "M" in table.columns:
+        y_src = table["M"]
+    elif "mean" in table.columns:
+        y_src = table["mean"]
+    else:
+        # 没有均值列时降级为分组列本身（如纯频数表）
+        y_src = table[group_col]
+    y = pd.to_numeric(y_src, errors="coerce").fillna(0).tolist()
+
+    # SEM：显式列 > SD/√N 推导 > 0
+    if "SEM" in table.columns:
+        sem_src = pd.to_numeric(table["SEM"], errors="coerce")
+    elif "SD" in table.columns and "N" in table.columns:
+        sd = pd.to_numeric(table["SD"], errors="coerce")
+        n = pd.to_numeric(table["N"], errors="coerce").replace(0, np.nan)
+        sem_src = sd / np.sqrt(n)
+    else:
+        sem_src = None
+    sem = (
+        np.nan_to_num(sem_src.to_numpy(dtype=float), nan=0.0).tolist()
+        if sem_src is not None
+        else [0.0] * len(y)
+    )
+
     fig = go.Figure()
-
-    x = data["组别"].astype(str).tolist()
-    y = data["M"].tolist()
-    sem = data.get("SEM", [0] * len(y)).tolist()
-
     fig.add_trace(go.Bar(
         x=x,
         y=y,
@@ -60,8 +103,31 @@ def box_plot(
     iv: str,
     title: str = "分组箱线图",
 ) -> go.Figure:
-    """分组箱线图 + 散点叠加"""
+    """分组箱线图 + 散点叠加。
+
+    v5.9: iv 为 None 时按「每列一个箱」渲染（配对检验的两列对比场景，
+    如 render_charts 的 paired_cols 分支传入 box_plot(df, col1, None)），
+    旧实现 df[None] 直接 TypeError 导致配对分析整页渲染崩溃。
+    """
     fig = go.Figure()
+
+    if iv is None:
+        # 配对/多列对比：dv 本身视为列名列表或单列
+        cols = dv if isinstance(dv, (list, tuple)) else [dv]
+        palette = COLOR_PALETTE[:len(cols)]
+        for i, col in enumerate(cols):
+            if col not in df.columns:
+                continue
+            col_data = pd.to_numeric(df[col], errors="coerce").dropna()
+            fig.add_trace(go.Box(
+                y=col_data,
+                name=str(col),
+                marker_color=palette[i % len(palette)],
+                boxpoints="outliers",
+                boxmean="sd",
+            ))
+        fig.update_layout(**_base_layout(title, xlabel="变量", ylabel="得分"))
+        return fig
 
     groups = df[iv].dropna().unique()
     palette = COLOR_PALETTE[:len(groups)]
@@ -78,6 +144,36 @@ def box_plot(
         ))
 
     fig.update_layout(**_base_layout(title, xlabel=iv, ylabel=dv))
+    return fig
+
+
+def contingency_heatmap(
+    table: pd.DataFrame,
+    title: str = "列联表频数热力图",
+) -> go.Figure:
+    """v5.9: 卡方检验列联表频数热力图。
+
+    此前卡方检验 charts_data 里有 contingency 但 render_charts 没有对应
+    分支，用户做完卡方一张图都看不到。用频数着色，单元格标注数值。
+    """
+    if not isinstance(table, pd.DataFrame) or table.empty:
+        return go.Figure()
+
+    z = table.astype(float).fillna(0).values
+    x_labels = [str(c) for c in table.columns]
+    y_labels = [str(i) for i in table.index]
+
+    fig = go.Figure(go.Heatmap(
+        z=z,
+        x=x_labels,
+        y=y_labels,
+        colorscale="Blues",
+        text=[[f"{v:g}" for v in row] for row in z],
+        texttemplate="%{text}",
+        hovertemplate="%{y} × %{x}<br>频数: %{z}<extra></extra>",
+        colorbar=dict(title="频数"),
+    ))
+    fig.update_layout(**_base_layout(title, xlabel="", ylabel=""))
     return fig
 
 

@@ -325,3 +325,60 @@ class TestPivotJspsychToWide:
         )
         assert meta["pivoted_from"] == "jspsych_long"
         assert meta["source_type"] == "jspsych_pivoted"
+
+class _NamedBytesIO(io.BytesIO):
+    def __init__(self, data: bytes, name: str):
+        super().__init__(data)
+        self.name = name
+
+
+class TestExcelLoaderPandas3Regression:
+    """v5.8: pandas 3.x 下 sheet_name=None 返回 dict 导致 load_excel 崩溃的回归测试。"""
+
+    @staticmethod
+    def _make_xlsx_bytes(sheets: list[tuple[str, list[list]]]) -> bytes:
+        import openpyxl
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+        for title, rows in sheets:
+            ws = wb.create_sheet(title=title)
+            for row in rows:
+                ws.append(row)
+        buf = io.BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+    def test_single_sheet_returns_dataframe(self):
+        data = self._make_xlsx_bytes([("Sheet1", [["x", "y"], [1, 10], [2, 20]])])
+        df, meta = load_data(_NamedBytesIO(data, "single.xlsx"))
+        assert isinstance(df, pd.DataFrame)
+        assert list(df.columns) == ["x", "y"]
+        assert len(df) == 2
+        assert meta["source_type"] == "excel"
+        assert meta["sheet_name"] == "Sheet1"
+
+    def test_multi_sheet_takes_first(self):
+        data = self._make_xlsx_bytes([
+            ("第一表", [["a"], [1]]),
+            ("第二表", [["b"], [2]]),
+        ])
+        df, meta = load_data(_NamedBytesIO(data, "multi.xlsx"))
+        assert meta["sheet_name"] == "第一表"
+        assert list(df.columns) == ["a"]
+
+    def test_explicit_sheet_name(self):
+        data = self._make_xlsx_bytes([
+            ("第一表", [["a"], [1]]),
+            ("第二表", [["b"], [2]]),
+        ])
+        df, meta = load_data(_NamedBytesIO(data, "multi.xlsx"), sheet_name="第二表")
+        assert list(df.columns) == ["b"]
+
+    def test_consumed_pointer_still_loads(self):
+        """v5.8: 大文件列预览（pd.read_csv(nrows=0)）消耗指针后 load_data 仍应完整加载。"""
+        csv_bytes = ("a,b\n" + "\n".join(f"{i},{i * 2}" for i in range(500))).encode("utf-8")
+        f = _NamedBytesIO(csv_bytes, "large.csv")
+        pd.read_csv(f, nrows=0)  # 模拟 app.py 大文件预览
+        df, meta = load_data(f)
+        assert len(df) == 500
+        assert meta["row_count"] == 500

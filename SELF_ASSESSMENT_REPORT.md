@@ -1,4 +1,8 @@
-# 心理学研究工具系统 v2.0 — 完整自评报告
+# 心理学研究工具系统 v2.0 — 完整自评报告（历史快照）
+
+> 本文是 2026-05-16 的 v2.0 历史评估，不代表当前 v5.10 状态。当前事实请以
+> `docs/SYSTEM_REPORT.md`、`UPGRADE_REPORT_V5.10.md` 与
+> `docs/SYSTEM_OPTIMIZATION_COMPLETION_AUDIT.md` 为准。
 
 **评估日期：** 2026-05-16
 **系统版本：** v2.0

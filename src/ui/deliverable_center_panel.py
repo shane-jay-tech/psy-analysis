@@ -34,8 +34,6 @@ def render_deliverable_center_panel(session_state: dict | None = None):
     if session_state is None:
         session_state = st.session_state
 
-    st.subheader("📦 研究交付包导出中心")
-
     bundle = _get_or_build_bundle(session_state)
     if bundle is None:
         st.warning("交付包信息不足，请先完成统计分析和论文写作")
@@ -172,7 +170,7 @@ def _render_pre_export_check(bundle: ResearchDeliverableBundle, session_state: d
     gate_result = run_export_gate(session_state)
     allowed, gate_reasons, issues = gate_result
     if not allowed:
-        st.warning("导出门禁检查:")
+        st.error("导出门禁检查 — 当前禁止导出:")
         for r in gate_reasons:
             st.markdown(f"- {r}")
 
@@ -180,6 +178,13 @@ def _render_pre_export_check(bundle: ResearchDeliverableBundle, session_state: d
 def _render_export(bundle: ResearchDeliverableBundle, session_state: dict):
     """导出操作。"""
     exportable, reasons = bundle.is_exportable()
+
+    gate_allowed, gate_reasons, _ = run_export_gate(session_state)
+    if not gate_allowed:
+        st.error("当前不满足导出门禁条件")
+        for reason in gate_reasons:
+            st.markdown(f"- {reason}")
+        return
 
     mode_label = st.radio("导出模式", list(EXPORT_MODES.keys()), horizontal=True)
     mode = EXPORT_MODES[mode_label]

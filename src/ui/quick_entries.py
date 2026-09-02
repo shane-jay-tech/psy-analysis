@@ -100,8 +100,8 @@ QUICK_ENTRIES = [
 
 def render_quick_entry_homepage(df: Optional[pd.DataFrame] = None):
     """渲染智能默认首页：三大快捷入口"""
-    st.title("📊 心理学研究工具")
-    st.caption("选择你要做的分析类型，一键进入")
+    st.subheader("选择分析任务")
+    st.caption("从常用研究问题开始；完整方法列表仍保留在页面底部。")
 
     # v3.7.9: 明确告知用户上传入口位置
     cur_df = df if df is not None else st.session_state.get("df")
@@ -128,7 +128,7 @@ def render_quick_entry_homepage(df: Optional[pd.DataFrame] = None):
             idx += 1
             with cols[c]:
                 with st.container(border=True):
-                    st.subheader(f"{entry['icon']} {entry['title']}")
+                    st.subheader(entry["title"])
                     st.caption(entry["subtitle"])
                     st.markdown(f"<small>{entry['description']}</small>", unsafe_allow_html=True)
 
@@ -136,7 +136,7 @@ def render_quick_entry_homepage(df: Optional[pd.DataFrame] = None):
                     st.caption(f"💡 {entry['example']}")
 
                     if st.button(f"进入 {entry['title']}", key=f"quick_{entry['id']}",
-                                 type="primary", use_container_width=True):
+                                 type="primary", width="stretch"):
                         st.session_state.quick_entry = entry
                         st.session_state.show_quick_detail = True
                         st.rerun()
@@ -176,7 +176,7 @@ def _render_full_method_list():
         for j, m in enumerate(methods):
             name = TEST_NAMES_ZH.get(m, m)
             with _cols[j % 4]:
-                if st.button(name, key=f"full_method_{m}", use_container_width=True,
+                if st.button(name, key=f"full_method_{m}", width="stretch",
                              help=f"直接使用 {name}"):
                     st.session_state.quick_entry = {
                         "id": m,
@@ -201,7 +201,7 @@ def render_quick_entry_detail():
     nav_cols = st.columns([1, 4, 1])
     with nav_cols[0]:
         if st.button("⬅️ 返回首页", key="back_to_home", type="secondary",
-                     use_container_width=True):
+                     width="stretch"):
             st.session_state.pop("quick_entry", None)
             st.session_state.pop("show_quick_detail", None)
             st.rerun()
@@ -214,7 +214,7 @@ def render_quick_entry_detail():
         )
     with nav_cols[2]:
         if st.button("🏠 主页", key="back_to_main_home", type="secondary",
-                     use_container_width=True,
+                     width="stretch",
                      help="回到三大快捷入口主页"):
             st.session_state.pop("quick_entry", None)
             st.session_state.pop("show_quick_detail", None)
@@ -268,7 +268,7 @@ def render_quick_entry_detail():
                 test_method = st.radio("检验方法", ["independent_ttest", "mann_whitney"],
                                       format_func=lambda x: "独立样本t检验" if x == "independent_ttest" else "Mann-Whitney U 检验",
                                       horizontal=True)
-                submitted = st.form_submit_button("🚀 开始分析", type="primary", use_container_width=True)
+                submitted = st.form_submit_button("🚀 开始分析", type="primary", width="stretch")
                 if submitted and dv and iv:
                     _run_quick_analysis(df, test_method, dv, iv)
 
@@ -288,7 +288,7 @@ def render_quick_entry_detail():
                 test_method = st.radio("相关方法", ["pearson_corr", "spearman_corr"],
                                       format_func=lambda x: "Pearson 相关" if x == "pearson_corr" else "Spearman 秩相关",
                                       horizontal=True)
-                submitted = st.form_submit_button("🚀 计算相关", type="primary", use_container_width=True)
+                submitted = st.form_submit_button("🚀 计算相关", type="primary", width="stretch")
                 if submitted and len(corr_vars) >= 2:
                     _run_quick_analysis(df, test_method, dv_list=corr_vars)
 
@@ -339,7 +339,7 @@ def _render_reliability_form(df, numeric_cols, cat_cols):
                 f"选择量表题目（至少 {min_items} 题）", numeric_cols,
                 help="同一量表的题目列",
             )
-            submitted = st.form_submit_button(submit_label, type="primary", use_container_width=True)
+            submitted = st.form_submit_button(submit_label, type="primary", width="stretch")
             if submitted and len(scale_items) >= min_items:
                 dep_vars = scale_items
                 valid = True
@@ -357,7 +357,7 @@ def _render_reliability_form(df, numeric_cols, cat_cols):
                 if fname and items:
                     factor_struct[fname] = items
                     used.update(items)
-        if st.button(submit_label, type="primary", use_container_width=True, key="cr_submit"):
+        if st.button(submit_label, type="primary", width="stretch", key="cr_submit"):
             if all(len(v) >= 2 for v in factor_struct.values()) and len(factor_struct) >= 1:
                 dep_vars = [it for v in factor_struct.values() for it in v]
                 extra_kwargs["factor_structure"] = factor_struct
@@ -375,7 +375,7 @@ def _render_reliability_form(df, numeric_cols, cat_cols):
                 index=1,
                 help="ICC2 双向随机（最常用）；k 后缀=多评分者均值版本",
             )
-            submitted = st.form_submit_button(submit_label, type="primary", use_container_width=True)
+            submitted = st.form_submit_button(submit_label, type="primary", width="stretch")
             if submitted and len(raters) >= 2:
                 extra_kwargs["rater_cols"] = raters
                 extra_kwargs["icc_type"] = icc_type
@@ -386,7 +386,7 @@ def _render_reliability_form(df, numeric_cols, cat_cols):
             t1 = st.selectbox("第一次测量列（time1）", numeric_cols, key="tr_t1")
             t2 = st.selectbox("第二次测量列（time2）", numeric_cols, key="tr_t2",
                               index=min(1, len(numeric_cols) - 1))
-            submitted = st.form_submit_button(submit_label, type="primary", use_container_width=True)
+            submitted = st.form_submit_button(submit_label, type="primary", width="stretch")
             if submitted and t1 and t2 and t1 != t2:
                 extra_kwargs["time1_col"] = t1
                 extra_kwargs["time2_col"] = t2
@@ -403,7 +403,7 @@ def _render_reliability_form(df, numeric_cols, cat_cols):
             weights = st.selectbox("权重", [None, "linear", "quadratic"],
                                    format_func=lambda x: {"None": "无权（标准 κ）", None: "无权（标准 κ）",
                                                           "linear": "线性加权", "quadratic": "二次加权"}.get(x, str(x)))
-            submitted = st.form_submit_button(submit_label, type="primary", use_container_width=True)
+            submitted = st.form_submit_button(submit_label, type="primary", width="stretch")
             if submitted and r1 and r2 and r1 != r2:
                 extra_kwargs["rater1_col"] = r1
                 extra_kwargs["rater2_col"] = r2
@@ -414,7 +414,7 @@ def _render_reliability_form(df, numeric_cols, cat_cols):
         with st.form("form_rel_fleiss"):
             all_cols = list(df.columns)
             raters = st.multiselect("评分者列（≥3 列）", all_cols)
-            submitted = st.form_submit_button(submit_label, type="primary", use_container_width=True)
+            submitted = st.form_submit_button(submit_label, type="primary", width="stretch")
             if submitted and len(raters) >= 3:
                 extra_kwargs["rater_cols"] = raters
                 valid = True
@@ -455,7 +455,7 @@ def _render_validity_form(df, numeric_cols, cat_cols):
                             ["concurrent", "predictive"],
                             format_func=lambda x: "同时效度（同期测量）" if x == "concurrent" else "预测效度（延迟测量）",
                             horizontal=True)
-            submitted = st.form_submit_button("🚀 计算效标效度", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("🚀 计算效标效度", type="primary", width="stretch")
             if submitted and len(scale_items) >= 3 and crit:
                 dep_vars = scale_items
                 extra_kwargs["criterion_col"] = crit
@@ -467,7 +467,7 @@ def _render_validity_form(df, numeric_cols, cat_cols):
             scale_items = st.multiselect("量表题目（至少 3 题）", numeric_cols)
             group_col = st.selectbox("已知差异分组变量", cat_cols + numeric_cols,
                                      help="2 组用 t 检验，≥3 组用 ANOVA")
-            submitted = st.form_submit_button("🚀 计算已知组别效度", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("🚀 计算已知组别效度", type="primary", width="stretch")
             if submitted and len(scale_items) >= 3 and group_col:
                 dep_vars = scale_items
                 iv = group_col
@@ -488,7 +488,7 @@ def _render_validity_form(df, numeric_cols, cat_cols):
                 if fname and items:
                     factor_struct[fname] = items
                     used.update(items)
-        if st.button("🚀 计算效度", type="primary", use_container_width=True, key=f"v_submit_{test_method}"):
+        if st.button("🚀 计算效度", type="primary", width="stretch", key=f"v_submit_{test_method}"):
             if (all(len(v) >= 3 for v in factor_struct.values())
                     and len(factor_struct) >= min_factors):
                 extra_kwargs["factor_structure"] = factor_struct
@@ -505,7 +505,7 @@ def _render_validity_form(df, numeric_cols, cat_cols):
                 "专家评分列（≥3 列；每列一位专家对所有题目的相关性打分 1-4）",
                 all_cols, help="每行=1 道题；列名建议为专家姓名/编号",
             )
-            submitted = st.form_submit_button("🚀 计算 CVI", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("🚀 计算 CVI", type="primary", width="stretch")
             if submitted and len(expert_cols) >= 3:
                 # 直接用主数据的这些列作为评分矩阵
                 dep_vars = expert_cols
@@ -628,7 +628,7 @@ def _render_ai_item_review_form(df, numeric_cols, cat_cols):
 
     col_run, _ = st.columns([1, 3])
     with col_run:
-        if st.button("🚀 运行预审", type="primary", use_container_width=True,
+        if st.button("🚀 运行预审", type="primary", width="stretch",
                       key="ai_review_run"):
             # ── 表单验证 ──
             if items_count < 3:

@@ -20,13 +20,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from src.utils.app_paths import LEGACY_AUTOSAVE_FILE, LEGACY_META_FILE
+
 logger = logging.getLogger(__name__)
 
 
 # 旧 v3.0 路径（保留只做一次性迁移检测）
-LEGACY_AUTOSAVE_FILE = Path.home() / ".psy_analysis" / "autosave.json"
-LEGACY_META_FILE = Path.home() / ".psy_analysis" / "autosave_meta.json"
-
 DEFAULT_THROTTLE_SECONDS = 30
 
 
@@ -45,6 +44,9 @@ class AutosaveStatus:
 # --------------------------------------------------------------------------- #
 
 SESSION_LAST_SAVE_KEY = "_autosave_last_ts"
+SESSION_LAST_PROJECT_KEY = "_autosave_last_project_id"
+SESSION_LAST_ERROR_KEY = "_autosave_last_error"
+SESSION_LAST_SAVED_LABEL_KEY = "_workspace_last_saved"
 
 
 def trigger_autosave(session_state: Any, workspace_builder, *, force: bool = False):
@@ -58,22 +60,34 @@ def trigger_autosave(session_state: Any, workspace_builder, *, force: bool = Fal
     Returns:
         是否实际保存
     """
-    last = session_state.get(SESSION_LAST_SAVE_KEY)
-    now = time.time()
-
-    if not force and last is not None:
-        if now - last < DEFAULT_THROTTLE_SECONDS:
-            return False  # 节流冷却中
-
     # 拿当前活跃项目
     try:
         from src.utils import project_manager as pm
         active_id = pm.get_active_project_id(session_state)
         if active_id is None:
+            session_state[SESSION_LAST_ERROR_KEY] = "没有可保存的当前项目"
             return False  # 还没有项目，跳过
+    except Exception:
+        logger.debug("autosave: 获取当前项目失败", exc_info=True)
+        session_state[SESSION_LAST_ERROR_KEY] = "自动保存准备失败，请手动导出项目快照"
+        return False
+
+    last = session_state.get(SESSION_LAST_SAVE_KEY)
+    last_project_id = session_state.get(SESSION_LAST_PROJECT_KEY)
+    now = time.time()
+    if (
+        not force
+        and last is not None
+        and last_project_id == active_id
+        and now - last < DEFAULT_THROTTLE_SECONDS
+    ):
+        return False  # 同一项目仍在节流冷却中
+
+    try:
         ws = workspace_builder()
     except Exception:
         logger.debug("autosave: workspace 构建失败", exc_info=True)
+        session_state[SESSION_LAST_ERROR_KEY] = "自动保存准备失败，请手动导出项目快照"
         return False
 
     try:
@@ -81,9 +95,17 @@ def trigger_autosave(session_state: Any, workspace_builder, *, force: bool = Fal
         ok = pm.save_workspace(active_id, ws)
         if ok:
             session_state[SESSION_LAST_SAVE_KEY] = now
+            session_state[SESSION_LAST_PROJECT_KEY] = active_id
+            session_state[SESSION_LAST_SAVED_LABEL_KEY] = datetime.now().strftime(
+                "%Y-%m-%d %H:%M"
+            )
+            session_state.pop(SESSION_LAST_ERROR_KEY, None)
+        else:
+            session_state[SESSION_LAST_ERROR_KEY] = "自动保存写入失败，请检查磁盘空间或导出快照"
         return ok
     except Exception:
         logger.debug("autosave: 保存到项目失败", exc_info=True)
+        session_state[SESSION_LAST_ERROR_KEY] = "自动保存写入失败，请检查磁盘空间或导出快照"
         return False
 
 

@@ -197,7 +197,7 @@ def render_items_upload_panel():
             st.dataframe(
                 pd.DataFrame(mapping_rows),
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
             st.caption(
                 "📌 第 3 步分维度评分填题号、AI 预审、Word/PDF 导出都按「最终题号」走。"
@@ -336,7 +336,7 @@ def render_items_upload_panel():
                 docx_bytes,
                 file_name=_safe_filename(current_doc.title, "docx"),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True,
+                width="stretch",
             )
         except Exception as exc:
             st.error(f"Word 生成失败：{exc}")
@@ -355,7 +355,7 @@ def render_items_upload_panel():
                 pdf_bytes,
                 file_name=_safe_filename(current_doc.title, "pdf"),
                 mime="application/pdf",
-                use_container_width=True,
+                width="stretch",
             )
         except RuntimeError as exc:
             st.warning(f"PDF 暂不可用：{exc}（请使用 Word 版本）")
@@ -420,7 +420,7 @@ def _render_dimension_editor(doc: ItemsDoc):
             key="_items_dim_paste_import_btn",
             disabled=not paste_text.strip(),
             type="primary",
-            use_container_width=True,
+            width="stretch",
         ):
             try:
                 from src.questionnaire.dimensions_paste_parser import parse_dimensions_text
@@ -446,7 +446,7 @@ def _render_dimension_editor(doc: ItemsDoc):
         if col_clr.button(
             "🗑️ 清空表格回到一行",
             key="_items_dim_paste_clear_btn",
-            use_container_width=True,
+            width="stretch",
         ):
             st.session_state.pop("_items_dim_editor_rows", None)
             st.session_state.pop("items_dim_editor", None)
@@ -594,12 +594,12 @@ def _render_ai_review_result(result):
     dim_summary = getattr(result, "dimension_summary", None)
     if isinstance(dim_summary, pd.DataFrame) and not dim_summary.empty:
         st.markdown("**📐 维度级摘要**")
-        st.dataframe(dim_summary, hide_index=True, use_container_width=True)
+        st.dataframe(dim_summary, hide_index=True, width="stretch")
 
     items_table = getattr(result, "items_table", None)
     if isinstance(items_table, pd.DataFrame) and not items_table.empty:
         st.markdown("**4 位 AI 专家评分汇总**")
-        st.dataframe(items_table, hide_index=True, use_container_width=True)
+        st.dataframe(items_table, hide_index=True, width="stretch")
     flagged = getattr(result, "flagged_items", []) or []
     if flagged:
         st.warning(f"⚠️ 标记需关注的题目（共 {len(flagged)} 题）：\n\n" +

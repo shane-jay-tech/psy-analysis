@@ -3,7 +3,11 @@
 import pandas as pd
 import pytest
 
-from src.utils.guardrails import detect_name_columns, detect_pii_columns
+from src.utils.guardrails import (
+    detect_name_columns,
+    detect_pii_columns,
+    redact_dataframe_for_storage,
+)
 
 
 class TestDetectPIIColumns:
@@ -62,3 +66,47 @@ class TestDetectPIIColumns:
         df = pd.DataFrame({"姓名": ["a"], "score": [1]})
         cols = detect_name_columns(df)
         assert "姓名" in cols
+
+
+class TestStorageRedaction:
+    def test_high_risk_columns_are_dropped_and_identifiers_are_hashed(self):
+        df = pd.DataFrame({
+            "手机号": ["13800138000", "13900139000"],
+            "姓名": ["张三", "李四"],
+            "subject_id": ["P01", "P02"],
+            "score": [10, 20],
+        })
+
+        redacted, report = redact_dataframe_for_storage(df)
+
+        assert "手机号" not in redacted.columns
+        assert redacted["姓名"].tolist() != df["姓名"].tolist()
+        assert redacted["subject_id"].tolist() != df["subject_id"].tolist()
+        assert redacted["score"].tolist() == [10, 20]
+        assert report["dropped_high_risk_columns"] == ["手机号"]
+        assert set(report["hashed_identifier_columns"]) == {"姓名", "subject_id"}
+        assert df["姓名"].tolist() == ["张三", "李四"]
+
+    def test_sensitive_content_inside_neutral_columns_is_redacted(self):
+        df = pd.DataFrame({
+            "备注": ["请联系13800138000", "邮箱 user@example.com", "普通说明"],
+            "分数": [1, 2, 3],
+        })
+
+        redacted, report = redact_dataframe_for_storage(df)
+
+        stored = " ".join(redacted["备注"].tolist())
+        assert "13800138000" not in stored
+        assert "user@example.com" not in stored
+        assert "[REDACTED_PHONE]" in stored
+        assert report["redacted_content_matches"]["备注:phone"] == 1
+        assert df.loc[0, "备注"] == "请联系13800138000"
+
+    def test_landline_requires_contact_context_to_avoid_numeric_id_false_positive(self):
+        df = pd.DataFrame({"备注": ["编号01234567890", "座机：010-12345678"]})
+
+        redacted, report = redact_dataframe_for_storage(df)
+
+        assert redacted.loc[0, "备注"] == "编号01234567890"
+        assert redacted.loc[1, "备注"] == "[REDACTED_LANDLINE]"
+        assert report["redacted_content_matches"] == {"备注:landline": 1}

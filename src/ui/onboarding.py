@@ -14,10 +14,13 @@ import streamlit as st
 ONBOARDING_KEY = "onboarding_completed"
 ONBOARDING_STAGE_KEY = "_onboarding_stage"  # welcome / loading / running / done
 SKIP_KEY = "_onboarding_skipped"
+FORCE_SHOW_KEY = "_onboarding_force_show"
 
 
 def is_first_visit() -> bool:
     """判断是否首次访问（无任何数据 + 未完成引导 + 未跳过）。"""
+    if st.session_state.get(FORCE_SHOW_KEY):
+        return True
     if st.session_state.get(SKIP_KEY):
         return False
     if st.session_state.get(ONBOARDING_KEY):
@@ -32,11 +35,39 @@ def is_first_visit() -> bool:
 def mark_onboarding_done():
     st.session_state[ONBOARDING_KEY] = True
     st.session_state.pop(ONBOARDING_STAGE_KEY, None)
+    st.session_state.pop(FORCE_SHOW_KEY, None)
+    try:
+        from src.utils.user_prefs import update_pref
+        update_pref(ONBOARDING_KEY, True)
+        update_pref(SKIP_KEY, False)
+    except Exception:
+        pass
 
 
 def skip_onboarding():
     st.session_state[SKIP_KEY] = True
     st.session_state[ONBOARDING_KEY] = True
+    st.session_state.pop(FORCE_SHOW_KEY, None)
+    try:
+        from src.utils.user_prefs import update_pref
+        update_pref(ONBOARDING_KEY, True)
+        update_pref(SKIP_KEY, True)
+    except Exception:
+        pass
+
+
+def restart_onboarding():
+    """由用户主动重新打开引导；即使已有数据也显示欢迎页。"""
+    st.session_state[ONBOARDING_KEY] = False
+    st.session_state[SKIP_KEY] = False
+    st.session_state[FORCE_SHOW_KEY] = True
+    st.session_state[ONBOARDING_STAGE_KEY] = "welcome"
+    try:
+        from src.utils.user_prefs import update_pref
+        update_pref(ONBOARDING_KEY, False)
+        update_pref(SKIP_KEY, False)
+    except Exception:
+        pass
 
 
 def render_onboarding_card() -> bool:
@@ -61,15 +92,14 @@ def _render_welcome():
     """欢迎页 + 选择路径。"""
     st.markdown(
         """
-<div style="background:linear-gradient(135deg,#fff8e7 0%,#ffeacc 100%);
-            border-left:5px solid #f5a623;padding:20px 24px;
-            border-radius:8px;margin:8px 0 18px 0;">
-<h2 style="margin-top:0;">👋 欢迎使用心理学研究工具</h2>
-<p style="font-size:1.05em;margin-bottom:14px;">
+<div class="psy-hero">
+<span class="psy-hero__eyebrow">5 分钟开始研究</span>
+<h2>👋 欢迎使用心理学研究工具</h2>
+<p class="psy-hero__lead">
 你将看到一个完整的<strong>本科论文产出流程</strong>：
 从数据分析到 Word 论文初稿、答辩备战手册、论文版图表，一气呵成。
 </p>
-<p style="font-size:0.95em;color:#555;">
+<p class="psy-hero__meta">
 🎯 <strong>5 分钟体验</strong>：用演示数据走完一遍，看看每个产出物长什么样。<br>
 🚀 <strong>直接开始</strong>：跳过演示，进入向导从你自己的研究开始。
 </p>
@@ -82,14 +112,14 @@ def _render_welcome():
     if cols[0].button(
         "🎯 5 分钟体验（推荐新用户）",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="ob_start_demo",
     ):
         st.session_state[ONBOARDING_STAGE_KEY] = "loading"
         st.rerun()
     if cols[1].button(
         "🚀 直接开始我的研究",
-        use_container_width=True,
+        width="stretch",
         key="ob_skip",
     ):
         skip_onboarding()
@@ -112,9 +142,9 @@ def _render_loading():
     """加载演示数据。"""
     st.markdown(
         """
-<div style="background:#e8f4fd;border-left:5px solid #4472c4;
-            padding:16px 20px;border-radius:6px;margin:8px 0;">
-<h3 style="margin-top:0;">📊 第 1/3 步：加载演示数据</h3>
+<div class="psy-hero psy-hero--info">
+<span class="psy-hero__eyebrow">新手体验 · 1/3</span>
+<h3>📊 加载演示数据</h3>
 <p>正在加载一份模拟的<strong>大学生社交焦虑问卷</strong>（n=200）：</p>
 <ul style="margin-top:8px;">
 <li>因变量：社交焦虑总分、自尊总分</li>
@@ -129,7 +159,7 @@ def _render_loading():
     if st.button(
         "▶ 加载演示数据并继续",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="ob_load_demo",
     ):
         from src.data.demo_datasets import generate_demo_questionnaire_data
@@ -153,9 +183,9 @@ def _render_running():
     """自动跑 t 检验 + 引导到向导第 7 步。"""
     st.markdown(
         """
-<div style="background:#e8f5e8;border-left:5px solid #4caf50;
-            padding:16px 20px;border-radius:6px;margin:8px 0;">
-<h3 style="margin-top:0;">🔬 第 2/3 步：自动运行 t 检验</h3>
+<div class="psy-hero psy-hero--success">
+<span class="psy-hero__eyebrow">新手体验 · 2/3</span>
+<h3>🔬 自动运行 t 检验</h3>
 <p>系统将自动运行<strong>「比较性别在社交焦虑总分上的差异」</strong>，
 等价于：进入向导 → 选「比较组间差异」→ 推荐独立样本 t 检验 → 一键运行。</p>
 </div>
@@ -166,7 +196,7 @@ def _render_running():
     if st.button(
         "▶ 一键运行 t 检验",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="ob_run_demo",
     ):
         try:
@@ -202,6 +232,7 @@ def _render_running():
 
             # 切到向导 + 第 7 步
             st.session_state.undergrad_mode = True
+            st.session_state["_pending_undergrad_mode"] = True
             st.session_state.undergrad_path = "survey"
             st.session_state.undergrad_step = 7
             # 同步到 wiz_data
@@ -238,6 +269,6 @@ def render_post_demo_highlight():
         "2. **🎤 答辩问题预演** — 系统给你 7 个针对性问题 + 标准答案\n"
         "3. **📦 批量下载所有图表** — 论文版 PNG（300dpi 灰度）\n"
         "4. **🎁 一键打包论文交付包** — Word + PDF + 图表 + README\n\n"
-        "完成体验后，回到侧边栏切换到「📊 数据分析」上传你自己的数据即可。"
+        "完成体验后，回到侧边栏切换到「📈 数据分析」上传你自己的数据即可。"
     )
     st.session_state["_post_demo_highlight_shown"] = True

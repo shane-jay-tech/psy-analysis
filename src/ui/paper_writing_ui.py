@@ -77,7 +77,7 @@ def render_paper_writing_ui():
                 st.caption(log)
 
         # 重置
-        if st.button("🔄 重置论文", use_container_width=True):
+        if st.button("🔄 重置论文", width="stretch"):
             st.session_state.paper_engine = PaperEngine()
             st.rerun()
 
@@ -299,7 +299,7 @@ def render_paper_writing_ui():
             )
         with col_l2:
             st.markdown("<br>", unsafe_allow_html=True)
-            search_btn = st.button("🔍 搜索文献", use_container_width=True, key="search_lit_btn")
+            search_btn = st.button("🔍 搜索文献", width="stretch", key="search_lit_btn")
 
         # ── 异步文献搜索 pending 状态 ──
         lit_pending = st.session_state.get("_lit_search_pending")
@@ -307,7 +307,7 @@ def render_paper_writing_ui():
             st.info("⏳ 正在搜索相关文献（含在线数据库），请稍候...")
             col_cancel, _ = st.columns([1, 3])
             with col_cancel:
-                if st.button("❌ 取消搜索", use_container_width=True, key="cancel_lit_search"):
+                if st.button("❌ 取消搜索", width="stretch", key="cancel_lit_search"):
                     cancel_search_request(lit_pending["cancel_id"])
                     try:
                         lit_pending["future"].cancel()
@@ -363,7 +363,7 @@ def render_paper_writing_ui():
                     "期刊": lit.get("journal", ""),
                     "相关性": lit.get("relevance", ""),
                 })
-            st.dataframe(pd.DataFrame(lit_data), use_container_width=True)
+            st.dataframe(pd.DataFrame(lit_data), width="stretch")
 
         # 手动添加文献
         st.divider()
@@ -450,7 +450,7 @@ def render_paper_writing_ui():
         if "❌" in gaps_text or "⚠" in gaps_text:
             st.warning("以下信息尚未完善，建议补充后再生成论文：\n\n" + gaps_text)
 
-        if st.button("🚀 生成完整论文初稿", type="primary", use_container_width=True, key="gen_paper"):
+        if st.button("🚀 生成完整论文初稿", type="primary", width="stretch", key="gen_paper"):
             with st.spinner("正在生成论文初稿（可能需要几十秒）..."):
                 try:
                     sections = engine.generate_full_paper()
@@ -631,7 +631,7 @@ def _render_paper_mode_defense_qa():
     )
 
     if st.button("🎤 生成答辩问题", type="secondary",
-                 use_container_width=True, key="paper_defense_qa_gen"):
+                 width="stretch", key="paper_defense_qa_gen"):
         ctx = {"test_type": test_type, "test_name_zh": test_name}
         with st.spinner("正在生成针对性答辩问题..."):
             items = generate_defense_qa(plan=plan, output=output, ctx=ctx,

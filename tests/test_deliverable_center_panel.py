@@ -12,6 +12,7 @@ from src.ui.deliverable_center_panel import (
     _get_or_build_bundle,
     _generate_export_content,
     get_deliverable_bundle,
+    _render_export,
 )
 from src.ui.state_keys import PAPER_BUNDLE_KEY, ANALYSIS_CARDS_KEY
 
@@ -128,3 +129,17 @@ class TestDeliverableState:
         bundle = _get_or_build_bundle(session_state)
         session_state[_BUNDLE_KEY] = bundle
         assert get_deliverable_bundle(session_state) is bundle
+
+
+def test_render_export_stops_before_download_when_gate_blocks(session_state, monkeypatch):
+    from unittest.mock import patch
+
+    bundle = _get_or_build_bundle(session_state)
+    monkeypatch.setattr(
+        "src.ui.deliverable_center_panel.run_export_gate",
+        lambda _state: (False, ["[PRIVACY_HIGH] 敏感信息"], []),
+    )
+    with patch("streamlit.error") as error, patch("streamlit.download_button") as download:
+        _render_export(bundle, session_state)
+    error.assert_called_once()
+    download.assert_not_called()

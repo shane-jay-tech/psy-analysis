@@ -19,8 +19,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import pandas as pd
 
-
-ARCHIVE_ROOT = Path(__file__).resolve().parent.parent.parent / "archive"
+from src.utils.app_paths import ARCHIVE_ROOT
 
 
 def _ensure_dir(path: Path) -> Path:
@@ -60,12 +59,9 @@ def archive_analysis(
     else:
         subdir = _ensure_dir(ARCHIVE_ROOT / f"{timestamp}_{archive_id}")
 
-    # 1. 原始数据（脱敏）
-    df_saved = df.copy()
-    from src.utils.guardrails import detect_name_columns, hash_column
-    name_cols = detect_name_columns(df_saved)
-    for col in name_cols:
-        df_saved[col] = hash_column(df_saved, col)
+    # 1. 数据最小化：高敏感列删除，身份标识稳定哈希。
+    from src.utils.guardrails import redact_dataframe_for_storage
+    df_saved, redaction_report = redact_dataframe_for_storage(df)
     df_saved.to_csv(subdir / "data.csv", index=False, encoding="utf-8-sig")
 
     # 2. 参数配置
@@ -79,6 +75,7 @@ def archive_analysis(
         "n_rows": len(df),
         "n_cols": len(df.columns),
         "columns": list(df.columns),
+        "privacy_redaction": redaction_report,
         "params": params,
     }
     with open(subdir / "params.json", "w", encoding="utf-8") as f:

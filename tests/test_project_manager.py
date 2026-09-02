@@ -102,6 +102,37 @@ def test_save_workspace_to_nonexistent_project_fails(temp_projects):
     assert not pm.save_workspace("nonexistent", {"x": 1})
 
 
+def test_failed_atomic_save_keeps_previous_workspace(temp_projects, monkeypatch):
+    p = pm.create_project("atomic")
+    assert pm.save_workspace(p.id, {"marker": "before"})
+
+    def fail_replace(_src, _dst):
+        raise OSError("disk interrupted")
+
+    monkeypatch.setattr(pm.os, "replace", fail_replace)
+    assert not pm.save_workspace(p.id, {"marker": "after"})
+    assert pm.load_workspace(p.id)["marker"] == "before"
+    assert list(temp_projects.glob(".*.tmp")) == []
+
+
+def test_corrupt_index_is_quarantined_and_workspaces_are_recovered(temp_projects):
+    first = pm.create_project("项目一")
+    second = pm.create_project("项目二")
+    pm.save_workspace(first.id, {"marker": "first"})
+    pm.save_workspace(second.id, {"marker": "second"})
+    (temp_projects / "index.json").write_text("{broken", encoding="utf-8")
+
+    recovered = pm.list_projects()
+
+    assert {project.id for project in recovered} == {first.id, second.id}
+    assert all("恢复的项目" in project.name for project in recovered)
+    assert len(list(temp_projects.glob("index.corrupt.*.bak"))) == 1
+    assert pm.load_workspace(first.id)["marker"] == "first"
+
+    third = pm.create_project("项目三")
+    assert {project.id for project in pm.list_projects()} == {first.id, second.id, third.id}
+
+
 def test_update_note(temp_projects):
     p = pm.create_project("p", note="原备注")
     assert pm.update_note(p.id, "新备注")

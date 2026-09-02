@@ -389,3 +389,47 @@ def detect_pii_columns(df) -> dict:
                     break
     result["any"] = bool(result["high"] or result["medium"] or result["low"])
     return result
+
+
+def redact_dataframe_for_storage(df):
+    """为档案/作业包生成最小化副本，不修改用户当前 DataFrame。
+
+    高敏感列直接移除；可识别身份与弱标识列做稳定哈希，以保留重复测量/分组关系。
+    返回 ``(redacted_df, report)``，便于导出物明确披露处理结果。
+    """
+    redacted = df.copy()
+    pii = detect_pii_columns(redacted)
+    dropped = list(pii.get("high", []))
+    hashed = list(dict.fromkeys(pii.get("medium", []) + pii.get("low", [])))
+
+    if dropped:
+        redacted = redacted.drop(columns=dropped, errors="ignore")
+    for column in hashed:
+        if column in redacted.columns:
+            redacted[column] = hash_column(redacted, column)
+
+    # PII 也可能藏在“备注/说明”等普通文本列中，不能只依赖列名。
+    from src.utils.privacy_ethics import redact_sensitive_text
+    from pandas.api.types import is_object_dtype, is_string_dtype
+
+    content_redactions: dict[str, int] = {}
+    for column in redacted.columns:
+        if not (is_object_dtype(redacted[column].dtype) or is_string_dtype(redacted[column].dtype)):
+            continue
+
+        def _redact_cell(value):
+            if not isinstance(value, str):
+                return value
+            cleaned, counts = redact_sensitive_text(value)
+            for pii_type, count in counts.items():
+                key = f"{column}:{pii_type}"
+                content_redactions[key] = content_redactions.get(key, 0) + count
+            return cleaned
+
+        redacted[column] = redacted[column].map(_redact_cell)
+
+    return redacted, {
+        "dropped_high_risk_columns": [str(c) for c in dropped],
+        "hashed_identifier_columns": [str(c) for c in hashed],
+        "redacted_content_matches": content_redactions,
+    }

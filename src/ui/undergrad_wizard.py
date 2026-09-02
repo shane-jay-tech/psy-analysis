@@ -53,6 +53,23 @@ from src.ui.cleaning_wizard import (
 from src.ui.export_gate import run_export_gate
 
 
+def _render_official_download(
+    label: str,
+    *,
+    artifact_state_keys: tuple[str, ...] = (),
+    **kwargs,
+) -> bool:
+    """正式论文/图表交付出口：门禁失败时清除产物且不渲染按钮。"""
+    allowed, gate_reasons, _ = run_export_gate(st.session_state)
+    if not allowed:
+        for state_key in artifact_state_keys:
+            st.session_state.pop(state_key, None)
+        st.error("导出被阻止：" + "; ".join(gate_reasons[:2]))
+        return False
+    st.download_button(label, **kwargs)
+    return True
+
+
 def _render_status_badges():
     """v2.9: 顶部进度条下显示全局状态徽章。"""
     from src.utils.figure_collection import get_collection_from_session
@@ -325,10 +342,9 @@ def _render_delivery_package_top_card():
 
     st.markdown(
         """
-<div style="background:#fff8e7;border-left:4px solid #f5a623;
-            padding:12px 16px;border-radius:4px;margin:6px 0 18px 0;">
+<div class="info-box">
 <strong>🎁 一键打包论文交付包</strong><br>
-<span style="font-size:0.92em;color:#555;">
+<span class="psy-panel-copy">
 把已生成的论文初稿（Word）+ 答辩备战手册（PDF）+ 论文图表集打包为一个 ZIP，
 一次下载齐全交付物，避免遗漏。
 </span>
@@ -390,7 +406,7 @@ def _render_delivery_package_top_card():
         )
 
         if st.button("🎁 生成论文交付包 ZIP", type="primary",
-                     use_container_width=True, key="delivery_gen"):
+                     width="stretch", key="delivery_gen"):
             with st.spinner("正在打包交付物..."):
                 figures = []
                 if include_figs:
@@ -436,16 +452,14 @@ def _render_delivery_package_top_card():
                     st.error(f"打包失败：{e}")
 
         if st.session_state.get("_delivery_zip"):
-            allowed, gate_reasons, _ = run_export_gate(st.session_state)
-            if not allowed:
-                st.warning("导出门禁提示: " + "; ".join(gate_reasons[:2]))
-            st.download_button(
+            _render_official_download(
                 "⬇ 下载论文交付包 ZIP",
+                artifact_state_keys=("_delivery_zip", "_delivery_filename"),
                 data=st.session_state["_delivery_zip"],
                 file_name=st.session_state.get("_delivery_filename", "论文交付包.zip"),
                 mime="application/zip",
                 key="delivery_dl",
-                use_container_width=True,
+                width="stretch",
                 on_click=lambda: _record_download(
                     "ZIP", st.session_state.get("_delivery_filename", "论文交付包.zip")
                 ),
@@ -517,7 +531,7 @@ def _render_ai_tutor(output: dict, ctx: dict, *, location: str = "step7"):
             st.markdown("**💭 推荐问题（点击直接发送）：**")
             for i, q in enumerate(suggestions):
                 if st.button(q, key=f"_tutor_suggest_{location}_{i}",
-                             use_container_width=True):
+                             width="stretch"):
                     st.session_state[f"_tutor_pending_q_{location}"] = q
                     st.rerun()
 
@@ -614,7 +628,7 @@ def _render_ai_tutor(output: dict, ctx: dict, *, location: str = "step7"):
                 file_name=f"AI助教对话_{location}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.md",
                 mime="text/markdown",
                 key=f"_tutor_export_{location}",
-                use_container_width=True,
+                width="stretch",
             )
             cols[2].caption(f"对话历史：{len(history)} 条（已自动保存到当前项目）")
 
@@ -659,8 +673,19 @@ def _render_collection_manager():
             for e in coll.list_all():
                 st.session_state[f"coll_sel_{e.figure_id}"] = False
             st.rerun()
-        if cols[2].button("🗑️ 清空整个收藏夹", key="coll_clear_all"):
-            coll.clear_all()
+        # v5.9: 收藏夹跨会话累积，误触清空不可恢复 → 两步确认
+        if st.session_state.get("_coll_clear_confirm"):
+            st.warning(f"⚠️ 将永久删除收藏夹中全部 {len(coll.list_all())} 张图表，不可恢复。")
+            _k1, _k2 = st.columns(2)
+            if _k1.button("⚠️ 确认清空", type="primary", key="coll_clear_yes"):
+                coll.clear_all()
+                st.session_state["_coll_clear_confirm"] = False
+                st.rerun()
+            if _k2.button("取消", key="coll_clear_no"):
+                st.session_state["_coll_clear_confirm"] = False
+                st.rerun()
+        elif cols[2].button("🗑️ 清空整个收藏夹", key="coll_clear_all"):
+            st.session_state["_coll_clear_confirm"] = True
             st.rerun()
 
         st.divider()
@@ -689,7 +714,7 @@ def _render_collection_manager():
                 with st.expander("👁 预览图表 / 编辑", expanded=False):
                     if entry.fig_object is not None:
                         st.plotly_chart(
-                            entry.fig_object, use_container_width=True,
+                            entry.fig_object, width="stretch",
                             config={"staticPlot": True},
                             key=f"coll_preview_{entry.figure_id}",
                         )
@@ -728,7 +753,7 @@ def _render_collection_manager():
                 key="coll_zip_palette",
             )
             if cols2[1].button("📦 批量下载 ZIP", type="primary",
-                              use_container_width=True, key="coll_zip"):
+                              width="stretch", key="coll_zip"):
                 specs = []
                 for fid in selected_ids:
                     e = coll.get(fid)
@@ -749,16 +774,14 @@ def _render_collection_manager():
                 st.session_state["_collection_zip_count"] = len(specs)
 
             if st.session_state.get("_collection_zip"):
-                _coll_allowed, _coll_reasons, _ = run_export_gate(st.session_state)
-                if not _coll_allowed:
-                    st.warning("导出门禁提示: " + "; ".join(_coll_reasons[:2]))
-                st.download_button(
+                _render_official_download(
                     "⬇ 下载论文图表集 ZIP",
+                    artifact_state_keys=("_collection_zip", "_collection_zip_count"),
                     data=st.session_state["_collection_zip"],
                     file_name="论文图表集.zip",
                     mime="application/zip",
                     key="coll_zip_dl",
-                    use_container_width=True,
+                    width="stretch",
                 )
 
             if st.button("🗑️ 删除选中", key="coll_batch_del"):
@@ -805,7 +828,7 @@ def _render_defense_handbook_download(items, ctx: dict):
             key="handbook_title",
         )
         if st.button("🖨 生成 PDF 手册", type="secondary",
-                     use_container_width=True, key="handbook_gen"):
+                     width="stretch", key="handbook_gen"):
             try:
                 meta = HandbookMeta(
                     research_title=title,
@@ -833,7 +856,7 @@ def _render_defense_handbook_download(items, ctx: dict):
                 file_name=st.session_state.get("_handbook_filename", "答辩备战手册.pdf"),
                 mime="application/pdf",
                 key="handbook_dl",
-                use_container_width=True,
+                width="stretch",
                 on_click=lambda: _record_download(
                     "PDF", st.session_state.get("_handbook_filename", "答辩备战手册.pdf")
                 ),
@@ -919,7 +942,7 @@ def _generate_paper_aware_with_context(plan, output: dict, ctx: dict, max_items:
     return list(result.items), meta
 
 
-def _render_pii_warning(df) -> None:
+def render_pii_warning(df) -> None:
     """v3.9 U5: 上传后检测 PII 列并提醒。
 
     高/中危列默认醒目展示并提供「一键脱敏」按钮（哈希替换原列）；低危列折叠。
@@ -1195,7 +1218,7 @@ def _render_defense_qa_section(plan, output: dict, ctx: dict):
             ),
         )
 
-        if st.button("🎤 生成答辩问题", type="secondary", use_container_width=True,
+        if st.button("🎤 生成答辩问题", type="secondary", width="stretch",
                      key="defense_qa_gen"):
             with st.spinner("正在分析检验类型并生成针对性问题..."):
                 # v3.9: paper-aware 路径 vs 模板路径
@@ -1440,7 +1463,7 @@ def _render_docx_download(method_md: str, result_md: str, output: dict,
             disabled=not include_chart,
         )
 
-        if st.button("📄 生成 Word 初稿", type="primary", use_container_width=True,
+        if st.button("📄 生成 Word 初稿", type="primary", width="stretch",
                      key="docx_generate"):
             with st.spinner("正在生成 Word 文档..."):
                 try:
@@ -1512,16 +1535,14 @@ def _render_docx_download(method_md: str, result_md: str, output: dict,
                     st.error(f"生成失败：{e}")
 
         if st.session_state.get("_docx_bytes"):
-            allowed, gate_reasons, _ = run_export_gate(st.session_state)
-            if not allowed:
-                st.warning("导出门禁提示: " + "; ".join(gate_reasons[:2]))
-            st.download_button(
+            _render_official_download(
                 "⬇ 下载 Word 文档",
+                artifact_state_keys=("_docx_bytes", "_docx_filename"),
                 data=st.session_state["_docx_bytes"],
                 file_name=st.session_state.get("_docx_filename", "论文初稿.docx"),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 key="docx_dl",
-                use_container_width=True,
+                width="stretch",
                 on_click=lambda: _record_download(
                     "Word", st.session_state.get("_docx_filename", "论文初稿.docx")
                 ),
@@ -1616,7 +1637,7 @@ def _render_figures_zip_download(output: dict, ctx: dict, wiz_data: dict):
             key="zip_palette",
         )
         if st.button("📦 生成 ZIP 包", type="secondary",
-                     use_container_width=True, key="zip_gen"):
+                     width="stretch", key="zip_gen"):
             from src.utils.export_naming import export_filename
             specs = _build_figure_specs(output, ctx, wiz_data)
             if not specs:
@@ -1634,16 +1655,14 @@ def _render_figures_zip_download(output: dict, ctx: dict, wiz_data: dict):
                     st.error(f"打包失败：{e}")
 
         if st.session_state.get("_figures_zip"):
-            _fig_allowed, _fig_reasons, _ = run_export_gate(st.session_state)
-            if not _fig_allowed:
-                st.warning("导出门禁提示: " + "; ".join(_fig_reasons[:2]))
-            st.download_button(
+            _render_official_download(
                 "⬇ 下载 ZIP 包",
+                artifact_state_keys=("_figures_zip", "_figures_zip_count"),
                 data=st.session_state["_figures_zip"],
                 file_name=export_filename("论文图表", "zip", title=ctx.get('test_name_zh', '分析')),
                 mime="application/zip",
                 key="zip_dl",
-                use_container_width=True,
+                width="stretch",
             )
             st.caption(
                 f"已打包 {st.session_state.get('_figures_zip_count', 0)} 张图，"
@@ -1903,7 +1922,7 @@ def render_assumption_failure_guidance(output, plan, df):
     iv = getattr(plan, "independent_vars", [None])
     iv = iv[0] if iv else None
 
-    if st.button(f"🔄 一键切换为 {alt_name}", type="primary", use_container_width=True,
+    if st.button(f"🔄 一键切换为 {alt_name}", type="primary", width="stretch",
                  key=f"switch_{alt_type}"):
         from src.parser.parser import resolve_intent
         from src.analysis.runner import run_analysis
@@ -1937,9 +1956,9 @@ def render_undergrad_wizard():
 
         with col1:
             st.markdown("""
-            <div style="border:2px solid #3498db; border-radius:12px; padding:1.2rem; height:320px;">
+            <div class="psy-choice-card">
             <h3>📋 问卷调查研究</h3>
-            <p style="color:#666; font-size:0.9em;">适合用问卷收集数据研究变量间关系的同学</p>
+            <p class="psy-choice-card__lead">适合用问卷收集数据研究变量间关系的同学</p>
             <hr>
             <p style="font-size:0.85em;">✅ 信度分析 → 描述统计<br>
             ✅ t检验 / 方差分析 / 相关<br>
@@ -1947,7 +1966,7 @@ def render_undergrad_wizard():
             ✅ 白话结果解读</p>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("📋 开始问卷研究向导", type="primary", use_container_width=True,
+            if st.button("📋 开始问卷研究向导", type="primary", width="stretch",
                          key="path_survey"):
                 wiz.undergrad_path = "survey"
                 wiz.undergrad_step = 1
@@ -1963,9 +1982,9 @@ def render_undergrad_wizard():
 
         with col2:
             st.markdown("""
-            <div style="border:2px solid #27ae60; border-radius:12px; padding:1.2rem; height:320px;">
+            <div class="psy-choice-card psy-choice-card--success">
             <h3>🧪 实验研究</h3>
-            <p style="color:#666; font-size:0.9em;">适合设计实验、操纵自变量、比较组间差异的同学</p>
+            <p class="psy-choice-card__lead">适合设计实验、操纵自变量、比较组间差异的同学</p>
             <hr>
             <p style="font-size:0.85em;">✅ 随机化检验 / 组间比较<br>
             ✅ t检验 / 方差分析<br>
@@ -1973,7 +1992,7 @@ def render_undergrad_wizard():
             ✅ 实验程序生成</p>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("🧪 开始实验研究向导", type="primary", use_container_width=True,
+            if st.button("🧪 开始实验研究向导", type="primary", width="stretch",
                          key="path_experiment"):
                 wiz.undergrad_path = "experiment"
                 wiz.undergrad_step = 1
@@ -1993,9 +2012,9 @@ def render_undergrad_wizard():
 
         with col3:
             st.markdown("""
-            <div style="border:2px solid #8e44ad; border-radius:12px; padding:1.2rem; height:320px;">
+            <div class="psy-choice-card psy-choice-card--neutral">
             <h3>🔓 自由模式</h3>
-            <p style="color:#666; font-size:0.9em;">我已熟悉系统操作，直接使用完整功能</p>
+            <p class="psy-choice-card__lead">我已熟悉系统操作，直接使用完整功能</p>
             <hr>
             <p style="font-size:0.85em;">✅ 所有分析功能<br>
             ✅ 问卷设计 / 实验设计<br>
@@ -2003,9 +2022,10 @@ def render_undergrad_wizard():
             ✅ 完整功能无限制</p>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("🔓 进入自由模式", type="secondary", use_container_width=True,
+            if st.button("🔓 进入自由模式", type="secondary", width="stretch",
                          key="path_free"):
                 wiz.undergrad_mode = False
+                wiz["_pending_undergrad_mode"] = False
                 wiz.undergrad_path = None
                 st.rerun()
 
@@ -2191,9 +2211,10 @@ def render_undergrad_wizard():
                     "💡 问卷设计模块可以帮助你根据研究构念自动生成量表题目。"
                     "点击下方按钮跳转到问卷设计模块，完成后可返回向导继续。"
                 )
-                if st.button("📋 跳转到问卷设计模块", type="secondary", use_container_width=True,
+                if st.button("📋 跳转到问卷设计模块", type="secondary", width="stretch",
                              key="bridge_to_questionnaire"):
                     wiz.undergrad_mode = False
+                    wiz["_pending_undergrad_mode"] = False
                     st.session_state.app_mode = "📋 问卷设计"
                     # 前向传递：把向导中的研究主题预填到问卷设计
                     prefill = wiz_data.get("topic", "") or wiz_data.get("construct", "")
@@ -2218,9 +2239,10 @@ def render_undergrad_wizard():
                     "💡 实验设计模块可以帮助你生成实验范式、确定样本量、"
                     "创建预注册文档。点击下方按钮跳转，完成后可返回向导继续。"
                 )
-                if st.button("🧪 跳转到实验设计模块", type="secondary", use_container_width=True,
+                if st.button("🧪 跳转到实验设计模块", type="secondary", width="stretch",
                              key="bridge_to_experiment"):
                     wiz.undergrad_mode = False
+                    wiz["_pending_undergrad_mode"] = False
                     st.session_state.app_mode = "🧪 实验设计"
                     # 前向传递：把向导中的研究信息预填到实验设计
                     topic = wiz_data.get("topic", "")
@@ -2271,8 +2293,9 @@ def render_undergrad_wizard():
                         "iv_count": len(getattr(exp_design, "independent_vars", [])),
                     }
             st.success(f"✅ 模块操作完成！点击下方按钮返回向导继续。")
-            if st.button("🔙 返回向导继续", type="primary", use_container_width=True):
+            if st.button("🔙 返回向导继续", type="primary", width="stretch"):
                 wiz.undergrad_mode = True
+                wiz["_pending_undergrad_mode"] = True
                 wiz.undergrad_path = ret["path"]
                 wiz.undergrad_step = 2
                 wiz_data = ret["data"]
@@ -2298,7 +2321,7 @@ def render_undergrad_wizard():
         st.divider()
         _, right_col = st.columns([3, 1])
         with right_col:
-            if st.button("下一步 ➡️", type="primary", use_container_width=True):
+            if st.button("下一步 ➡️", type="primary", width="stretch"):
                 wiz.undergrad_step = 2
                 st.rerun()
 
@@ -2396,7 +2419,7 @@ def render_undergrad_wizard():
             st.markdown("选择一组模拟数据直接体验完整分析流程：")
             demo_col1, demo_col2 = st.columns(2)
             with demo_col1:
-                if st.button("📋 加载问卷示例数据", use_container_width=True,
+                if st.button("📋 加载问卷示例数据", width="stretch",
                              help="200名被试的社交焦虑问卷数据（含焦虑总分、维度分、自尊分）"):
                     demo_df = generate_demo_questionnaire_data(200)
                     wiz.df = demo_df
@@ -2413,7 +2436,7 @@ def render_undergrad_wizard():
                     st.success(f"✅ 已加载问卷示例数据 ({len(demo_df)} 名被试, {len(demo_df.columns)} 个变量)")
                     st.rerun()
             with demo_col2:
-                if st.button("🧪 加载实验示例数据", use_container_width=True,
+                if st.button("🧪 加载实验示例数据", width="stretch",
                              help="80名被试的认知实验数据（实验组/控制组，前测/后测）"):
                     demo_df = generate_demo_experiment_data(40)
                     wiz.df = demo_df
@@ -2431,7 +2454,7 @@ def render_undergrad_wizard():
                     st.rerun()
             demo_col3, demo_col4 = st.columns(2)
             with demo_col3:
-                if st.button("🔄 加载重复测量示例", use_container_width=True,
+                if st.button("🔄 加载重复测量示例", width="stretch",
                              help="50名被试×3个时间点的焦虑追踪数据（T1→T2→T3递减趋势）"):
                     demo_df = generate_demo_repeated_measures_data(50)
                     wiz.df = demo_df
@@ -2448,7 +2471,7 @@ def render_undergrad_wizard():
                     st.success(f"✅ 已加载重复测量示例 ({len(demo_df)} 名被试, {len(demo_df.columns)} 个变量)")
                     st.rerun()
             with demo_col4:
-                if st.button("📊 加载多组干预示例", use_container_width=True,
+                if st.button("📊 加载多组干预示例", width="stretch",
                              help="120名被试×4组干预数据（1对照组+3实验组，前测/后测）"):
                     demo_df = generate_demo_multi_group_data(30)
                     wiz.df = demo_df
@@ -2466,7 +2489,7 @@ def render_undergrad_wizard():
                     st.rerun()
             demo_col5, _ = st.columns([1, 1])
             with demo_col5:
-                if st.button("🔗 加载中介效应示例", use_container_width=True,
+                if st.button("🔗 加载中介效应示例", width="stretch",
                              help="150名被试的中介模型数据（培训→学习动机→学业成绩, ab路径显著）"):
                     demo_df = generate_demo_mediation_data(150)
                     wiz.df = demo_df
@@ -2498,7 +2521,7 @@ def render_undergrad_wizard():
                     with col:
                         if st.button(
                             spec["title"],
-                            use_container_width=True,
+                            width="stretch",
                             help=spec["description"],
                             key=f"hr_demo_{spec['key']}",
                         ):
@@ -2594,10 +2617,10 @@ def render_undergrad_wizard():
                 f"行数：{meta.get('row_count', '?')} | 列数：{meta.get('col_count', '?')}"
             )
             with st.expander("📋 数据预览（前10行）"):
-                st.dataframe(wiz.df.head(10), use_container_width=True)
+                st.dataframe(wiz.df.head(10), width="stretch")
 
             # v3.9 U5: PII 隐私风险检测
-            _render_pii_warning(wiz.df)
+            render_pii_warning(wiz.df)
 
             # v3.9 N9: jsPsych 长→宽 auto-pivot
             if meta.get("source_type") == "jspsych_json":
@@ -2606,11 +2629,11 @@ def render_undergrad_wizard():
         st.divider()
         col_left, col_right = st.columns([1, 1])
         with col_left:
-            if st.button("⬅️ 上一步", use_container_width=True):
+            if st.button("⬅️ 上一步", width="stretch"):
                 wiz.undergrad_step = 1
                 st.rerun()
         with col_right:
-            if st.button("下一步 ➡️", type="primary", use_container_width=True):
+            if st.button("下一步 ➡️", type="primary", width="stretch"):
                 if wiz.df is None:
                     st.error("请先上传数据文件！")
                 else:
@@ -2636,13 +2659,13 @@ def render_undergrad_wizard():
                 "缺失值": info.get("n_missing", 0),
                 "唯一值数": info.get("n_unique", "?"),
             })
-        st.dataframe(pd.DataFrame(var_data), use_container_width=True)
+        st.dataframe(pd.DataFrame(var_data), width="stretch")
 
         numeric_cols = [c for c, info in inspector.items()
                        if info.get("type") in ("continuous", "numeric", "float", "int")]
         if numeric_cols:
             with st.expander("📊 描述性统计（数值变量）"):
-                st.dataframe(df[numeric_cols].describe(), use_container_width=True)
+                st.dataframe(df[numeric_cols].describe(), width="stretch")
 
         cat_cols = [c for c, info in inspector.items()
                     if info.get("type") in ("categorical", "object", "string", "str")]
@@ -2650,7 +2673,7 @@ def render_undergrad_wizard():
             with st.expander("📊 分类变量分布"):
                 for col in cat_cols:
                     st.markdown(f"**{col}**")
-                    st.dataframe(df[col].value_counts().reset_index(), use_container_width=True)
+                    st.dataframe(df[col].value_counts().reset_index(), width="stretch")
 
         issues = validate_data(df)
         if issues:
@@ -2675,11 +2698,11 @@ def render_undergrad_wizard():
         st.divider()
         col_left, col_right = st.columns([1, 1])
         with col_left:
-            if st.button("⬅️ 上一步", use_container_width=True, key="step3_back"):
+            if st.button("⬅️ 上一步", width="stretch", key="step3_back"):
                 wiz.undergrad_step = 2
                 st.rerun()
         with col_right:
-            if st.button("下一步 ➡️", type="primary", use_container_width=True, key="step3_next"):
+            if st.button("下一步 ➡️", type="primary", width="stretch", key="step3_next"):
                 wiz.undergrad_step = 4
                 st.rerun()
 
@@ -2895,11 +2918,11 @@ def render_undergrad_wizard():
         st.divider()
         col_left, col_right = st.columns([1, 1])
         with col_left:
-            if st.button("⬅️ 上一步", use_container_width=True, key="step4_back"):
+            if st.button("⬅️ 上一步", width="stretch", key="step4_back"):
                 wiz.undergrad_step = 3
                 st.rerun()
         with col_right:
-            if st.button("下一步 ➡️", type="primary", use_container_width=True, key="step4_next"):
+            if st.button("下一步 ➡️", type="primary", width="stretch", key="step4_next"):
                 wiz.undergrad_step = 5
                 st.rerun()
 
@@ -2959,11 +2982,11 @@ def render_undergrad_wizard():
         st.divider()
         col_left, col_mid, col_right = st.columns([1, 1, 1])
         with col_left:
-            if st.button("⬅️ 上一步", use_container_width=True, key="step5_back"):
+            if st.button("⬅️ 上一步", width="stretch", key="step5_back"):
                 wiz.undergrad_step = 4
                 st.rerun()
         with col_mid:
-            run_btn = st.button("🔍 运行分析", type="primary", use_container_width=True, key="step5_run")
+            run_btn = st.button("🔍 运行分析", type="primary", width="stretch", key="step5_run")
 
         if run_btn:
             if not selected_dv or selected_dv == "（未检测到数值变量）":
@@ -3027,7 +3050,7 @@ def render_undergrad_wizard():
 
         if output is None:
             st.warning("⚠️ 尚未运行分析，请先回到第5步运行分析。")
-            if st.button("⬅️ 返回第5步", use_container_width=True):
+            if st.button("⬅️ 返回第5步", width="stretch"):
                 wiz.undergrad_step = 5
                 st.rerun()
             st.stop()
@@ -3052,7 +3075,7 @@ def render_undergrad_wizard():
         desc = output.get("descriptive")
         if desc is not None and not desc.empty:
             with st.expander("📊 描述性统计", expanded=True):
-                st.dataframe(desc, use_container_width=True)
+                st.dataframe(desc, width="stretch")
 
         assumptions = output.get("assumptions", {})
         if assumptions:
@@ -3167,13 +3190,13 @@ def render_undergrad_wizard():
         st.subheader("📥 导出结果")
         col_exp1, col_exp2, col_exp3 = st.columns(3)
         with col_exp1:
-            if st.button("📥 导出分析报告 (HTML)", use_container_width=True, key="wiz_export_html"):
+            if st.button("📥 导出分析报告 (HTML)", width="stretch", key="wiz_export_html"):
                 export_html(output, df)
         with col_exp2:
-            if st.button("📄 导出结果数据 (CSV)", use_container_width=True, key="wiz_export_csv"):
+            if st.button("📄 导出结果数据 (CSV)", width="stretch", key="wiz_export_csv"):
                 export_csv(output)
         with col_exp3:
-            if st.button("💾 保存分析快照", use_container_width=True, key="wiz_snapshot"):
+            if st.button("💾 保存分析快照", width="stretch", key="wiz_snapshot"):
                 try:
                     from src.analysis.runner import export_snapshot
                     snap_path = export_snapshot(output)
@@ -3183,7 +3206,8 @@ def render_undergrad_wizard():
                     st.error(f"快照保存失败：{e}")
 
         with st.expander("⚠️ 学术诚信提醒（重要！）"):
-            st.markdown("""
+            from src.version import APP_VERSION_LABEL
+            st.markdown(f"""
             <div style="font-size:0.9em;">
             <h4>📝 使用本工具的研究者须知：</h4>
             <ol>
@@ -3192,7 +3216,7 @@ def render_undergrad_wizard():
                 <li><strong>相关 ≠ 因果</strong>：相关分析只能说明两个变量有关联，不能推断因果关系。</li>
                 <li><strong>避免 p-hacking</strong>：不要在分析后根据结果调整假设或选择性报告显著结果。</li>
                 <li><strong>辅助工具声明</strong>：在论文中声明使用本工具辅助数据分析。示例声明：<br>
-                <em>"本研究使用心理学研究工具 v2.2 进行数据整理和统计分析。"</em></li>
+                <em>"本研究使用心理学研究工具 {APP_VERSION_LABEL} 进行数据整理和统计分析。"</em></li>
             </ol>
             </div>
             """, unsafe_allow_html=True)
@@ -3201,27 +3225,29 @@ def render_undergrad_wizard():
         st.subheader("🎯 接下来可以做什么？")
         suggestions = st.columns(4)
         with suggestions[0]:
-            if st.button("✍️ 写入论文 → 第7步", type="primary", use_container_width=True, key="wiz_to_step7"):
+            if st.button("✍️ 写入论文 → 第7步", type="primary", width="stretch", key="wiz_to_step7"):
                 wiz.undergrad_step = 7
                 st.rerun()
         with suggestions[1]:
-            if st.button("🔄 运行其他分析", use_container_width=True, key="wiz_rerun"):
+            if st.button("🔄 运行其他分析", width="stretch", key="wiz_rerun"):
                 wiz.undergrad_step = 4
                 st.rerun()
         with suggestions[2]:
-            if st.button("📝 进入论文写作", use_container_width=True, key="wiz_paper"):
+            if st.button("📝 进入论文写作", width="stretch", key="wiz_paper"):
                 wiz.undergrad_mode = False
+                wiz["_pending_undergrad_mode"] = False
                 st.session_state.app_mode = "📝 论文写作"
                 st.rerun()
         with suggestions[3]:
-            if st.button("🔓 进入自由模式", use_container_width=True, key="wiz_free"):
+            if st.button("🔓 进入自由模式", width="stretch", key="wiz_free"):
                 wiz.undergrad_mode = False
+                wiz["_pending_undergrad_mode"] = False
                 st.rerun()
 
         st.divider()
         col_left, _ = st.columns([1, 3])
         with col_left:
-            if st.button("⬅️ 返回第5步", use_container_width=True, key="step6_back"):
+            if st.button("⬅️ 返回第5步", width="stretch", key="step6_back"):
                 wiz.undergrad_step = 5
                 st.rerun()
 
@@ -3259,7 +3285,7 @@ def render_undergrad_wizard():
 
         if output is None:
             st.warning("⚠️ 尚未运行分析，请先回到第5步完成分析。")
-            if st.button("⬅️ 返回第5步", use_container_width=True):
+            if st.button("⬅️ 返回第5步", width="stretch"):
                 wiz.undergrad_step = 5
                 st.rerun()
             st.stop()
@@ -3507,7 +3533,7 @@ def render_undergrad_wizard():
                     )
                     if "polished_draft" not in st.session_state:
                         st.session_state.polished_draft = None
-                    if st.button("✨ 开始AI润色", type="secondary", use_container_width=True,
+                    if st.button("✨ 开始AI润色", type="secondary", width="stretch",
                                  key="polish_draft_btn"):
                         from src.utils.llm_timer import llm_status
                         with llm_status("AI 正在润色论文草稿"):
@@ -3550,9 +3576,10 @@ def render_undergrad_wizard():
         # ── 跳转到完整论文写作 ──
         st.divider()
         st.markdown("#### 📝 需要完整的论文初稿？")
-        if st.button("📝 打开完整论文写作模块", type="secondary", use_container_width=True):
+        if st.button("📝 打开完整论文写作模块", type="secondary", width="stretch"):
             # 切换到标准模式并进入论文写作
             wiz.undergrad_mode = False
+            wiz["_pending_undergrad_mode"] = False
             st.session_state.app_mode = "📝 论文写作"
             st.rerun()
 
@@ -3683,6 +3710,6 @@ def render_undergrad_wizard():
         st.divider()
         col_left, _ = st.columns([1, 3])
         with col_left:
-            if st.button("⬅️ 返回第6步", use_container_width=True, key="step7_back"):
+            if st.button("⬅️ 返回第6步", width="stretch", key="step7_back"):
                 wiz.undergrad_step = 6
                 st.rerun()

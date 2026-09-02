@@ -1,7 +1,9 @@
 # 软约束（minimum + 已知不兼容上界）
 # v3.9 U5: 校准上界以匹配 2026 已验证可工作版本；
 # 若需精确复现部署环境，使用同目录下的 requirements-lock.txt（pip freeze 锁定）。
-streamlit>=1.28.0,<2.0.0
+# v5.9: width="stretch" 替代 use_container_width（后者 2025-12-31 移除）；
+# 1.50+ 全量支持 width 参数，requirements-lock 锁定 1.57.0（已实测）。
+streamlit>=1.50.0,<2.0.0
 pandas>=2.0.0,<4.0.0
 numpy>=1.24.0,<3.0.0
 scipy>=1.10.0,<2.0.0

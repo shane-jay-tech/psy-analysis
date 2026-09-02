@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import copy
 import io
+import os
+from pathlib import Path
 from typing import Literal
 
 import plotly.graph_objects as go
@@ -45,13 +47,16 @@ DEFAULT_HEIGHT_PX = 1200
 
 
 class KaleidoMissingError(RuntimeError):
-    """kaleido 包不可用时抛出，UI 层捕获并提示安装命令。"""
+    """kaleido 或其浏览器运行时不可用时抛出，UI 层统一友好提示。"""
 
-    def __init__(self):
+    def __init__(self, detail: str = ""):
+        suffix = f"\n原因：{detail}" if detail else ""
         super().__init__(
-            "导出 PNG 需要安装 kaleido。请在终端运行：\n"
+            "导出 PNG 需要 kaleido 和可用的 Chrome/Chromium。请运行：\n"
             "    pip install -U kaleido\n"
-            "若安装失败，可下载 HTML 版图表后用浏览器截图。"
+            "    kaleido_get_chrome\n"
+            "也可安装 Playwright Chromium；临时无法安装时请导出 HTML。"
+            f"{suffix}"
         )
 
 
@@ -61,6 +66,42 @@ def _kaleido_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+def _find_local_chromium() -> Path | None:
+    """寻找 Kaleido 可用的浏览器，优先 Chrome 与 Playwright Chromium。"""
+    configured = os.environ.get("BROWSER_PATH")
+    if configured:
+        configured_path = Path(configured)
+        if configured_path.is_file():
+            return configured_path
+
+    candidates = [
+        Path(os.environ.get("PROGRAMFILES", "")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", "")) / "Google/Chrome/Application/chrome.exe",
+    ]
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        playwright_root = Path(local_app_data) / "ms-playwright"
+        if playwright_root.is_dir():
+            candidates.extend(
+                sorted(
+                    playwright_root.glob("chromium-*/chrome-win*/chrome.exe"),
+                    reverse=True,
+                )
+            )
+    return next((path for path in candidates if path.is_file()), None)
+
+
+def _render_static_image(fig: go.Figure, **kwargs) -> bytes:
+    """渲染静态图；为 Kaleido 设置已安装的可靠浏览器并统一错误。"""
+    browser_path = _find_local_chromium()
+    if browser_path is not None:
+        os.environ["BROWSER_PATH"] = str(browser_path)
+    try:
+        return fig.to_image(**kwargs)
+    except Exception as exc:
+        raise KaleidoMissingError(str(exc)) from exc
 
 
 def apply_paper_style(
@@ -191,7 +232,8 @@ def to_paper_png(
 
     target = apply_paper_style(fig, palette=palette) if apply_style else copy.deepcopy(fig)
 
-    return target.to_image(
+    return _render_static_image(
+        target,
         format="png",
         width=width_px,
         height=height_px,
@@ -210,7 +252,7 @@ def to_paper_svg(
         raise KaleidoMissingError()
 
     target = apply_paper_style(fig, palette=palette) if apply_style else copy.deepcopy(fig)
-    return target.to_image(format="svg")
+    return _render_static_image(target, format="svg")
 
 
 def get_palette_label(palette: PaletteName) -> str:

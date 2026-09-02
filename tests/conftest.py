@@ -12,8 +12,41 @@ v3.3: 新增 benchmark 标记与 --run-benchmark 命令行选项（反问质量�
 """
 
 import warnings
+from pathlib import Path
 
 import pytest
+
+
+_APP_TEST_FILES = {
+    "test_e2e_rendering.py",
+    "test_e2e_ui.py",
+    "test_e2e_v52_paths.py",
+    "test_playwright_e2e.py",
+    "test_playwright_golden_research_flow.py",
+}
+
+
+@pytest.fixture(autouse=True)
+def isolate_streamlit_app_test_storage(request, monkeypatch, tmp_path):
+    """AppTest 不得读取或写入用户真实项目、偏好、档案和事件日志。"""
+    if Path(str(request.node.fspath)).name not in _APP_TEST_FILES:
+        return
+
+    from src.utils import archive_manager, autosave, project_manager, usage_logger, user_prefs
+
+    app_home = tmp_path / ".psy_analysis"
+    projects_dir = app_home / "projects"
+    monkeypatch.setenv("PSY_ANALYSIS_HOME", str(app_home))
+    monkeypatch.setenv("PSY_ANALYSIS_ARCHIVE_DIR", str(tmp_path / "archive"))
+    monkeypatch.setenv("PSY_ANALYSIS_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(project_manager, "PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr(project_manager, "INDEX_FILE", projects_dir / "index.json")
+    monkeypatch.setattr(user_prefs, "PREFS_DIR", app_home)
+    monkeypatch.setattr(user_prefs, "PREFS_FILE", app_home / "user_prefs.json")
+    monkeypatch.setattr(autosave, "LEGACY_AUTOSAVE_FILE", app_home / "autosave.json")
+    monkeypatch.setattr(autosave, "LEGACY_META_FILE", app_home / "autosave_meta.json")
+    monkeypatch.setattr(archive_manager, "ARCHIVE_ROOT", tmp_path / "archive")
+    monkeypatch.setattr(usage_logger, "_LOG_DIR", tmp_path / "logs")
 
 
 def pytest_addoption(parser):

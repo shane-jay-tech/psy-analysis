@@ -332,8 +332,9 @@ class TestSessionStateManagement:
 class TestPerformanceBenchmarks:
     """使用合成大数据验证核心分析函数的性能"""
 
+    @classmethod
     @pytest.fixture(scope="class")
-    def large_df(self):
+    def large_df(cls):
         """生成 1000×20 的合成数据"""
         np.random.seed(42)
         n_rows = 1000

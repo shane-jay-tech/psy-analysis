@@ -57,11 +57,13 @@ class SensitiveFinding:
 
 # 敏感信息正则
 _PATTERNS = {
-    "id_card": (r"\b\d{17}[\dXx]\b", "high"),
-    "phone": (r"\b1[3-9]\d{9}\b", "high"),
+    "id_card": (r"(?<!\d)\d{17}[\dXx](?!\w)", "high"),
+    "phone": (r"(?<!\d)1[3-9]\d{9}(?!\d)", "high"),
+    "landline": (r"(?i)(?:电话|座机|tel(?:ephone)?)\s*[：:=]?\s*0\d{2,3}-?\d{7,8}(?!\d)", "high"),
     "email": (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "medium"),
     "api_key": (r"\b(sk-|ak_|AKIA)[A-Za-z0-9]{20,}\b", "high"),
     "password": (r"(?i)(password|passwd|pwd)\s*[=:]\s*\S+", "medium"),
+    "messenger": (r"(?i)(微信|wechat|qq)\s*[：:=]?\s*[A-Za-z0-9_-]{5,20}", "high"),
 }
 
 
@@ -79,6 +81,20 @@ def scan_text_for_sensitive(text: str, source: str = "unknown") -> list[Sensitiv
                 severity=severity,
             ))
     return findings
+
+
+def redact_sensitive_text(text: str) -> tuple[str, dict[str, int]]:
+    """替换文本中的可识别信息，返回脱敏文本与按类型计数。
+
+    使用与导出预检完全相同的模式，避免出现“门禁能发现、归档却未处理”的分叉。
+    """
+    redacted = str(text)
+    counts: dict[str, int] = {}
+    for pattern_type, (regex, _severity) in _PATTERNS.items():
+        redacted, count = re.subn(regex, f"[REDACTED_{pattern_type.upper()}]", redacted)
+        if count:
+            counts[pattern_type] = count
+    return redacted, counts
 
 
 def scan_dataframe_for_sensitive(df, column_names_only: bool = False) -> list[SensitiveFinding]:

@@ -30,6 +30,8 @@ def test_autosave_writes_to_active_project(temp_projects):
     assert saved
     ws = pm.load_workspace(proj.id)
     assert ws["marker"] == "abc"
+    assert state[autosave_mod.SESSION_LAST_SAVED_LABEL_KEY]
+    assert autosave_mod.SESSION_LAST_ERROR_KEY not in state
 
 
 def test_autosave_skipped_when_no_active_project(temp_projects):
@@ -68,6 +70,15 @@ def test_autosave_handles_builder_exception(temp_projects):
         raise RuntimeError("build failed")
     saved = autosave_mod.trigger_autosave(state, boom, force=True)
     assert not saved
+    assert "自动保存" in state[autosave_mod.SESSION_LAST_ERROR_KEY]
+
+
+def test_autosave_clears_previous_error_after_success(temp_projects):
+    state = {autosave_mod.SESSION_LAST_ERROR_KEY: "old error"}
+    proj = pm.create_project("recover")
+    pm.set_active_project(state, proj.id)
+    assert autosave_mod.trigger_autosave(state, lambda: {"ok": True}, force=True)
+    assert autosave_mod.SESSION_LAST_ERROR_KEY not in state
 
 
 def test_autosave_targets_correct_project_after_switch(temp_projects):
@@ -77,10 +88,11 @@ def test_autosave_targets_correct_project_after_switch(temp_projects):
     p2 = pm.create_project("project2")
 
     pm.set_active_project(state, p1.id)
-    autosave_mod.trigger_autosave(state, lambda: {"who": "p1"}, force=True)
+    autosave_mod.trigger_autosave(state, lambda: {"who": "p1"})
 
     pm.set_active_project(state, p2.id)
-    autosave_mod.trigger_autosave(state, lambda: {"who": "p2"}, force=True)
+    # 切换项目后即使仍在 30 秒窗口，也必须保存新项目。
+    assert autosave_mod.trigger_autosave(state, lambda: {"who": "p2"})
 
     assert pm.load_workspace(p1.id)["who"] == "p1"
     assert pm.load_workspace(p2.id)["who"] == "p2"

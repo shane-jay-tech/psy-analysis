@@ -11,6 +11,8 @@ from unittest.mock import patch, MagicMock
 import pandas as pd
 import pytest
 
+from src.utils import project_manager as pm
+
 from src.templates.registry import list_templates, get_template, create_project_from_template
 from src.ui.template_center_panel import (
     _CREATED_PROJECT_KEY,
@@ -20,6 +22,13 @@ from src.ui.template_center_panel import (
     _translate_research_type,
     _translate_method,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolated_project_store(tmp_path, monkeypatch):
+    projects_dir = tmp_path / "projects"
+    monkeypatch.setattr(pm, "PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr(pm, "INDEX_FILE", projects_dir / "index.json")
 
 
 class TestTemplateListDisplay:
@@ -82,6 +91,11 @@ class TestProjectCreation:
         df = session_state["uploaded_df"]
         assert isinstance(df, pd.DataFrame)
         assert len(df) >= 30
+        assert session_state["df"] is df
+        assert session_state["file_name"].endswith("样例数据.csv")
+        assert session_state["meta"]["source_type"] == "template"
+        assert session_state["inspector"]
+        assert session_state["analysis_output"] is None
 
     def test_create_loads_config(self):
         tpl = get_template("pre_post_experiment")
@@ -112,8 +126,47 @@ class TestProjectCreation:
         with patch("streamlit.error"):
             _create_project(tpl, session_state)
 
-        assert session_state.get("project_id") == "questionnaire_correlation"
+        project_id = session_state.get("project_id")
+        assert project_id
+        assert project_id != "questionnaire_correlation"
+        assert session_state.get("_active_project_id") == project_id
+        assert pm.get_project(project_id).name == tpl.name
+        workspace = pm.load_workspace(project_id)
+        assert workspace and "df_b64" in workspace
         assert session_state.get("template_source") == "questionnaire_correlation"
+
+    def test_create_saves_previous_project_before_switching(self):
+        previous = pm.create_project("旧研究")
+        old_df = pd.DataFrame({"old_score": [1, 2, 3]})
+        session_state = {
+            "_active_project_id": previous.id,
+            "df": old_df,
+            "file_name": "old.csv",
+            "analysis_history": [{"test_type": "descriptive"}],
+        }
+
+        tpl = get_template("questionnaire_correlation")
+        with patch("streamlit.error"):
+            _create_project(tpl, session_state)
+
+        previous_workspace = pm.load_workspace(previous.id)
+        assert previous_workspace and "df_b64" in previous_workspace
+        assert previous_workspace["file_name"] == "old.csv"
+        assert session_state["_active_project_id"] != previous.id
+
+    def test_create_failure_does_not_clear_current_session(self, monkeypatch):
+        previous = pm.create_project("旧研究")
+        old_df = pd.DataFrame({"old_score": [1, 2, 3]})
+        session_state = {"_active_project_id": previous.id, "df": old_df}
+        monkeypatch.setattr(pm, "create_project", MagicMock(side_effect=OSError("disk full")))
+
+        tpl = get_template("questionnaire_correlation")
+        with patch("streamlit.error") as show_error:
+            _create_project(tpl, session_state)
+
+        assert session_state["df"] is old_df
+        assert session_state["_active_project_id"] == previous.id
+        show_error.assert_called_once()
 
 
 class TestHelperFunctions:

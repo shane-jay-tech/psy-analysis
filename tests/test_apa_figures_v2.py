@@ -6,6 +6,7 @@ regression_diagnostics, simple_slopes, factor_loading_heatmap。
 """
 
 import pytest
+import warnings
 
 from src.output.apa_figures import (
     APAFigure,
@@ -74,10 +75,13 @@ class TestRegressionFit:
     def test_basic_fit(self):
         x = [1, 2, 3, 4, 5, 6, 7, 8]
         y = [2.1, 3.8, 5.2, 7.1, 8.9, 10.5, 12.0, 14.2]
-        fig = generate_regression_fit_figure(x, y, r_squared=0.98)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            fig = generate_regression_fit_figure(x, y, r_squared=0.98)
         assert isinstance(fig, APAFigure)
         assert fig.png_bytes[:4] == b"\x89PNG"
         assert "regression" in fig.method
+        assert not any("Glyph 178" in str(item.message) for item in caught)
 
     def test_with_predicted(self):
         x = [1, 2, 3, 4, 5]

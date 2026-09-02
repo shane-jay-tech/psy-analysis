@@ -124,6 +124,33 @@ def test_archive_round_trip_index_and_tag_queries(isolated_archive):
     assert loaded["report"] == "# report"
 
 
+def test_archive_removes_high_pii_and_records_redaction(isolated_archive):
+    df = pd.DataFrame({
+        "手机号": ["13800138000", "13900139000"],
+        "姓名": ["张三", "李四"],
+        "score": [1, 2],
+    })
+    saved = archive_manager.archive_analysis(df, {"test_type": "descriptive"}, "", {})
+
+    loaded = archive_manager.load_archive(saved["archive_id"])
+    assert "手机号" not in loaded["df"].columns
+    assert loaded["df"]["姓名"].tolist() != df["姓名"].tolist()
+    redaction = loaded["params"]["privacy_redaction"]
+    assert redaction["dropped_high_risk_columns"] == ["手机号"]
+    assert redaction["hashed_identifier_columns"] == ["姓名"]
+
+
+def test_archive_redacts_phone_hidden_in_neutral_text_column(isolated_archive):
+    df = pd.DataFrame({"备注": ["请联系13800138000"], "score": [1]})
+
+    saved = archive_manager.archive_analysis(df, {"test_type": "descriptive"}, "", {})
+    loaded = archive_manager.load_archive(saved["archive_id"])
+
+    assert loaded["df"].loc[0, "备注"] == "请联系[REDACTED_PHONE]"
+    report = loaded["params"]["privacy_redaction"]
+    assert report["redacted_content_matches"] == {"备注:phone": 1}
+
+
 def test_archive_without_report_and_invalid_or_missing_index(isolated_archive):
     assert archive_manager.list_archives() == []
     isolated_archive.mkdir(parents=True)

@@ -110,7 +110,7 @@ def render_project_panel():
 
     if not active:
         st.sidebar.warning("⚠ 当前无活跃项目")
-        if st.sidebar.button("➕ 新建项目", use_container_width=True, key="proj_new_empty"):
+        if st.sidebar.button("➕ 新建项目", width="stretch", key="proj_new_empty"):
             new_proj = pm.create_project("我的研究")
             pm.set_active_project(st.session_state, new_proj.id)
             st.rerun()
@@ -144,19 +144,19 @@ def render_project_panel():
 
     # 操作按钮
     cols = st.sidebar.columns(2)
-    if cols[0].button("➕ 新建", use_container_width=True, key="proj_new"):
+    if cols[0].button("➕ 新建", width="stretch", key="proj_new"):
         st.session_state["_proj_show_new"] = True
-    if cols[1].button("✏️ 重命名", use_container_width=True, key="proj_rename"):
+    if cols[1].button("✏️ 重命名", width="stretch", key="proj_rename"):
         st.session_state["_proj_show_rename"] = True
 
     cols2 = st.sidebar.columns(2)
-    if cols2[0].button("📋 复制", use_container_width=True, key="proj_copy"):
+    if cols2[0].button("📋 复制", width="stretch", key="proj_copy"):
         new_proj = pm.copy_project(active.id)
         if new_proj:
             _save_active_then_load(new_proj.id)
             st.sidebar.success(f"已复制为「{new_proj.name}」")
             st.rerun()
-    if cols2[1].button("🗑 删除", use_container_width=True, key="proj_delete"):
+    if cols2[1].button("🗑 删除", width="stretch", key="proj_delete"):
         st.session_state["_proj_show_delete"] = True
 
     # ------- 新建对话框 -------
@@ -229,7 +229,7 @@ def render_project_panel():
                 data=ws_json,
                 file_name=__import__('src.utils.export_naming', fromlist=['export_filename']).export_filename("工作区", "json", title=active.name),
                 mime="application/json",
-                use_container_width=True,
+                width="stretch",
                 key="proj_export_btn",
             )
         except Exception as e:

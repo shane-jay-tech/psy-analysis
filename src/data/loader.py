@@ -66,7 +66,19 @@ def load_csv(file_path: str, usecols=None) -> Tuple[pd.DataFrame, dict]:
 
 
 def load_excel(file_path: str, sheet_name=None, usecols=None) -> Tuple[pd.DataFrame, dict]:
-    """加载Excel文件，支持指定Sheet名称或索引，以及只加载指定列。"""
+    """加载Excel文件，支持指定Sheet名称或索引，以及只加载指定列。
+
+    v5.8: pandas 3.x 下 sheet_name=None 永远返回 {sheet: DataFrame} 字典
+    （即使只有一个表），直接崩 'dict' object has no attribute 'columns'。
+    未指定时显式取第一个 sheet 并按名称读取。
+    """
+    if sheet_name is None:
+        try:
+            xls = pd.ExcelFile(file_path, engine="openpyxl")
+            sheet_name = xls.sheet_names[0] if xls.sheet_names else 0
+        except Exception:
+            sheet_name = 0  # ExcelFile 探测失败时退回索引 0
+
     read_kwargs = {"engine": "openpyxl", "sheet_name": sheet_name}
     if usecols is not None:
         read_kwargs["usecols"] = usecols
@@ -419,6 +431,14 @@ def load_data(file_path_or_bytes, sheet_name=None, usecols=None) -> Tuple[pd.Dat
     else:
         file_name = str(file_path_or_bytes).lower()
         file_obj = file_path_or_bytes
+
+    # v5.8: 上游（如大文件列预览 pd.read_csv(nrows=0)）可能已消耗文件指针，
+    # 必须在解析前归零，否则读到 EOF 得到空表 / EmptyDataError。
+    if hasattr(file_obj, "seek"):
+        try:
+            file_obj.seek(0)
+        except Exception:
+            pass
 
     _check_file_size(file_obj)
 

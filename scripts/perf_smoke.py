@@ -206,6 +206,7 @@ def main():
     parser.add_argument("--json", action="store_true", help="Output JSON only (CI-friendly)")
     parser.add_argument("--warm", action="store_true", help="Skip cold run, only warm")
     parser.add_argument("--strict", action="store_true", help="Exit 1 on any WARN or FAIL")
+    parser.add_argument("--no-history", action="store_true", help="Do not append to performance history")
     args = parser.parse_args()
 
     results = {}
@@ -258,7 +259,8 @@ def main():
         }
         print(json.dumps(output, ensure_ascii=False, indent=2))
 
-    save_history(results, run_type)
+    if not args.no_history:
+        save_history(results, run_type)
 
     if fails or (args.strict and warns):
         sys.exit(1)

@@ -1,0 +1,20 @@
+# v5.9 性能配置：app.py 未使用任何 magic 语法（裸表达式），
+# 关闭 magic 预处理可省去每次脚本编译的 AST 重写（2600+ 行脚本约 0.4~0.6s）。
+[runner]
+magicEnabled = false
+
+# 桌面启动器/浏览器模式统一关掉匿名统计（launcher 参数之外的双保险）
+[browser]
+gatherUsageStats = false
+
+# 交付环境不需要热重载文件监听，减少磁盘轮询与误重载
+[server]
+fileWatcherType = "none"
+
+[theme]
+base = "light"
+primaryColor = "#1F5B83"
+backgroundColor = "#F7F8FA"
+secondaryBackgroundColor = "#F1F4F7"
+textColor = "#172033"
+font = "sans-serif"

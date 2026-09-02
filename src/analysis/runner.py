@@ -32,6 +32,8 @@ from . import validity
 from . import assumption_router
 from . import post_hoc_power as _post_hoc_power
 from .data_quality import data_quality_check, DataQualityReport, handle_missing
+from .contracts import AnalysisResult
+from .method_catalog import get_method_definition, resolve_method_id
 
 
 # ===========================================================================
@@ -42,6 +44,8 @@ AnalysisRegistry: Dict[str, Callable] = {}
 
 def _register(test_type: str):
     """装饰器：将函数注册到 AnalysisRegistry"""
+    if get_method_definition(test_type) is None:
+        raise RuntimeError(f"analysis method is missing from method catalog: {test_type}")
     def decorator(func: Callable):
         AnalysisRegistry[test_type] = func
         return func
@@ -858,7 +862,7 @@ def _run_moderation(df, plan, output):
 # 主调度函数
 # ===========================================================================
 
-def run_analysis(df: pd.DataFrame, plan: AnalysisPlan) -> Dict[str, Any]:
+def run_analysis(df: pd.DataFrame, plan: AnalysisPlan) -> AnalysisResult:
     """
     根据 AnalysisPlan 执行对应的统计分析（注册表模式）。
 
@@ -880,8 +884,9 @@ def run_analysis(df: pd.DataFrame, plan: AnalysisPlan) -> Dict[str, Any]:
     missing_strategy = getattr(plan, "missing_strategy", "listwise") or "listwise"
     analysis_df = df
 
-    output = {
+    output = AnalysisResult({
         "test_type": plan.test_type,
+        "canonical_method_id": resolve_method_id(plan.test_type),
         "test_name_zh": _test_name(plan.test_type),
         "plan": plan,
         "descriptive": None,
@@ -896,7 +901,7 @@ def run_analysis(df: pd.DataFrame, plan: AnalysisPlan) -> Dict[str, Any]:
         "snapshot_id": None,
         "routing": None,           # Phase 1.3: 假设违反路由建议（仅建议，不切换）
         "post_hoc_power": None,    # Phase 1.3: 事后样本量建议（仅 power<0.8 时填充）
-    }
+    })
 
     # ====== 统一数据前置检查 ======
     try:
@@ -1027,8 +1032,10 @@ def export_snapshot(output: Dict[str, Any], file_path: str = None) -> str:
 
     返回：保存的文件路径"""
     snapshot = {
+        "schema_version": output.get("schema_version"),
         "snapshot_id": output.get("snapshot_id", ""),
         "test_type": output.get("test_type", ""),
+        "canonical_method_id": output.get("canonical_method_id", output.get("test_type", "")),
         "test_name_zh": output.get("test_name_zh", ""),
         "missing_strategy": output.get("missing_strategy", "listwise"),
         "missing_meta": output.get("missing_meta", {}),

@@ -218,20 +218,19 @@ def _render_completeness_badge(lr_state: Dict[str, Any]) -> None:
         result = calculate_completeness(lr_state)
     except Exception:
         return
-    color_map = {
-        "优秀": "#43a047",
-        "良好": "#fb8c00",
-        "及格": "#fdd835",
-        "不足": "#e53935",
+    tone_map = {
+        "优秀": "success",
+        "良好": "warning",
+        "及格": "warning",
+        "不足": "danger",
     }
-    color = color_map.get(result.grade, "#757575")
+    tone = tone_map.get(result.grade, "neutral")
     cols = st.columns([3, 1])
     with cols[1]:
         st.markdown(
-            f"""<div style="background:{color};color:white;text-align:center;
-            padding:8px 12px;border-radius:8px;margin:4px 0;">
+            f"""<div class="psy-score-badge psy-score-badge--{tone}">
             <strong>📊 完成度 {result.total:.0f}/100</strong><br>
-            <span style="font-size:0.85em;">{result.grade}</span></div>""",
+            <span>{result.grade}</span></div>""",
             unsafe_allow_html=True,
         )
     with st.expander("📈 完成度子项详情", expanded=False):
@@ -247,10 +246,10 @@ def _render_completeness_badge(lr_state: Dict[str, Any]) -> None:
 def _render_header(tier: str = "beginner") -> None:
     label = "（研究生模式）" if tier == "advanced" else ""
     st.markdown(
-        f"""<div style="background:linear-gradient(135deg,#f3e5f5 0%,#e1bee7 100%);
-        border-left:5px solid #9c27b0;padding:16px 20px;border-radius:8px;margin:8px 0 18px;">
-        <h3 style="margin:0 0 6px 0;">📚 文献综述工作台 {label}</h3>
-        <p style="margin:0;color:#444;font-size:0.95em;">
+        f"""<div class="psy-hero psy-hero--info">
+        <span class="psy-hero__eyebrow">证据工作流</span>
+        <h3>📚 文献综述工作台 {label}</h3>
+        <p class="psy-hero__lead">
         从已确定的研究问题出发，搜索 → 精读 → 矩阵 → 主题 → 识别 gap。
         所有笔记和矩阵随项目自动保存。
         </p></div>""",
@@ -278,7 +277,7 @@ def _render_search_bar(upstream: Dict[str, Any], lr_state: Dict[str, Any]) -> No
     with cols[2]:
         st.write("")
         st.write("")
-        do_search = st.button("🔍 搜索", type="primary", use_container_width=True,
+        do_search = st.button("🔍 搜索", type="primary", width="stretch",
                                 key="_lr_do_search")
 
     if do_search and query.strip():

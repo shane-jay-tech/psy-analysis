@@ -1,9 +1,22 @@
-# 已知局限与待办（v4.6 → v4.7 路线图）
+# 已知局限与待办
 
 记录当前明确已知但**不阻塞使用**的局限。
 
-> **2026-05-28 文档收尾**：v4.0~v4.6 已修内容收口，v4.7 路线启动（自学习模块 + F1 论文写作合并 + N10 评分趋势）。
-> 历史 v3.x 记录见 `UPGRADE_REPORT_V3.0.md` ~ `UPGRADE_REPORT_V3.9.md`，v4.x 决策见 `docs/decisions/2026-05-23-*.md` 与 `2026-05-26-*.md`。
+> **2026-08-15 v5.8 性能收口**：启动自检免导入化（30s→740ms）+ 侧栏快照按需生成
+> + 后台预热线程 + Excel 上传必崩/大文件上传必失败两个数据入口 Bug 修复，详见
+> `UPGRADE_REPORT_V5.8.md`。#L5 已完成。
+>
+> **2026-08-15 v5.9 交互深化**：关闭 magic AST 重写（rerun 0.31s→0.10s）、
+> 修独立 t 检验/配对检验图表必崩两个 P0、卡方新增列联表热力图、三处破坏性
+> 操作加两步确认、179 处 width 迁移，详见 `UPGRADE_REPORT_V5.9.md`。
+>
+> **2026-08-24 v5.10 系统体验收口**：接通实验设计主路由、统一导航事实源、
+> “保存并开始新研究”隔离跨项目资产、恢复一次性新手引导、接入下一步提示、
+> 自动保存原子写盘、Kaleido 浏览器回退及版本/隐私声明统一，详见
+> `UPGRADE_REPORT_V5.10.md`。
+>
+> 历史 v3.x 记录见 `UPGRADE_REPORT_V3.0.md` ~ `UPGRADE_REPORT_V3.9.md`，
+> v4.x 决策见 `docs/decisions/2026-05-23-*.md` 与 `2026-05-26-*.md`。
 
 ---
 
@@ -22,7 +35,7 @@
 | **v4.6.a** | LLM 单轨化（删底部配置面板 + 备用模型 fallback；侧栏 9→4 块） | `docs/decisions/2026-05-25-merge-llm-config-quickonly.md` + `2026-05-26-llm-single-track-review.md` |
 | **v4.6.b** | 冗余清理：A 类 ~1500 行 src 死代码 + B 类 legacy 函数 + F2/F3 用户视角冗余 | `docs/decisions/2026-05-26-redundancy-audit.md` |
 
-**测试基线**：v3.9 (1140) → v4.0 (1166) → v4.1+4.2 (1208) → v4.3 (1222) → v4.4 (1253) → v4.5 (1260) → v4.6.a (1260) → v4.6.b (1235) → 当前 1239 collected。
+**测试基线**：v3.9 (1140) → v4.0 (1166) → v4.1+4.2 (1208) → v4.3 (1222) → v4.4 (1253) → v4.5 (1260) → v4.6.a (1260) → v4.6.b (1235) → v5.10 当前 2544 个离线收集项。
 
 ---
 
@@ -54,10 +67,12 @@
 - **影响**：根目录 `SELF_ASSESSMENT_REPORT.md` 还停留在 2026-05-16 v2.0（74 个文件 / 11 测试 / 68 用例），与当前 v4.6（1239 collected / 几百个文件）已严重失真。
 - **计划**：v4.7 收尾时刷新到 v4.7 真实快照，或干脆删除（依赖 `UPGRADE_REPORT_V*.md` 序列即可看清演进）。
 
-### 🟢 #L5 socratic_engine.ask_socratic 类型签名 lie
+### ✅ #L5 socratic_engine.ask_socratic 类型签名 lie（v5.8 已修）
 
-- **影响**：`socratic_engine.ask_socratic(llm_config: Dict)` 类型签名是非 Optional 的 Dict；目前由 `is_llm_active()` gate 保护（先判活再调），但类型上是 lie。如未来有人绕过 gate 直接调，会 `None.get` crash。
-- **计划**：把签名改成 `Optional[Dict]` + 函数内部判 None 早返回；半小时活，可与下次相关重构合并。
+- **修复**：`ask_socratic` / `ask_socratic_stream` 签名改 `Optional[Dict[str, Any]]`，
+  None 早返回 fallback 模板（`_safe_chat` 同样加 None 双保险）。绕过 gate 直调永不 crash。
+- **测试**：`tests/test_upstream_socratic.py` 新增 2 个 None 降级测试。
+- **报告**：`UPGRADE_REPORT_V5.8.md` 三.3。
 
 ---
 
@@ -76,4 +91,14 @@
 | 🟡 中 | #L2 F1 论文写作合并 | v4.7 | 待评估 |
 | 🟡 中 | #L3 N10 评分趋势观测 | v4.7 | 待开 |
 | 🟢 低 | #L4 自评报告刷新 | v4.7 收尾 | 待开 |
-| 🟢 低 | #L5 socratic_engine 类型 lie | v4.7 顺手 | 待开 |
+| 🟢 低 | #L5 socratic_engine 类型 lie | v5.8 | 已完成 |
+
+## v5.10 后续硬化路线
+
+| 优先级 | 项目 | 当前边界 |
+|---|---|---|
+| P1 | 多实例项目写入 | 当前原子替换与 `RLock` 覆盖单进程；多实例需 OS 文件锁或事务存储 |
+| P1 | 大工作区快照 | 首次自动保存仍同步序列化完整数据；评估增量资产/后台队列 |
+| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，25 项明确跳过；发布认证环境补装后重跑 |
+| P2 | 交付入口收敛 | 正式交付已统一硬门禁；草稿、作业包与正式交付仍需统一入口语义 |
+| P2 | 编排层拆分 | `app.py` 保持兼容但体量较大；按页面控制器渐进拆分 |

@@ -22,7 +22,7 @@ def render_experiment_design_ui():
     eng = st.session_state.experiment_engine
 
     st.title("🧪 实验设计")
-    st.caption("输入研究方向 → 智能推荐设计模板 → 效力分析 → 生成完整方案")
+    st.caption("输入研究方向 → 智能推荐设计模板 → 统计检验力分析 → 生成完整方案")
 
     with st.sidebar:
         st.divider()
@@ -41,12 +41,12 @@ def render_experiment_design_ui():
         1. 输入您的研究方向和目标人群
         2. 可选择指定设计类型偏好
         3. 系统自动推荐最合适的设计模板
-        4. 进行统计效力分析，确定样本量
+        4. 进行统计检验力分析，确定样本量
         5. 生成包含完整程序的实验方案
         """)
 
         st.divider()
-        if st.button("🔄 重置设计", use_container_width=True):
+        if st.button("🔄 重置设计", width="stretch"):
             st.session_state.experiment_engine = ExperimentDesignEngine()
             st.rerun()
 
@@ -102,14 +102,14 @@ def render_experiment_design_ui():
             ["中（medium, d=0.5）", "小（small, d=0.2）", "大（large, d=0.8）"],
             key="exp_effect",
         )
-        exp_power = st.slider("目标统计效力", 0.50, 0.99, 0.80, 0.05, key="exp_power")
+        exp_power = st.slider("目标统计检验力", 0.50, 0.99, 0.80, 0.05, key="exp_power")
         use_llm_enhance = st.checkbox(
             "🤖 使用LLM增强设计",
             value=False,
             key="exp_use_llm_enhance",
             help="启用后，系统将调用大语言模型对实验设计进行深度增强（生成更丰富的背景、假设、程序等）。需要配置API密钥。",
         )
-        design_btn_exp = st.button("🔬 设计实验", type="primary", use_container_width=True)
+        design_btn_exp = st.button("🔬 设计实验", type="primary", width="stretch")
 
     # 高级选项
     with st.expander("⚙ 高级选项"):
@@ -131,7 +131,7 @@ def render_experiment_design_ui():
             exp_n_hint = st.number_input(
                 "指定样本量（0=自动计算）",
                 min_value=0, value=0, key="exp_n_hint",
-                help="留空则由系统通过效力分析自动计算所需样本量",
+                help="留空则由系统通过统计检验力分析自动计算所需样本量",
             )
             exp_include_budget = st.checkbox("包含预算估算", value=False, key="exp_budget")
 
@@ -141,7 +141,7 @@ def render_experiment_design_ui():
         st.info("⏳ 正在通过大语言模型增强实验设计，请稍候...")
         col_cancel, _ = st.columns([1, 3])
         with col_cancel:
-            if st.button("❌ 取消增强", use_container_width=True, key="cancel_exp_design"):
+            if st.button("❌ 取消增强", width="stretch", key="cancel_exp_design"):
                 cancel_design_request(pending["cancel_id"])
                 try:
                     pending["future"].cancel()
@@ -285,7 +285,7 @@ def render_experiment_design_ui():
                 st.markdown(f"**分组：** {d.n_groups}组，每组{d.n_per_group}人")
 
             if d.power_result:
-                with st.expander("📊 统计效力分析详情"):
+                with st.expander("📊 统计检验力分析详情"):
                     st.markdown(format_power_report(d.power_result))
 
         with det3:
@@ -313,7 +313,7 @@ def render_experiment_design_ui():
                         "结束(分钟)": t['end_min'],
                         "时长(分钟)": t['duration_min'],
                     })
-                st.dataframe(pd.DataFrame(tl_data), use_container_width=True)
+                st.dataframe(pd.DataFrame(tl_data), width="stretch")
 
                 # 各阶段详情
                 for phase in d.procedure.phases:
@@ -389,7 +389,7 @@ def render_experiment_design_ui():
                 pass
 
             if st.button("📄 生成实验程序文档", type="primary",
-                         use_container_width=True, key="exp_protocol_gen"):
+                         width="stretch", key="exp_protocol_gen"):
                 try:
                     from src.output.docx_exporter import build_experiment_protocol_docx
                     with st.spinner("正在生成 Word 文档..."):
@@ -409,7 +409,7 @@ def render_experiment_design_ui():
                     ),
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     key="exp_protocol_dl",
-                    use_container_width=True,
+                    width="stretch",
                 )
 
     st.divider()

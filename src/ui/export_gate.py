@@ -82,6 +82,22 @@ def run_export_gate(session_state: dict) -> tuple[bool, list[str], list[ProjectH
             if diff_sel.has_unconfirmed(section_keys):
                 block_reasons.append("[UNCONFIRMED_AI] 有未确认的 AI 修改，请先完成差异对比选择")
 
+    # 正式交付物中出现手机号、身份证、API key 等高风险文本时必须阻止，
+    # 不能只显示提醒后仍允许下载。
+    from src.utils.privacy_ethics import export_pre_check
+
+    export_text_parts = []
+    for key in ("analysis_output", PAPER_BUNDLE_KEY, "research_deliverable_bundle"):
+        value = session_state.get(key)
+        if value is not None:
+            export_text_parts.append(str(value))
+    if export_text_parts:
+        privacy = export_pre_check("\n".join(export_text_parts), source="正式交付物")
+        if not privacy["safe"]:
+            block_reasons.append(
+                f"[PRIVACY_HIGH] 检测到 {privacy['high_count']} 项高风险敏感信息，请脱敏后再导出"
+            )
+
     allowed = len(block_reasons) == 0
     return allowed, block_reasons, issues
 

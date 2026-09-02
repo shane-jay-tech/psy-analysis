@@ -25,3 +25,17 @@ def test_report_script_uses_version_module():
     script = PROJECT_ROOT / "scripts" / "generate_system_report.py"
     text = script.read_text(encoding="utf-8", errors="ignore")
     assert "from src.version import" in text
+
+
+def test_system_report_displays_current_version():
+    report = (PROJECT_ROOT / "docs" / "SYSTEM_REPORT.md").read_text(
+        encoding="utf-8", errors="ignore"
+    )
+    assert f"**版本**: v{APP_VERSION}" in report
+
+
+def test_user_visible_method_declarations_do_not_hardcode_old_versions():
+    for relative in ("app.py", "src/ui/undergrad_wizard.py"):
+        text = (PROJECT_ROOT / relative).read_text(encoding="utf-8", errors="ignore")
+        assert "心理学研究工具 v2.2" not in text
+        assert "APP_VERSION_LABEL" in text

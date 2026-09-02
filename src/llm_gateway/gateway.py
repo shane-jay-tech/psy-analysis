@@ -148,6 +148,16 @@ def _record_trace(trace: LLMTrace) -> None:
     """把 trace 推入 streamlit session_state.llm_traces（容错：无 streamlit 时无操作）。"""
     try:
         import streamlit as st
+        from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
+
+        # 并发 fallback 的工作线程没有 Streamlit ScriptRunContext；访问 session_state
+        # 会产生警告，测试进程退出时还可能写入已关闭的捕获流。UI trace 只在主会话
+        # 上下文记录，后台调用仍由 FallbackResult.attempts 完整返回。
+        if (
+            threading.current_thread() is not threading.main_thread()
+            and get_script_run_ctx(suppress_warning=True) is None
+        ):
+            return
         with _trace_lock:
             traces = st.session_state.get("llm_traces")
             if not isinstance(traces, list):

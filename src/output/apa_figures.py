@@ -292,7 +292,8 @@ def generate_regression_fit_figure(
     _apply_apa_style(ax)
 
     if r_squared is not None:
-        ax.text(0.05, 0.95, f"R² = {r_squared:.3f}",
+        # 用 mathtext 渲染上标，避免中文字体缺少 Unicode ² 导致导出方框。
+        ax.text(0.05, 0.95, rf"$R^2$ = {r_squared:.3f}",
                 transform=ax.transAxes, ha="left", va="top", fontsize=9, style="italic")
 
     fig.tight_layout()

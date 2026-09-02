@@ -227,7 +227,7 @@ def render_cleaning_wizard(df: pd.DataFrame, *, key_prefix: str = "clean") -> Tu
     if issues_count > 0:
         if st.button(
             "🪄 一键应用所有建议（保守策略：删常数列 + 列表删缺失）",
-            type="primary", use_container_width=True,
+            type="primary", width="stretch",
             key=f"{key_prefix}_auto",
         ):
             new_df = current_df
@@ -259,7 +259,7 @@ def render_cleaning_wizard(df: pd.DataFrame, *, key_prefix: str = "clean") -> Tu
         with st.expander(f"❓ 缺失值（{len(report.missing_cols)} 列）", expanded=True):
             preview = current_df[report.missing_cols].isna().sum().to_frame("缺失数")
             preview["缺失率"] = (preview["缺失数"] / len(current_df) * 100).round(1).astype(str) + "%"
-            st.dataframe(preview, use_container_width=True)
+            st.dataframe(preview, width="stretch")
 
             target = st.multiselect(
                 "选择要处理的列",

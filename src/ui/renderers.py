@@ -17,6 +17,7 @@ from src.visualization.charts import (
     bar_with_error, box_plot, scatter_with_regression,
     correlation_heatmap, distribution_plot, interaction_plot,
     scree_plot, qq_plot, forest_plot, mediation_diagram,
+    contingency_heatmap,
 )
 from src.visualization.paper_export import (
     to_paper_png, KaleidoMissingError, get_palette_label,
@@ -114,7 +115,7 @@ def render_post_hoc_power(output: dict):
 def render_result_table(result):
     if isinstance(result, TTestResult):
         if result.group_stats is not None:
-            st.dataframe(result.group_stats, use_container_width=True)
+            st.dataframe(result.group_stats, width="stretch")
         r_cols = st.columns(5)
         r_cols[0].metric("t", f"{result.t_statistic:.3f}")
         r_cols[1].metric("df", f"{result.df:.2f}")
@@ -129,11 +130,11 @@ def render_result_table(result):
                 st.warning(f"Levene：F={eq['statistic']}, p={eq['p_value']} — 方差不齐，已使用Welch校正。")
 
     elif isinstance(result, ANOVAResult):
-        st.dataframe(result.table, use_container_width=True)
+        st.dataframe(result.table, width="stretch")
         st.metric(result.effect_size_name, f"{result.effect_size:.4f}")
         if result.post_hoc is not None and not result.post_hoc.empty:
             st.caption("事后多重比较 (Tukey HSD):")
-            st.dataframe(result.post_hoc, use_container_width=True)
+            st.dataframe(result.post_hoc, width="stretch")
         if result.assumption_homogeneity and not result.assumption_homogeneity.get("passed", True):
             st.warning("⚠ 方差齐性假设未满足。建议 Welch ANOVA 或 Kruskal-Wallis。")
 
@@ -148,7 +149,7 @@ def render_result_table(result):
                     display.loc[i, j] = f"{rv:.3f}{sig}"
                 else:
                     display.loc[i, j] = "-"
-        st.dataframe(display, use_container_width=True)
+        st.dataframe(display, width="stretch")
         # Phase 1.3：显示 Fisher-z 95% CI 矩阵（仅在有 CI 时）
         ci_low = getattr(result, "ci_low_matrix", None)
         ci_high = getattr(result, "ci_high_matrix", None)
@@ -169,10 +170,10 @@ def render_result_table(result):
                             ci_display.loc[i, j] = f"[{lo:.3f}, {hi:.3f}]"
                         else:
                             ci_display.loc[i, j] = "-"
-                st.dataframe(ci_display, use_container_width=True)
+                st.dataframe(ci_display, width="stretch")
 
     elif isinstance(result, ChiSquareResult):
-        st.dataframe(result.contingency_table, use_container_width=True)
+        st.dataframe(result.contingency_table, width="stretch")
         r_cols = st.columns(4)
         r_cols[0].metric("χ²", f"{result.chi_sq:.3f}")
         r_cols[1].metric("df", str(result.df))
@@ -227,13 +228,13 @@ def _render_reliability(r: ReliabilityResult):
             {"因子": f, "CR": cr, "评估": "✅ 合格" if cr >= 0.70 else "⚠ 偏低"}
             for f, cr in r.cr_per_factor.items()
         ])
-        st.dataframe(cr_df, use_container_width=True)
+        st.dataframe(cr_df, width="stretch")
         if r.item_stats is not None:
             st.caption("**因子载荷明细：**")
-            st.dataframe(r.item_stats, use_container_width=True)
+            st.dataframe(r.item_stats, width="stretch")
     elif r.item_stats is not None:
         st.caption("**题目分析：**")
-        st.dataframe(r.item_stats, use_container_width=True)
+        st.dataframe(r.item_stats, width="stretch")
 
     if r.warning:
         st.warning(r.warning)
@@ -244,7 +245,7 @@ def _render_cfa(r: CFAResult):
     if r.is_fallback:
         st.warning(r.fallback_note)
         if r.loadings is not None:
-            st.dataframe(r.loadings, use_container_width=True)
+            st.dataframe(r.loadings, width="stretch")
         return
 
     # 拟合指标卡片
@@ -276,7 +277,7 @@ def _render_cfa(r: CFAResult):
     # 因子载荷
     if r.loadings is not None and not r.loadings.empty:
         st.caption("**标准化因子载荷：**")
-        st.dataframe(r.loadings, use_container_width=True)
+        st.dataframe(r.loadings, width="stretch")
 
     # AVE / CR per factor
     if r.ave_per_factor or r.cr_per_factor:
@@ -293,26 +294,26 @@ def _render_cfa(r: CFAResult):
             })
         if rows:
             st.caption("**聚合效度（AVE）与组合信度（CR）：**")
-            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+            st.dataframe(pd.DataFrame(rows), width="stretch")
 
     # Fornell-Larcker 矩阵
     if r.fl_matrix is not None and not r.fl_matrix.empty:
         st.caption("**Fornell-Larcker 区分效度矩阵**（对角线为 √AVE，下三角为因子相关；带 ⚠ 表示违例）：")
-        st.dataframe(r.fl_matrix, use_container_width=True)
+        st.dataframe(r.fl_matrix, width="stretch")
 
     # HTMT 矩阵
     if r.htmt_matrix is not None and not r.htmt_matrix.empty:
         st.caption("**HTMT 矩阵**（异质-单质特征比，>0.85 警告）：")
         try:
             st.dataframe(r.htmt_matrix.style.applymap(_htmt_color, subset=pd.IndexSlice[:, r.htmt_matrix.columns[1:]]),
-                         use_container_width=True)
+                         width="stretch")
         except Exception:
-            st.dataframe(r.htmt_matrix, use_container_width=True)
+            st.dataframe(r.htmt_matrix, width="stretch")
 
     # 因子协方差
     if r.factor_cov is not None and not r.factor_cov.empty:
         st.caption("**因子间协方差/相关：**")
-        st.dataframe(r.factor_cov, use_container_width=True)
+        st.dataframe(r.factor_cov, width="stretch")
 
     if r.warnings:
         for w in r.warnings:
@@ -364,7 +365,7 @@ def _render_validity(r: ValidityResult):
         cols[3].metric("n", str(r.n_cases))
 
     if r.detail is not None and not r.detail.empty:
-        st.dataframe(r.detail, use_container_width=True)
+        st.dataframe(r.detail, width="stretch")
 
     if r.interpretation:
         st.caption(r.interpretation)
@@ -417,9 +418,9 @@ def _render_ai_item_review(r: AIItemReviewResult):
 
         try:
             styled = r.items_table.style.apply(_highlight_flagged, axis=1)
-            st.dataframe(styled, use_container_width=True)
+            st.dataframe(styled, width="stretch")
         except Exception:
-            st.dataframe(r.items_table, use_container_width=True)
+            st.dataframe(r.items_table, width="stretch")
 
     # ── 标记需修订 ──
     if r.flagged_items:
@@ -466,86 +467,91 @@ def render_charts(charts_data: dict, df: pd.DataFrame, ctx: dict = None):
     """
     ctx = ctx or {}
     charts: list = []  # list of (fig, chart_type_zh, variables)
+    skipped: list = []  # (chart_type_zh, reason) — 单图失败不阻断整页
+
+    def _safe(chart_type_zh: str, variables: list, factory):
+        """v5.9：单张图构建失败只跳过该图，绝不让整页结果白屏。"""
+        try:
+            fig = factory()
+            charts.append((fig, chart_type_zh, variables))
+        except Exception as exc:  # noqa: BLE001
+            skipped.append((chart_type_zh, f"{type(exc).__name__}: {exc}"))
+
     if "box_data" in charts_data:
         bd = charts_data["box_data"]
-        charts.append((
-            box_plot(df, bd["dv"], bd["iv"], title=f"{bd['dv']} 分组箱线图"),
-            "箱线图", [bd["dv"], bd["iv"]],
-        ))
+        _safe("箱线图", [bd["dv"], bd["iv"]],
+              lambda: box_plot(df, bd["dv"], bd["iv"], title=f"{bd['dv']} 分组箱线图"))
     if "corr_matrix" in charts_data:
         cm = charts_data["corr_matrix"]
-        charts.append((
-            correlation_heatmap(cm), "相关热力图",
-            list(cm.columns) if hasattr(cm, "columns") else [],
-        ))
+        _safe("相关热力图", list(cm.columns) if hasattr(cm, "columns") else [],
+              lambda: correlation_heatmap(cm))
+    if "contingency" in charts_data:
+        ct = charts_data["contingency"]
+        if isinstance(ct, pd.DataFrame):
+            _safe("列联表热力图", [], lambda: contingency_heatmap(ct))
     if "scatter_cols" in charts_data:
         cols = charts_data["scatter_cols"]
         if len(cols) >= 2:
-            charts.append((
-                scatter_with_regression(df, cols[0], cols[1], title=f"{cols[0]} vs {cols[1]}"),
-                "散点图", cols[:2],
-            ))
+            _safe("散点图", cols[:2],
+                  lambda: scatter_with_regression(df, cols[0], cols[1], title=f"{cols[0]} vs {cols[1]}"))
     if "bar_data" in charts_data:
         bd = charts_data["bar_data"]
-        if isinstance(bd, pd.DataFrame) and "组别" in bd.columns:
+        if isinstance(bd, pd.DataFrame) and len(bd.columns) >= 2:
             dv_name = charts_data.get("box_data", {}).get("dv", "因变量")
             iv_name = charts_data.get("box_data", {}).get("iv", "分组")
-            charts.append((bar_with_error(bd, dv_name, iv_name), "柱状图", [dv_name, iv_name]))
+            _safe("柱状图", [dv_name, iv_name],
+                  lambda: bar_with_error(bd, dv_name, iv_name))
     if "anova_result" in charts_data and "box_data" in charts_data:
         bd = charts_data["box_data"]
-        charts.append((
-            box_plot(df, bd["dv"], bd["iv"], title=f"{bd['dv']} 各组箱线图（ANOVA）"),
-            "ANOVA箱线图", [bd["dv"], bd["iv"]],
-        ))
+        _safe("ANOVA箱线图", [bd["dv"], bd["iv"]],
+              lambda: box_plot(df, bd["dv"], bd["iv"], title=f"{bd['dv']} 各组箱线图（ANOVA）"))
     if "interaction_data" in charts_data:
         id_ = charts_data["interaction_data"]
-        charts.append((
-            interaction_plot(df, id_["dv"], id_["iv1"], id_["iv2"]),
-            "交互图", [id_["dv"], id_["iv1"], id_["iv2"]],
-        ))
+        _safe("交互图", [id_["dv"], id_["iv1"], id_["iv2"]],
+              lambda: interaction_plot(df, id_["dv"], id_["iv1"], id_["iv2"]))
     if "histogram_cols" in charts_data:
         for col in charts_data["histogram_cols"][:3]:
             if col in df.columns:
-                charts.append((
-                    distribution_plot(df, col, title=f"{col} 分布图"),
-                    "分布图", [col],
-                ))
+                _safe("分布图", [col],
+                      lambda c=col: distribution_plot(df, c, title=f"{c} 分布图"))
     if "scree_data" in charts_data:
         eigen = charts_data["scree_data"]
         if isinstance(eigen, pd.DataFrame):
-            charts.append((scree_plot(eigen, title="因素分析碎石图"), "碎石图", []))
+            _safe("碎石图", [], lambda: scree_plot(eigen, title="因素分析碎石图"))
     if "qq_col" in charts_data:
         col = charts_data["qq_col"]
         if col in df.columns:
-            charts.append((qq_plot(df, col, title=f"{col} Q-Q 图"), "QQ图", [col]))
+            _safe("QQ图", [col], lambda c=col: qq_plot(df, c, title=f"{c} Q-Q 图"))
     if "forest_data" in charts_data:
         fd = charts_data["forest_data"]
         if isinstance(fd, pd.DataFrame):
-            charts.append((forest_plot(fd, title="回归系数森林图"), "森林图", []))
+            _safe("森林图", [], lambda: forest_plot(fd, title="回归系数森林图"))
     if "mediation_data" in charts_data:
         md = charts_data["mediation_data"]
         if isinstance(md, dict):
             coef = md.get("coef_table")
             ci = md.get("bootstrap_ci")
             if isinstance(coef, pd.DataFrame):
-                charts.append((
-                    mediation_diagram(coef, ci, title="中介效应路径图"),
-                    "中介路径图", [],
-                ))
+                _safe("中介路径图", [],
+                      lambda: mediation_diagram(coef, ci, title="中介效应路径图"))
     if "paired_cols" in charts_data:
         cols = charts_data["paired_cols"]
         if isinstance(cols, (list, tuple)) and len(cols) >= 2:
-            charts.append((
-                box_plot(df, cols[0], None, title=f"{cols[0]} 与 {cols[1]} 箱线图对比"),
-                "配对箱线图", list(cols[:2]),
-            ))
+            _safe("配对箱线图", list(cols[:2]),
+                  lambda: box_plot(df, list(cols[:2]), None,
+                                   title=f"{cols[0]} 与 {cols[1]} 箱线图对比"))
+
+    if skipped:
+        with st.expander("⚠️ 部分图表未能生成", expanded=False):
+            for name, reason in skipped:
+                st.caption(f"• {name}：{reason}")
 
     if charts:
         interactive = st.session_state.get("interactive_charts", False)
         plotly_config = None if interactive else {"staticPlot": True}
         for i, (fig, chart_type, variables) in enumerate(charts):
             try:
-                st.plotly_chart(fig, use_container_width=True, config=plotly_config, key=f"chart_{i}")
+                st.plotly_chart(fig, width="stretch", config=plotly_config, key=f"chart_{i}")
                 _render_paper_export_button(fig, idx=i)
                 _render_add_to_collection_button(
                     fig, idx=i, chart_type=chart_type, variables=variables, ctx=ctx,
@@ -603,7 +609,7 @@ def _render_add_to_collection_button(fig, idx: int, chart_type: str,
                 placeholder="例：用于展示实验组与控制组焦虑得分的差异分布",
             )
             if st.button("📌 加入论文图表集", type="primary",
-                         key=f"coll_add_{idx}", use_container_width=True):
+                         key=f"coll_add_{idx}", width="stretch"):
                 coll.add(
                     title=title.strip() or default_title,
                     test_type=test_type,

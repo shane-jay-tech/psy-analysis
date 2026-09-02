@@ -33,6 +33,17 @@ class TestLoadSavePrefs:
         tmp_prefs.write_text("not json", encoding="utf-8")
         assert user_prefs.load_prefs() == {}
 
+    def test_failed_atomic_save_keeps_previous_preferences(self, tmp_prefs, monkeypatch):
+        assert user_prefs.save_prefs({"language": "zh"})
+
+        def fail_replace(_src, _dst):
+            raise OSError("interrupted")
+
+        monkeypatch.setattr(user_prefs.os, "replace", fail_replace)
+        assert not user_prefs.save_prefs({"language": "en"})
+        assert json.loads(tmp_prefs.read_text(encoding="utf-8"))["language"] == "zh"
+        assert list(tmp_prefs.parent.glob(".user_prefs.*.tmp")) == []
+
 
 class TestUpdatePref:
     def test_update_creates_file(self, tmp_prefs):
@@ -65,9 +76,15 @@ class TestApplyToSession:
         assert "irrelevant_key" not in session
 
     def test_no_file_no_change(self, tmp_prefs):
-        session = {"privacy_accepted": False}
+        session = {
+            "privacy_accepted": False,
+            "onboarding_completed": False,
+            "_onboarding_skipped": False,
+        }
         user_prefs.apply_to_session(session)
         assert session["privacy_accepted"] is False
+        assert session["onboarding_completed"] is False
+        assert session["_onboarding_skipped"] is False
 
 
 class TestSyncFromSession:

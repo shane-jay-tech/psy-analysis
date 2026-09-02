@@ -199,6 +199,19 @@ class TestUIGoldenPath:
         assert allowed is False
         assert any("未确认" in r for r in reasons)
 
+    def test_export_gate_blocks_high_risk_sensitive_text(self, session_state, sample_df):
+        session_state[DATA_FRAME_KEY] = sample_df
+        session_state["meta"] = {"columns": list(sample_df.columns)}
+        session_state["analysis_output"] = {
+            "test_type": "descriptive",
+            "notes": "受试者手机号 13800138000",
+        }
+
+        allowed, reasons, _ = run_export_gate(session_state)
+
+        assert allowed is False
+        assert any("PRIVACY_HIGH" in reason for reason in reasons)
+
     def test_step11_export_gate_passes(self, session_state, sample_df):
         """所有条件满足时导出门禁放行。"""
         session_state[DATA_FRAME_KEY] = sample_df

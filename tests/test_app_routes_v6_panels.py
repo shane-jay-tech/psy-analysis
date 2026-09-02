@@ -22,6 +22,23 @@ class TestV6PanelImports:
         from src.ui.deliverable_center_panel import render_deliverable_center_panel
         assert callable(render_deliverable_center_panel)
 
+    def test_experiment_design_is_a_real_main_route(self):
+        from pathlib import Path
+        from src.ui.navigation import PAGE_MODES
+
+        assert "🧪 实验设计" in PAGE_MODES
+        app_text = (Path(__file__).resolve().parents[1] / "app.py").read_text(
+            encoding="utf-8"
+        )
+        assert 'from src.ui.navigation import PAGE_MODES' in app_text
+        assert 'elif mode == "🧪 实验设计"' in app_text
+        assert "render_experiment_design_ui()" in app_text
+
+    def test_unknown_navigation_defaults_to_data_analysis(self):
+        from src.ui.navigation import PAGE_MODES, get_mode_index
+
+        assert PAGE_MODES[get_mode_index("不存在")] == "📈 数据分析"
+
 
 class TestV6PanelStateIntegration:
     """验证面板通过 state_keys 共享状态。"""

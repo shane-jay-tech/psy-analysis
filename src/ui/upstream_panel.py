@@ -247,10 +247,10 @@ def render_advanced_skip_form() -> None:
 def _render_header(advanced: bool = False) -> None:
     title = "🔬 选题漏斗（研究生快速通道）" if advanced else "🔬 选题漏斗"
     st.markdown(
-        f"""<div style="background:linear-gradient(135deg,#e8f4fd 0%,#d6eaff 100%);
-            border-left:5px solid #2e86de;padding:16px 20px;border-radius:8px;margin:8px 0 18px;">
-<h3 style="margin:0 0 6px 0;">{title}</h3>
-<p style="margin:0;color:#444;font-size:0.95em;">
+        f"""<div class="psy-hero psy-hero--info">
+<span class="psy-hero__eyebrow">全流程引导</span>
+<h3>{title}</h3>
+<p class="psy-hero__lead">
 从「我想研究 XX」收敛到「可研究的具体问题」。
 AI 助教只反问，不替你做决定 —— 你想得越透，论文越扎实。
 </p></div>""",
@@ -283,12 +283,12 @@ def _render_stepper(current_stage: int) -> None:
     cols = st.columns(5)
     for i, stage in enumerate(STAGES):
         with cols[i]:
-            label = f"**{stage.id}. {stage.name}**" if stage.id == current_stage else f"{stage.id}. {stage.name}"
-            color = "#2e86de" if stage.id == current_stage else (
-                "#27ae60" if stage.id < current_stage else "#aaa"
+            label = f"<strong>{stage.id}. {stage.name}</strong>" if stage.id == current_stage else f"{stage.id}. {stage.name}"
+            state = "active" if stage.id == current_stage else (
+                "complete" if stage.id < current_stage else "upcoming"
             )
             st.markdown(
-                f"<div style='text-align:center;padding:8px 4px;border-bottom:3px solid {color};'>{label}</div>",
+                f"<div class='psy-stepper psy-stepper--{state}'>{label}</div>",
                 unsafe_allow_html=True,
             )
     st.write("")
@@ -700,10 +700,22 @@ def _render_branch_history_panel() -> None:
                     st.rerun()
                 else:
                     st.error("切换失败：分支不存在")
-            if cols[2].button("🗑️ 删除", key=f"_branch_delete_{bid}"):
-                if delete_branch(st.session_state, bid):
-                    st.success("已删除")
+            # v5.9: 删除改为两步确认（误触即永久丢失选题历史，不可恢复）
+            if st.session_state.get(f"_branch_delete_confirm_{bid}"):
+                _c1, _c2 = st.columns([1, 1])
+                if _c1.button("⚠️ 确认删除", key=f"_branch_delete_yes_{bid}", type="primary"):
+                    st.session_state.pop(f"_branch_delete_confirm_{bid}", None)
+                    if delete_branch(st.session_state, bid):
+                        st.success("已删除")
+                    else:
+                        st.error("删除失败：分支不存在")
                     st.rerun()
+                if _c2.button("取消", key=f"_branch_delete_no_{bid}"):
+                    st.session_state.pop(f"_branch_delete_confirm_{bid}", None)
+                    st.rerun()
+            elif cols[2].button("🗑️ 删除", key=f"_branch_delete_{bid}"):
+                st.session_state[f"_branch_delete_confirm_{bid}"] = True
+                st.rerun()
 
             # 详情弹窗
             if st.session_state.get(f"_branch_view_open_{bid}"):
@@ -728,14 +740,14 @@ def _render_branch_history_panel() -> None:
 def _render_user_contract() -> None:
     """v3.3 用户契约：明确告知漏斗的"逼你想清楚"哲学，让用户主动选择是否进入。"""
     st.markdown(
-        """<div style="background:linear-gradient(135deg,#fff8e7 0%,#ffe9b3 100%);
-            border-left:5px solid #f0a500;padding:24px;border-radius:10px;margin:18px 0;">
-        <h2 style="margin-top:0;">🎓 选题漏斗不是 AI 替你选题</h2>
-        <p style="font-size:1.05em;line-height:1.7;margin:14px 0;">
+        """<div class="psy-hero psy-hero--warning">
+        <span class="psy-hero__eyebrow">开始前请确认</span>
+        <h2>🎓 选题漏斗不是 AI 替你选题</h2>
+        <p class="psy-hero__lead">
             系统会向你提出 <strong>5 轮反问</strong>，帮你把模糊的兴趣转化为可研究的问题。<br>
             预计耗时 <strong>30-60 分钟</strong>（取决于思考速度）。
         </p>
-        <p style="margin:16px 0 8px;">
+        <p class="psy-hero__meta">
             ⚠️ 如果你只想<strong>快速拿到一个题目</strong>，请选择 ADVANCED 模式跳过漏斗。<br>
             ✅ 如果你愿意花时间想清楚，本工具能帮你避免后续大量返工。
         </p>
@@ -747,14 +759,14 @@ def _render_user_contract() -> None:
         "✅ 我准备好了，开始漏斗",
         key="_funnel_intro_accept",
         type="primary",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state["funnel_intro_shown"] = True
         st.rerun()
     if cols[1].button(
         "⏭️ 我想跳过，切换到 ADVANCED",
         key="_funnel_intro_skip",
-        use_container_width=True,
+        width="stretch",
     ):
         set_active_tier(st.session_state, ResearchTier.ADVANCED)
         st.session_state["funnel_intro_shown"] = True

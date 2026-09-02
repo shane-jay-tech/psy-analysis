@@ -16,6 +16,8 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from .method_catalog import get_card_builder_id, resolve_method_id
+
 
 @dataclass
 class AnalysisResultCard:
@@ -102,7 +104,12 @@ def build_card_from_output(output: dict[str, Any]) -> AnalysisResultCard:
             card.assumption_status = "partial"
 
     # Dispatch to method-specific card builder
-    builder = _CARD_BUILDERS.get(method_id)
+    card_builder_id = get_card_builder_id(method_id)
+    builder = (
+        _CARD_BUILDERS.get(method_id)
+        or _CARD_BUILDERS.get(card_builder_id or "")
+        or _CARD_BUILDERS.get(resolve_method_id(method_id))
+    )
     if builder:
         builder(card, output)
     else:

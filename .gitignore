@@ -35,3 +35,7 @@ test_artifacts/
 *.sqlite-wal
 *.sqlite-shm
 *.sqlite-journal
+
+# ---- Public release: exclude research archives and raw feeds ----
+archive/
+data/literature_feed/

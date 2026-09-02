@@ -32,9 +32,10 @@ ICON = str(ASSETS / "app.ico")
 LOG_FILE = HERE / "logs" / "launcher.log"
 SINGLETON_LOCK_PORT = 49283  # 与 learning-system (49281) 错开
 
-# Streamlit 启动 + app.py 重型 ML 依赖（sentence-transformers/factor-analyzer/semopy）
-# 冷启动可能要 30-60s。设宽一点。
-READY_TIMEOUT_SEC = 120
+# v5.8: 重型依赖（pingouin/statsmodels/semopy 等）已改为页面渲染后
+# 后台懒加载，启动只等 Streamlit 服务器就绪（通常 3~8s）。
+# 超时设宽一点兜底（冷盘/杀毒扫描等极端情况）。
+READY_TIMEOUT_SEC = 90
 READY_POLL_INTERVAL = 0.4
 
 
@@ -226,16 +227,17 @@ def wait_for_streamlit_and_load(window: "webview.Window", target_url: str,
             return
 
         # 进度文案：随时间推移给出"为啥还没好"的合理解释
-        if elapsed < 3:
-            msg, pct = "正在启动后端…", 15
-        elif elapsed < 8:
-            msg, pct = "Streamlit 服务器初始化中…", 35
-        elif elapsed < 18:
-            msg, pct = "加载分析模块（统计 / NLP）…", 60
-        elif elapsed < 35:
-            msg, pct = "首次启动稍慢，重型依赖正在导入…", 80
+        # （v5.8 后正常启动 3~8s，这些阶段仅兜底）
+        if elapsed < 2:
+            msg, pct = "正在启动后端…", 20
+        elif elapsed < 5:
+            msg, pct = "Streamlit 服务器初始化中…", 45
+        elif elapsed < 10:
+            msg, pct = "正在渲染主界面…", 70
+        elif elapsed < 20:
+            msg, pct = "首次启动稍慢，正在初始化…", 85
         else:
-            msg, pct = f"还在启动（已 {int(elapsed)}s），首次冷启动可能较慢…", 92
+            msg, pct = f"还在启动（已 {int(elapsed)}s），请稍候或查看 logs/launcher.log…", 92
         update_splash(window, msg, pct)
 
         time.sleep(READY_POLL_INTERVAL)

@@ -14,12 +14,17 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
+import threading
 from pathlib import Path
 from typing import Any, Dict
 
+from src.utils.app_paths import APP_HOME, PREFS_FILE
 
-PREFS_DIR = Path.home() / ".psy_analysis"
-PREFS_FILE = PREFS_DIR / "user_prefs.json"
+
+PREFS_DIR = APP_HOME
+_PREFS_LOCK = threading.RLock()
 
 
 # 这些字段从 session_state 持久化到文件
@@ -44,73 +49,70 @@ RUNTIME_MODEL_KEYS = {
     "_runtime_models_custom",
 }
 
-# v3.7: 默认值——首次启动时这些被默认设为 True（直接跳过新手引导）
-DEFAULT_TRUE_ON_FIRST_RUN = {
-    "onboarding_completed",
-    "funnel_intro_shown",
-    "_quality_preview_dismissed",
-    "_onboarding_skipped",
-}
-
-
 def _ensure_dir() -> None:
     PREFS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_prefs() -> Dict[str, Any]:
     """读取本地偏好；不存在或损坏返回空 dict。"""
-    if not PREFS_FILE.exists():
-        return {}
-    try:
-        return json.loads(PREFS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
+    with _PREFS_LOCK:
+        if not PREFS_FILE.exists():
+            return {}
+        try:
+            return json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
 
 
 def save_prefs(prefs: Dict[str, Any]) -> bool:
-    """写入本地偏好文件。"""
-    try:
-        _ensure_dir()
-        PREFS_FILE.write_text(
-            json.dumps(prefs, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        return True
-    except OSError:
-        return False
+    """原子写入本地偏好文件，失败时保留上一份有效内容。"""
+    with _PREFS_LOCK:
+        temp_path: Path | None = None
+        try:
+            _ensure_dir()
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=PREFS_DIR,
+                prefix=".user_prefs.",
+                suffix=".tmp",
+                delete=False,
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
+                json.dump(prefs, temp_file, ensure_ascii=False, indent=2)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            os.replace(temp_path, PREFS_FILE)
+            return True
+        except (OSError, TypeError, ValueError):
+            if temp_path is not None:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            return False
 
 
 def update_pref(key: str, value: Any) -> bool:
     """更新单个偏好（读 → 改 → 写）。"""
-    prefs = load_prefs()
-    prefs[key] = value
-    return save_prefs(prefs)
+    with _PREFS_LOCK:
+        prefs = load_prefs()
+        prefs[key] = value
+        return save_prefs(prefs)
 
 
 def apply_to_session(session_state: Any) -> None:
-    """启动时调：把本地偏好覆盖到 session_state。
+    """启动时把用户真实保存过的偏好恢复到 session_state。
 
-    v3.7：用户明确要求「删除新手引导」，所以**每次启动**都强制把引导类标志置 True
-    （不依赖 prefs 文件是否存在 / 旧值是什么）。如未来需要恢复，可加重置按钮。
+    偏好文件不存在时不写入任何默认值，确保全新用户能看到一次新手引导。
     """
     prefs = load_prefs()
-
-    # v3.7: 引导类标志强制 True（每次启动都覆盖，无视旧值）
-    for key in DEFAULT_TRUE_ON_FIRST_RUN:
-        session_state[key] = True
-
-    # 写回文件（保持 prefs 一致）
-    if any(prefs.get(k) is not True for k in DEFAULT_TRUE_ON_FIRST_RUN):
-        for k in DEFAULT_TRUE_ON_FIRST_RUN:
-            prefs[k] = True
-        save_prefs(prefs)
-
     if not prefs:
         return
 
-    # 已有 prefs：恢复其他持久字段（语言/隐私同意/联网模型列表）
+    # 已有 prefs：只恢复白名单字段，未知字段不进入 session_state。
     for key in PERSISTED_KEYS:
-        if key in prefs and key not in DEFAULT_TRUE_ON_FIRST_RUN:
+        if key in prefs:
             session_state[key] = prefs[key]
     # v3.7: 联网获取的模型列表也恢复
     for key in RUNTIME_MODEL_KEYS:
@@ -120,18 +122,19 @@ def apply_to_session(session_state: Any) -> None:
 
 def sync_from_session(session_state: Any) -> bool:
     """同步 session_state 中的持久字段到本地文件。"""
-    current = load_prefs()
-    changed = False
-    for key in PERSISTED_KEYS | RUNTIME_MODEL_KEYS:
-        new_val = session_state.get(key) if hasattr(session_state, "get") else None
-        if new_val is None:
-            continue
-        if current.get(key) != new_val:
-            current[key] = new_val
-            changed = True
-    if changed:
-        return save_prefs(current)
-    return True
+    with _PREFS_LOCK:
+        current = load_prefs()
+        changed = False
+        for key in PERSISTED_KEYS | RUNTIME_MODEL_KEYS:
+            new_val = session_state.get(key) if hasattr(session_state, "get") else None
+            if new_val is None:
+                continue
+            if current.get(key) != new_val:
+                current[key] = new_val
+                changed = True
+        if changed:
+            return save_prefs(current)
+        return True
 
 
 def update_runtime_models(provider: str, models: list) -> bool:
@@ -144,9 +147,10 @@ def update_runtime_models(provider: str, models: list) -> bool:
 
 def reset_prefs() -> bool:
     """清空本地偏好（用户手动重置时调用）。"""
-    try:
-        if PREFS_FILE.exists():
-            PREFS_FILE.unlink()
-        return True
-    except OSError:
-        return False
+    with _PREFS_LOCK:
+        try:
+            if PREFS_FILE.exists():
+                PREFS_FILE.unlink()
+            return True
+        except OSError:
+            return False

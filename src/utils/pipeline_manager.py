@@ -186,14 +186,14 @@ def render_pipeline_ui():
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if st.button("➕ 保存当前分析", use_container_width=True, key="pipe_save"):
+        if st.button("➕ 保存当前分析", width="stretch", key="pipe_save"):
             if save_current_analysis_to_pipeline():
                 st.success("已保存到 Pipeline！")
                 st.rerun()
             else:
                 st.warning("没有可保存的分析结果。")
     with col2:
-        if st.button("▶ 复跑 Pipeline", use_container_width=True, key="pipe_replay"):
+        if st.button("▶ 复跑 Pipeline", width="stretch", key="pipe_replay"):
             try:
                 results = replay_pipeline()
                 success = sum(1 for r in results if r["success"])
@@ -204,13 +204,13 @@ def render_pipeline_ui():
             except Exception as e:
                 st.error(f"复跑失败：{e}")
     with col3:
-        if st.button("📤 导出", use_container_width=True, key="pipe_export"):
+        if st.button("📤 导出", width="stretch", key="pipe_export"):
             json_str = export_pipeline()
             b64 = base64.b64encode(json_str.encode("utf-8")).decode()
             href = f'<a href="data:application/json;base64,{b64}" download="analysis_pipeline.json">点击下载 Pipeline JSON</a>'
             st.markdown(href, unsafe_allow_html=True)
     with col4:
-        if st.button("🗑 清空", use_container_width=True, key="pipe_clear"):
+        if st.button("🗑 清空", width="stretch", key="pipe_clear"):
             clear_pipeline()
             st.success("Pipeline 已清空。")
             st.rerun()

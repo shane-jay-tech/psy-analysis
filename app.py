@@ -1,16 +1,21 @@
-"""心理学研究工具 v3.9 — 数据分析 + 问卷设计 + 论文交付 + AI 陪练 + 多项目管理"""
+"""心理学研究工具 — 研究全流程辅助、统计分析与交付。"""
 
 import sys
 import os
 import json
 import time
 import io
+import html
 import threading
 import zipfile
 import base64
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
+
+
+logger = logging.getLogger(__name__)
 
 
 class _DummyContext:
@@ -45,6 +50,7 @@ from src.utils.env_check import (
     render_env_health_banner, render_env_status_toasts, run_startup_check,
 )
 from src.ui.quick_entries import render_quick_entry_homepage, render_quick_entry_detail
+from src.ui.navigation import PAGE_MODES
 from src.utils.usage_hooks import (
     on_page_visit, on_template_select, on_data_upload, on_method_recommend,
     on_analysis_execute, on_table_generate, on_consistency_check,
@@ -57,20 +63,13 @@ st.set_page_config(
     page_title="心理学研究工具",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
-st.markdown("""
-<style>
-    .stApp { font-family: "Microsoft YaHei", "SimHei", sans-serif; }
-    .error-box { background-color: #fff0f0; border-left: 4px solid #e74c3c; padding: 1rem; border-radius: 4px; margin: 0.5rem 0; }
-    .warning-box { background-color: #fff8e1; border-left: 4px solid #f39c12; padding: 1rem; border-radius: 4px; margin: 0.5rem 0; }
-    .info-box { background-color: #e8f4fd; border-left: 4px solid #3498db; padding: 1rem; border-radius: 4px; margin: 0.5rem 0; }
-    .success-box { background-color: #e8f8e8; border-left: 4px solid #27ae60; padding: 1rem; border-radius: 4px; margin: 0.5rem 0; }
-    .onboarding-step { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
-    .tooltip { position: relative; display: inline-block; border-bottom: 1px dotted #999; cursor: help; }
-</style>
-""", unsafe_allow_html=True)
+from src.ui.accessibility import render_accessibility_support
+from src.ui.design_system import render_design_system
+render_design_system()
+render_accessibility_support()
 
 
 
@@ -161,10 +160,8 @@ def _build_homework_package(output, df, tag=""):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         # 1. 数据文件（脱敏）
-        df_saved = df.copy()
-        from src.utils.guardrails import detect_name_columns, hash_column
-        for col in detect_name_columns(df_saved):
-            df_saved[col] = hash_column(df_saved, col)
+        from src.utils.guardrails import redact_dataframe_for_storage
+        df_saved, redaction_report = redact_dataframe_for_storage(df)
         zf.writestr("data.csv", df_saved.to_csv(index=False, encoding="utf-8-sig"))
 
         # 2. APA7 报告
@@ -185,6 +182,7 @@ def _build_homework_package(output, df, tag=""):
             "test_type": test_type,
             "test_name": test_name,
             "timestamp": now,
+            "privacy_redaction": redaction_report,
         }
         if plan:
             params["dependent_vars"] = plan.dependent_vars if hasattr(plan, "dependent_vars") else []
@@ -202,7 +200,7 @@ def _build_homework_package(output, df, tag=""):
             f"生成时间：{now}\n"
             f"标签/课程：{tag or '未标注'}\n\n"
             "文件说明：\n"
-            "- data.csv: 分析数据（姓名列已脱敏）\n"
+            "- data.csv: 分析数据（高敏感列已移除，身份标识列已哈希）\n"
             "- report.md: APA7 格式分析报告 + 方法说明\n"
             "- params.json: 分析参数记录\n\n"
             "学术诚信提醒：请确保你理解所用方法的原理，在论文中正确表述统计结果。\n"
@@ -216,7 +214,7 @@ def _build_homework_package(output, df, tag=""):
         data=buf,
         file_name=f"作业包_{safe_name}_{now}.zip",
         mime="application/zip",
-        use_container_width=True,
+        width="stretch",
     )
     st.success("✅ 作业包已生成！包含数据、APA7报告和方法说明。")
 
@@ -309,6 +307,10 @@ try:
 except Exception:
     pass
 
+# “开始新研究”发生在控件实例化之后；延迟到下一轮、控件创建前清理上传框。
+for _widget_key in st.session_state.pop("_pending_widget_resets", []):
+    st.session_state.pop(_widget_key, None)
+
 # ============================================================
 # 隐私声明（首次使用时弹出）
 # ============================================================
@@ -318,11 +320,11 @@ if not st.session_state.privacy_accepted:
         st.markdown("""
         <div class="info-box">
         <p><strong>数据隐私承诺</strong></p>
-        <p>本工具的所有数据处理均在您的本地计算机上完成。我们<strong>不收集、不上传、不存储</strong>您的任何数据。</p>
+        <p>本工具的统计处理和项目存储均在您的本地计算机上完成；项目文件不会由本工具开发者收集。</p>
         <ul>
-            <li>上传的数据文件仅存在于当前会话的内存中</li>
-            <li>关闭浏览器或清除会话后，所有数据将被清除</li>
-            <li>LLM API 调用仅发送必要的提示词，不会上传您的原始数据</li>
+            <li>上传的数据会进入当前会话，并随自动保存写入本机项目目录，方便恢复</li>
+            <li>关闭浏览器不会删除本地项目；可在项目管理或缓存清理中主动删除</li>
+            <li>使用云端 AI 功能时，你提交的文本会发送给所选服务商；原始数据不会被自动上传，除非功能明确提示</li>
             <li>文献爬取功能仅向公开 API 发送关键词查询，不涉及个人数据</li>
         </ul>
         <p><em>如使用云端 LLM 服务，请遵守相应平台的数据使用协议。</em></p>
@@ -331,7 +333,7 @@ if not st.session_state.privacy_accepted:
 
         col1, col2 = st.columns([1, 4])
         with col1:
-            if st.button("✅ 我已阅读并同意", type="primary", use_container_width=True):
+            if st.button("✅ 我已阅读并同意", type="primary", width="stretch"):
                 st.session_state.privacy_accepted = True
                 # v3.7: 持久化，下次启动不再弹
                 try:
@@ -357,14 +359,41 @@ if "has_auto_cleaned" not in st.session_state:
         pass
 
 # ============================================================
-# 启动时一键环境检查（5秒自检，toast弹出，不阻塞）
+# 启动时一键环境检查（v5.8：毫秒级 find_spec 自检，toast 弹出，不阻塞）
 # ============================================================
 if not st.session_state.startup_check_done:
     st.session_state.startup_check_done = True
-    with st.spinner("🔍 正在检查运行环境..."):
+    try:
         env_status = run_startup_check()
         st.session_state.env_status = env_status
-    render_env_status_toasts(env_status)
+        render_env_status_toasts(env_status)
+    except Exception:
+        # 自检失败绝不能让整个应用白屏（v5.8 鲁棒性修复）
+        st.session_state.env_status = None
+
+# v5.8: 后台预热重型统计依赖（daemon 线程，不阻塞渲染）。
+# 用户在阅读界面/上传数据的同时，pingouin/statsmodels/semopy 等
+# 已在后台导入完成，第一次点「开始分析」不再额外等待 10~30s。
+def _preload_heavy_deps() -> None:
+    try:
+        import scipy.stats  # noqa: F401
+        import statsmodels.api  # noqa: F401
+        import pingouin  # noqa: F401
+        import sklearn.cluster  # noqa: F401
+        import factor_analyzer  # noqa: F401
+        import openpyxl  # noqa: F401
+        import jieba  # noqa: F401
+        import semopy  # noqa: F401
+        import kaleido  # noqa: F401
+    except Exception:
+        pass  # 预热失败静默——真正用到时会有明确的懒加载错误提示
+
+if not st.session_state.get("_heavy_preload_started"):
+    st.session_state._heavy_preload_started = True
+    try:
+        threading.Thread(target=_preload_heavy_deps, daemon=True, name="heavy-preload").start()
+    except Exception:
+        pass
 
 # v2.9: 顶部环境健康提示条（仅在有问题时显示）
 render_env_health_banner()
@@ -376,6 +405,19 @@ ensure_active_project_on_first_visit()
 # v3.0: 自动恢复提示（仅在首次访问 + 有 autosave 时）
 from src.utils.autosave import render_restore_prompt, trigger_autosave
 render_restore_prompt(st)
+
+
+def _autosave_current_workspace(*, force: bool = False) -> bool:
+    """保存当前项目；所有失败由 autosave 状态统一反馈，不阻断主流程。"""
+    try:
+        from src.utils.workspace import build_workspace_snapshot
+        return trigger_autosave(
+            st.session_state, build_workspace_snapshot, force=force
+        )
+    except Exception:
+        logger.exception("自动保存入口失败")
+        st.session_state["_autosave_last_error"] = "自动保存失败，请手动导出项目快照"
+        return False
 
 # v3.0: 5 分钟引导路径（首次访问无任何数据时显示）
 from src.ui.onboarding import render_onboarding_card
@@ -421,7 +463,15 @@ with st.sidebar:
                 _cid = _pending.get("cancel_id")
                 if _cid is not None:
                     try:
-                        cancel_design_request(_cid)
+                        if _pkey == "_q_design_pending":
+                            from src.questionnaire.llm_engine import (
+                                cancel_design_request as _cancel_pending_design,
+                            )
+                        else:
+                            from src.experiment_design import (
+                                cancel_design_request as _cancel_pending_design,
+                            )
+                        _cancel_pending_design(_cid)
                     except Exception:
                         pass
                 _fut = _pending.get("future")
@@ -446,9 +496,14 @@ with st.sidebar:
     st.divider()
 
     # ── 一键全流程开关（v3.7 改名：原「📚 本科论文模式」）──
+    _pending_undergrad_mode = st.session_state.pop("_pending_undergrad_mode", None)
+    if isinstance(_pending_undergrad_mode, bool):
+        st.session_state.undergrad_mode = _pending_undergrad_mode
+        st.session_state["undergrad_mode_toggle"] = _pending_undergrad_mode
+    if "undergrad_mode_toggle" not in st.session_state:
+        st.session_state["undergrad_mode_toggle"] = bool(st.session_state.undergrad_mode)
     undergrad_mode = st.toggle(
         "🎯 一键全流程引导",
-        value=st.session_state.undergrad_mode,
         key="undergrad_mode_toggle",
         help="开启后从选题→文献→设计→分析→写作→答辩按真实科研顺序引导（共 13+ 步）。"
               "关闭后可单独进入任一阶段。建议第一次使用时开启。",
@@ -462,19 +517,22 @@ with st.sidebar:
         st.rerun()
 
     if not st.session_state.undergrad_mode:
+        _pending_mode = st.session_state.pop("_pending_app_mode", None)
+        if _pending_mode in PAGE_MODES:
+            st.session_state.app_mode = _pending_mode
+        if st.session_state.get("app_mode") not in PAGE_MODES:
+            st.session_state.app_mode = "📈 数据分析"
         mode = st.radio(
             "按阶段进入",
-            [
-                "🗂️ 模板中心",
-                "📚 文献与选题",
-                "📋 问卷设计",
-                "📈 数据分析",
-                "📝 论文写作",
-                "📦 交付包导出",
-            ],
+            PAGE_MODES,
             key="app_mode",
             help="每个阶段可独立使用；阶段间数据自动共享。",
         )
+        try:
+            from src.ui.next_step_panel import render_next_step_panel
+            render_next_step_panel(mode)
+        except Exception:
+            pass
     else:
         mode = "📈 数据分析"  # 全流程模式下隐藏，但保持变量存在
 
@@ -496,24 +554,48 @@ with st.sidebar:
             '此处用于导出快照供备份或迁移。</p>',
             unsafe_allow_html=True,
         )
+        _autosave_error = st.session_state.get("_autosave_last_error")
+        _autosave_saved = st.session_state.get("_workspace_last_saved")
+        if _autosave_error:
+            st.warning(f"⚠️ {_autosave_error}")
+        elif _autosave_saved:
+            st.caption(f"✅ 当前项目已自动保存：{_autosave_saved}")
         st.markdown(
             '<p style="font-size:0.75em; color:#c0392b;">⚠️ 工作区文件含原始数据，妥善保管勿分享。</p>',
             unsafe_allow_html=True,
         )
 
-        workspace = build_workspace_snapshot()
-        workspace_json = json.dumps(workspace, ensure_ascii=False, default=str, indent=2)
-        if st.download_button(
-            "📥 导出项目快照",
-            data=workspace_json,
-            file_name=f"psy_workspace_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-            mime="application/json",
-            use_container_width=True,
-            help="导出当前数据 + 分析结果 + 向导状态（用于备份/迁移）",
-        ):
-            st.session_state["_workspace_last_saved"] = (
-                datetime.now().strftime("%Y-%m-%d %H:%M")
+        # v5.8 性能修复：快照（含全量 df.to_csv + base64）此前在每次 rerun
+        # 都被重算——大文件下每次点击交互都要等 1~3s。改为「点击后才生成」，
+        # 生成结果暂存 session_state，点「下载」取走。
+        if st.button("📥 导出项目快照", width="stretch",
+                     help="生成当前数据 + 分析结果 + 向导状态的备份文件（大文件需要几秒）"):
+            with st.spinner("正在打包工作区快照..."):
+                try:
+                    workspace = build_workspace_snapshot()
+                    ws_json = json.dumps(workspace, ensure_ascii=False, default=str, indent=2)
+                    st.session_state["_ws_export_json"] = ws_json
+                    st.session_state["_ws_export_ts"] = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    st.session_state["_workspace_last_saved"] = workspace.get(
+                        "_saved_at", datetime.now().strftime("%Y-%m-%d %H:%M")
+                    )
+                except Exception as _ws_err:
+                    st.error(f"❌ 快照生成失败：{_ws_err}")
+
+        _ws_json = st.session_state.get("_ws_export_json")
+        if _ws_json:
+            st.download_button(
+                "💾 下载快照文件",
+                data=_ws_json,
+                file_name=f"psy_workspace_{st.session_state.get('_ws_export_ts', datetime.now().strftime('%Y%m%d_%H%M%S'))}.json",
+                mime="application/json",
+                width="stretch",
+                help="快照已生成，点击下载。",
             )
+            if st.button("🗑 丢弃快照（释放内存）", key="_ws_export_discard"):
+                st.session_state.pop("_ws_export_json", None)
+                st.session_state.pop("_ws_export_ts", None)
+                st.rerun()
 
         st.markdown(
             '<p style="font-size:0.85em; font-weight:600; margin-top:8px;">📤 导入项目快照</p>',
@@ -526,27 +608,43 @@ with st.sidebar:
             label_visibility="collapsed",
         )
         if workspace_file is not None:
-            try:
-                loaded = json.loads(workspace_file.read().decode("utf-8"))
-                restored_count = restore_workspace(loaded)
-                st.success(
-                    f"✅ 已恢复 {restored_count} 个数据项"
-                    f" (保存时间: {loaded.get('_saved_at', '未知')})"
+            import hashlib as _hashlib
+            _workspace_cheap_identity = (
+                workspace_file.name,
+                int(getattr(workspace_file, "size", 0)),
+                str(getattr(workspace_file, "file_id", "")),
+            )
+            _workspace_handled = st.session_state.get("_workspace_import_handled")
+            if not (
+                isinstance(_workspace_handled, tuple)
+                and _workspace_handled[:3] == _workspace_cheap_identity
+            ):
+                _workspace_bytes = workspace_file.getvalue()
+                _workspace_identity = _workspace_cheap_identity + (
+                    _hashlib.sha256(_workspace_bytes).hexdigest(),
                 )
-                mig_info = st.session_state.get("_workspace_migration_info")
-                if mig_info:
-                    st.info(
-                        f"🔄 已自动升级旧版工作区：{mig_info['from_version']} → {mig_info['to_version']}"
+                try:
+                    loaded = json.loads(_workspace_bytes.decode("utf-8"))
+                    restored_count = restore_workspace(loaded)
+                    st.session_state["_workspace_import_handled"] = _workspace_identity
+                    st.success(
+                        f"✅ 已恢复 {restored_count} 个数据项"
+                        f" (保存时间: {loaded.get('_saved_at', '未知')})"
                     )
-                    st.session_state.pop("_workspace_migration_info", None)
-                if st.session_state.get("undergrad_mode"):
-                    step = st.session_state.get("undergrad_step", 0)
-                    st.info(f"📚 已恢复本科向导模式，当前第 {step} 步。")
-                st.rerun()
-            except FutureSchemaError as e:
-                st.error(f"❌ {str(e)}")
-            except Exception as e:
-                st.error(f"❌ 恢复失败: {str(e)}")
+                    mig_info = st.session_state.get("_workspace_migration_info")
+                    if mig_info:
+                        st.info(
+                            f"🔄 已自动升级旧版工作区：{mig_info['from_version']} → {mig_info['to_version']}"
+                        )
+                        st.session_state.pop("_workspace_migration_info", None)
+                    if st.session_state.get("undergrad_mode"):
+                        step = st.session_state.get("undergrad_step", 0)
+                        st.info(f"📚 已恢复本科向导模式，当前第 {step} 步。")
+                    st.rerun()
+                except FutureSchemaError as e:
+                    st.error(f"❌ {str(e)}")
+                except Exception as e:
+                    st.error(f"❌ 恢复失败: {str(e)}")
 
         st.divider()
         st.markdown(
@@ -574,7 +672,7 @@ with st.sidebar:
                 test_name = entry.get("test_name_zh", entry.get("test_type", ""))
                 label = f"{ts} — {test_name}{tag_badge}"
                 if st.button(label, key=f"archive_{i}_{entry['archive_id'][:8]}",
-                            use_container_width=True):
+                            width="stretch"):
                     loaded = load_archive(entry["archive_id"])
                     if loaded and "df" in loaded:
                         st.session_state.df = loaded["df"]
@@ -587,24 +685,48 @@ with st.sidebar:
                         st.rerun()
 
         st.divider()
-        if st.button("🗑️ 清除会话数据", type="secondary", use_container_width=True,
-                     help="清除所有上传的数据、分析结果和临时状态"):
-            import gc
-            keys_to_clear = [
-                "df", "meta", "inspector", "analysis_output", "plan",
-                "questionnaire_design", "paper_engine", "experiment_engine",
-            ]
-            for k in keys_to_clear:
-                if k in st.session_state:
-                    del st.session_state[k]
-                st.session_state[k] = _defaults[k]
-            st.session_state.onboarding_completed = False
-            gc.collect()
+        # 清空前先保存当前项目，再切换到新的空白项目，避免研究资产交叉污染。
+        if st.session_state.get("_clear_session_confirm"):
+            st.warning("⚠️ 将保存当前项目并创建一个新的空白项目；当前研究不会被删除。")
+            _cc1, _cc2 = st.columns(2)
+            if _cc1.button("✅ 保存并开始新研究", type="primary", width="stretch", key="_clear_session_yes"):
+                import gc
+                try:
+                    from src.ui.session_reset import clear_research_session
+                    from src.utils import project_manager as _pm
+                    from src.utils.workspace import build_workspace_snapshot
+
+                    _active_id = _pm.get_active_project_id(st.session_state)
+                    if _active_id is not None:
+                        _current_snapshot = build_workspace_snapshot()
+                        if not _pm.save_workspace(_active_id, _current_snapshot):
+                            raise OSError("当前项目保存失败，请先导出项目快照")
+                    _new_project = _pm.create_project(
+                        f"新研究 {datetime.now().strftime('%Y-%m-%d %H%M')}"
+                    )
+                    _pm.set_active_project(st.session_state, _new_project.id)
+                    clear_research_session(st.session_state)
+                    st.session_state["_clear_session_confirm"] = False
+                    st.session_state["_session_reset_notice"] = "已保存原项目，并进入新的空白研究。"
+                    gc.collect()
+                    st.rerun()
+                except Exception as _reset_err:
+                    st.error(f"无法开始新研究：{_reset_err}")
+            if _cc2.button("取消", width="stretch", key="_clear_session_no"):
+                st.session_state["_clear_session_confirm"] = False
+                st.rerun()
+        elif st.button("➕ 开始新研究", type="secondary", width="stretch",
+                       help="保存当前项目后创建空白项目，避免不同研究的数据混用"):
+            st.session_state["_clear_session_confirm"] = True
             st.rerun()
 
     # ── 💡 帮助 · 入门（向导 + 术语速查）──
     with st.expander("💡 帮助 · 入门", expanded=not st.session_state.onboarding_completed):
         st.markdown(_get_onboarding_text(mode))
+        if st.button("🎯 重新打开 5 分钟新手引导", key="restart_onboarding"):
+            from src.ui.onboarding import restart_onboarding
+            restart_onboarding()
+            st.rerun()
         if st.button("✓ 知道了", key="dismiss_onboarding"):
             st.session_state.onboarding_completed = True
             try:
@@ -640,7 +762,7 @@ with st.sidebar:
         st.divider()
         ret = st.session_state._wizard_return
         st.success("✅ 模块操作已完成！")
-        if st.button("🔙 返回向导继续", type="primary", use_container_width=True,
+        if st.button("🔙 返回向导继续", type="primary", width="stretch",
                      key="sidebar_return_wizard"):
             wiz_data = ret["data"]
             design = st.session_state.get("questionnaire_design")
@@ -655,7 +777,7 @@ with st.sidebar:
                     "reverse_count": rev_count,
                     "reverse_ratio": round(rev_count / len(items), 2) if items else 0,
                 }
-            st.session_state.undergrad_mode = True
+            st.session_state["_pending_undergrad_mode"] = True
             st.session_state.undergrad_path = ret["path"]
             st.session_state.undergrad_step = 2
             st.session_state.undergrad_wizard_data = wiz_data
@@ -732,7 +854,7 @@ with st.sidebar:
             st.caption(f"{semopy_icon} CFA/SEM  |  {fa_icon} EFA  |  {llm_icon} LLM")
 
         st.divider()
-        if st.button("🔧 运行系统诊断", key="_sidebar_diag", use_container_width=True):
+        if st.button("🔧 运行系统诊断", key="_sidebar_diag", width="stretch"):
             from src.utils.environment_diagnosis import run_full_diagnosis, format_diagnosis_for_streamlit
             _diag = run_full_diagnosis(project_root=Path("."))
             _diag_results = format_diagnosis_for_streamlit(_diag)
@@ -752,7 +874,7 @@ with st.sidebar:
         if _cache_dirs:
             for _cd in _cache_dirs:
                 st.caption(f"• {_cd['label']}：{_cd['size_mb']} MB")
-            if st.button("🗑️ 一键清理所有缓存", key="_privacy_clear_cache", use_container_width=True):
+            if st.button("🗑️ 一键清理所有缓存", key="_privacy_clear_cache", width="stretch"):
                 _clear_result = clear_cache()
                 if _clear_result["cleared"]:
                     st.success(f"✅ 已清理：{', '.join(_clear_result['cleared'])}")
@@ -762,7 +884,7 @@ with st.sidebar:
             st.caption("当前无可清理的缓存目录。")
 
     from src.version import APP_VERSION_LABEL
-    st.caption(f"{APP_VERSION_LABEL} · 单轨 LLM + 4 块侧栏 · 本地运行 · 数据不上传")
+    st.caption(f"{APP_VERSION_LABEL} · 单轨 LLM · 本地项目存储 · 云端 AI 按需调用")
 
 # ============================================================
 # 本科论文向导模式覆盖（v3.3：路由配置表查表分发）
@@ -859,7 +981,11 @@ if mode == "📈 数据分析":
         render_undergrad_wizard,
         render_common_mistake_warnings,
         render_assumption_failure_guidance,
+        render_pii_warning,
     )
+    st.title("📈 数据分析")
+    st.caption("上传研究数据，选择分析任务，并获得可核查的统计结果与 APA7 输出。")
+
     # ── 数据上传与状态信息（页面顶部，路由 stop() 前必须先渲染） ──
     # 之前在 sidebar；v3.7.x 移到主区，因为只有数据分析页才需要上传，
     # 也腾出 sidebar 空间留给工作区/语言/全局设置。
@@ -877,21 +1003,28 @@ if mode == "📈 数据分析":
     )
 
     if uploaded_file is not None:
+        from src.ui.upload_state import commit_loaded_dataset, uploaded_file_identity
         current_name = uploaded_file.name
-        if current_name != st.session_state.file_name:
-            st.session_state.file_name = current_name
+        _upload_identity = uploaded_file_identity(uploaded_file)
+        if _upload_identity != st.session_state.get("_uploaded_file_identity"):
             # 大文件列选择提示
-            size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
+            _upload_size = getattr(uploaded_file, "size", None)
+            if _upload_size is None:
+                _upload_size = len(uploaded_file.getbuffer())
+            size_mb = _upload_size / (1024 * 1024)
             usecols = None
+            _ready_to_load = True
             if size_mb > 20:
                 st.warning(f"⚠️ 文件较大（{size_mb:.1f} MB），建议只加载分析所需的列以节省内存。")
                 try:
+                    uploaded_file.seek(0)
                     if current_name.lower().endswith(".csv"):
                         preview_cols = pd.read_csv(uploaded_file, nrows=0).columns.tolist()
                     elif current_name.lower().endswith((".xlsx", ".xls")):
                         preview_cols = pd.read_excel(uploaded_file, nrows=0).columns.tolist()
                     else:
                         preview_cols = []
+                    uploaded_file.seek(0)
                     if preview_cols:
                         selected_cols = st.multiselect(
                             "选择需要加载的列（留空则加载全部）：",
@@ -901,21 +1034,34 @@ if mode == "📈 数据分析":
                         )
                         if selected_cols:
                             usecols = selected_cols
+                        _ready_to_load = st.button(
+                            "加载所选列" if selected_cols else "加载全部列",
+                            key="load_large_file",
+                            type="primary",
+                        )
                 except Exception:
-                    pass
-            try:
-                with st.spinner("正在加载数据..."):
-                    df, meta = load_data(uploaded_file, usecols=usecols)
-                    st.session_state.df = df
-                    st.session_state.meta = meta
-                    st.session_state.inspector = inspect_dataframe(df)
-                    st.session_state.analysis_output = None
-                    st.session_state.plan = None
-                    on_data_upload(len(df), len(df.columns), current_name.rsplit(".", 1)[-1])
-            except Exception as e:
-                st.error(f"❌ 数据加载失败：{e}")
-                on_error_display("data_load_failed", "error")
-                st.session_state.df = None
+                    uploaded_file.seek(0)
+            if _ready_to_load:
+                try:
+                    uploaded_file.seek(0)
+                    with st.spinner("正在加载数据..."):
+                        new_df, new_meta = load_data(uploaded_file, usecols=usecols)
+                        new_inspector = inspect_dataframe(new_df)
+                    # 全部成功后再替换，坏文件不会清掉当前有效数据。
+                    commit_loaded_dataset(
+                        st.session_state,
+                        dataframe=new_df,
+                        meta=new_meta,
+                        inspector=new_inspector,
+                        file_name=current_name,
+                        identity=_upload_identity,
+                    )
+                    on_data_upload(len(new_df), len(new_df.columns), current_name.rsplit(".", 1)[-1])
+                    _autosave_current_workspace(force=True)
+                except Exception as e:
+                    st.session_state["_upload_error"] = str(e)
+                    st.error(f"❌ 数据加载失败：{e}。已保留当前数据。")
+                    on_error_display("data_load_failed", "error")
 
     if not _has_df and st.session_state.df is None:
         st.info("👆 请上传数据文件以开始分析")
@@ -923,7 +1069,7 @@ if mode == "📈 数据分析":
         demo_col1, demo_col2, demo_col3, _ = st.columns([1, 1, 1, 3])
         _demo_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "fixtures")
         with demo_col1:
-            if st.button("📋 问卷数据", use_container_width=True, help="7维度心理量表 (N=50)"):
+            if st.button("📋 问卷数据", width="stretch", help="7维度心理量表 (N=50)"):
                 _p = os.path.join(_demo_dir, "sample_survey.csv")
                 if os.path.exists(_p):
                     _demo_df, _demo_meta = load_data(_p)
@@ -933,7 +1079,7 @@ if mode == "📈 数据分析":
                     st.session_state.file_name = "sample_survey.csv"
                     st.rerun()
         with demo_col2:
-            if st.button("📊 t 检验数据", use_container_width=True, help="两组对比数据"):
+            if st.button("📊 t 检验数据", width="stretch", help="两组对比数据"):
                 _p = os.path.join(_demo_dir, "sample_ttest.csv")
                 if os.path.exists(_p):
                     _demo_df, _demo_meta = load_data(_p)
@@ -943,7 +1089,7 @@ if mode == "📈 数据分析":
                     st.session_state.file_name = "sample_ttest.csv"
                     st.rerun()
         with demo_col3:
-            if st.button("🔬 方差分析数据", use_container_width=True, help="多组对比数据"):
+            if st.button("🔬 方差分析数据", width="stretch", help="多组对比数据"):
                 _p = os.path.join(_demo_dir, "sample_anova.csv")
                 if os.path.exists(_p):
                     _demo_df, _demo_meta = load_data(_p)
@@ -990,7 +1136,7 @@ if mode == "📈 数据分析":
         info_cols = st.columns(2)
         with info_cols[0]:
             with st.expander("📋 数据预览（前10行）"):
-                st.dataframe(df.head(10), use_container_width=True)
+                st.dataframe(df.head(10), width="stretch")
         with info_cols[1]:
             with st.expander("🔤 变量列表"):
                 for col, info in inspector.items():
@@ -1001,6 +1147,8 @@ if mode == "📈 数据分析":
         issues = validate_data(df)
         for issue in issues:
             st.warning(issue)
+
+        render_pii_warning(df)
 
         # ── 交互式图表开关 ──
         has_plotly = True
@@ -1035,10 +1183,6 @@ if mode == "📈 数据分析":
     if st.session_state.df is None:
         render_quick_entry_homepage()
         st.stop()
-
-    # 主区域
-    st.title("📈 数据分析")
-    st.caption("上传数据 → 输入分析需求 → 自动分析 → 结果与图表")
 
     # ── 方法选择助手 ──
     with st.expander("🎯 不知道用什么方法？点击这里", expanded=False):
@@ -1078,7 +1222,7 @@ if mode == "📈 数据分析":
                     st.caption(f"📁 可用的分类变量：{', '.join(cat_cols) if cat_cols else '未检测到'}")
 
     # ── 推荐方案预填 ──
-    from src.ui.state_keys import ANALYSIS_RECIPE_KEY, RECIPE_EXECUTED_KEY, ANALYSIS_CARDS_KEY
+    from src.ui.state_keys import ANALYSIS_RECIPE_KEY, RECIPE_EXECUTED_KEY
     _recipe = st.session_state.get(ANALYSIS_RECIPE_KEY)
     _recipe_used = False
     if _recipe and not st.session_state.get(RECIPE_EXECUTED_KEY):
@@ -1089,7 +1233,7 @@ if mode == "📈 数据分析":
         )
         _rcol1, _rcol2, _rcol3 = st.columns([2, 2, 2])
         with _rcol1:
-            _recipe_used = st.button("✅ 使用推荐方案", type="primary", key="use_recipe_prefill")
+            _recipe_used = st.button("✅ 填入推荐方案", type="primary", key="use_recipe_prefill")
         with _rcol2:
             if st.button("✏️ 修改后使用", key="modify_recipe"):
                 st.session_state["_recipe_prefill_text"] = f"使用{_recipe.method_zh}分析"
@@ -1098,6 +1242,12 @@ if mode == "📈 数据分析":
                 st.session_state[RECIPE_EXECUTED_KEY] = "dismissed"
                 st.rerun()
 
+    if _recipe_used and _recipe:
+        # recipe 中的 variable_roles 是角色说明，不是用户数据的真实列名。
+        # 只预填方法，让用户明确变量后再走统一的解析与防呆检查。
+        st.session_state["_recipe_prefill_text"] = (
+            f"使用{_recipe.method_zh}分析；请在这里补充因变量、自变量或分组变量的列名"
+        )
     _prefill_text = st.session_state.pop("_recipe_prefill_text", "")
 
     col1, col2 = st.columns([3, 1])
@@ -1113,71 +1263,12 @@ if mode == "📈 数据分析":
         )
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
-        analyze_btn = st.button("🔍 开始分析", type="primary", use_container_width=True)
-        clear_btn = st.button("🗑 清空", use_container_width=True)
+        analyze_btn = st.button("🔍 开始分析", type="primary", width="stretch")
+        clear_btn = st.button("🗑 清空分析结果", width="stretch")
 
     if clear_btn:
         st.session_state.analysis_output = None
         st.session_state.plan = None
-        st.rerun()
-
-    # ── 推荐方案直接执行 ──
-    if _recipe_used and _recipe and st.session_state.df is not None:
-        from src.parser.intent_resolver import AnalysisPlan
-        _method_to_test_type = {
-            "independent_ttest": "independent_ttest",
-            "paired_ttest": "paired_ttest",
-            "one_way_anova": "one_way_anova",
-            "repeated_anova": "repeated_anova",
-            "pearson_corr": "pearson_corr",
-            "spearman_corr": "spearman_corr",
-            "multiple_regression": "multiple_regression",
-            "binary_logistic": "binary_logistic",
-            "mediation": "mediation",
-            "moderation": "moderation",
-            "cronbach_alpha": "cronbach_alpha",
-            "chi_square_independence": "chi_square",
-            "chi_square": "chi_square",
-            "ancova": "ancova",
-            "mann_whitney": "mann_whitney",
-            "wilcoxon": "wilcoxon",
-            "kruskal_wallis": "kruskal_wallis",
-            "descriptive": "descriptive",
-        }
-        _test_type = _method_to_test_type.get(_recipe.method_id, _recipe.method_id)
-        _inspector = st.session_state.inspector or {}
-        _numeric_cols = [c for c, info in _inspector.items()
-                        if info.get("type") in ("continuous", "numeric", "float", "int")]
-        _cat_cols = [c for c, info in _inspector.items()
-                     if info.get("type") in ("categorical", "object", "string", "str")]
-        _dvs = _numeric_cols[:1] if _numeric_cols else []
-        _ivs = _cat_cols[:1] if _cat_cols else []
-        if "x" in _recipe.variable_roles and "y" in _recipe.variable_roles:
-            _dvs = _numeric_cols[:2] if len(_numeric_cols) >= 2 else _numeric_cols
-            _ivs = []
-        plan = AnalysisPlan(
-            test_type=_test_type,
-            dependent_vars=_dvs,
-            independent_vars=_ivs,
-            raw_request=f"[推荐方案] {_recipe.method_zh}",
-        )
-        st.session_state.plan = plan
-        with st.spinner("正在执行推荐方案分析..."):
-            with AnalysisTimer(_test_type):
-                output = run_analysis(st.session_state.df, plan)
-            st.session_state.analysis_output = output
-        on_method_recommend(_test_type, template_id=None)
-        st.session_state[RECIPE_EXECUTED_KEY] = _recipe.recommendation_id or "executed"
-        if not st.session_state.get(ANALYSIS_CARDS_KEY):
-            st.session_state[ANALYSIS_CARDS_KEY] = []
-        if isinstance(output, dict) and output.get("test_name_zh"):
-            st.session_state[ANALYSIS_CARDS_KEY].append({
-                "method": _test_type,
-                "method_zh": _recipe.method_zh,
-                "apa_text": output.get("apa_text", ""),
-                "recommendation_id": _recipe.recommendation_id,
-            })
-        st.success(f"✅ 已使用推荐方案执行 {_recipe.method_zh}，结果如下：")
         st.rerun()
 
     # 分析执行（含防呆检查）
@@ -1202,11 +1293,7 @@ if mode == "📈 数据分析":
 
             type_check = check_variable_type_match(plan.test_type, dv_types, iv_types)
             if not type_check.passed:
-                st.markdown(
-                    f'<div class="error-box"><strong>{type_check.title}</strong><br>'
-                    f'{type_check.message}</div>',
-                    unsafe_allow_html=True,
-                )
+                st.error(f"{type_check.title}\n\n{type_check.message}")
                 if type_check.suggested_test_type:
                     st.info(
                         f"💡 建议改用：**{type_check.suggested_test_name}** — "
@@ -1218,11 +1305,7 @@ if mode == "📈 数据分析":
         n_rows = st.session_state.df.shape[0]
         sample_check = check_sample_size(n_rows, plan.test_type)
         if sample_check.severity == "warn":
-            st.markdown(
-                f'<div class="warning-box"><strong>{sample_check.title}</strong><br>'
-                f'{sample_check.message}</div>',
-                unsafe_allow_html=True,
-            )
+            st.warning(f"{sample_check.title}\n\n{sample_check.message}")
 
         # ── 防呆检查3: 多重比较拦截 ──
         multi_check = check_multiple_comparisons(
@@ -1231,11 +1314,7 @@ if mode == "📈 数据分析":
             list(plan.dependent_vars) if hasattr(plan, "dependent_vars") else [],
         )
         if not multi_check.passed:
-            st.markdown(
-                f'<div class="error-box"><strong>{multi_check.title}</strong><br>'
-                f'{multi_check.message}</div>',
-                unsafe_allow_html=True,
-            )
+            st.error(f"{multi_check.title}\n\n{multi_check.message}")
             col_switch, col_ignore = st.columns(2)
             with col_switch:
                 if st.button(f"🔄 切换为 {multi_check.suggested_test_name}", type="primary"):
@@ -1252,13 +1331,15 @@ if mode == "📈 数据分析":
                 else:
                     st.stop()
 
-        # Cache key: data content hash + plan repr
+        # Cache key: data content hash + plan repr。每次真正点击分析时重算内容哈希；
+        # 不能用对象 id 代替内容版本，因为清洗器可能原地修改 DataFrame。
         import hashlib
-        _df_hash = hashlib.md5(
-            pd.util.hash_pandas_object(st.session_state.df).values.tobytes()
+        _df_obj = st.session_state.df
+        _df_content_hash = hashlib.md5(
+            pd.util.hash_pandas_object(_df_obj).values.tobytes()
         ).hexdigest()
         _cache_key = hashlib.md5(
-            f"{_df_hash}|{plan}".encode()
+            f"{_df_content_hash}|{plan}".encode()
         ).hexdigest()
         _prev_cache = st.session_state.get("_analysis_cache_key")
         if _prev_cache == _cache_key and st.session_state.get("analysis_output") is not None:
@@ -1279,6 +1360,8 @@ if mode == "📈 数据分析":
                     "iv": list(plan.independent_vars) if hasattr(plan, "independent_vars") else [],
                 }
                 st.session_state.analysis_history.append(history_entry)
+
+            _autosave_current_workspace(force=True)
 
             # ── 自动归档 ──
             try:
@@ -1303,9 +1386,9 @@ if mode == "📈 数据分析":
     elif analyze_btn and not request.strip():
         st.error("请输入分析需求！")
 
-    # 分析计划
-    if st.session_state.plan is not None:
-        plan = st.session_state.plan
+    # 分析计划。恢复旧工作区时可能只有结果而缺少计划，保持 plan 明确定义。
+    plan = st.session_state.get("plan")
+    if plan is not None:
         test_name = get_test_name(plan.test_type)
         with st.expander(f"📋 分析计划：{test_name}", expanded=True):
             cols = st.columns(4)
@@ -1331,9 +1414,9 @@ if mode == "📈 数据分析":
 
         for err in output.get("errors", []):
             if err["severity"] == "error":
-                st.markdown(f'<div class="error-box">❌ {err["message"]}</div>', unsafe_allow_html=True)
+                st.error(f"❌ {err['message']}")
             else:
-                st.markdown(f'<div class="warning-box">⚠ {err["message"]}</div>', unsafe_allow_html=True)
+                st.warning(f"⚠ {err['message']}")
 
         # ── 行为感知：多次t检验检测（非向导模式） ──
         if not st.session_state.undergrad_mode:
@@ -1548,7 +1631,7 @@ if mode == "📈 数据分析":
         desc = output.get("descriptive")
         if desc is not None and not desc.empty:
             with st.expander("📊 描述性统计", expanded=True):
-                st.dataframe(desc, use_container_width=True)
+                st.dataframe(desc, width="stretch")
 
         assumptions = output.get("assumptions", {})
         if assumptions:
@@ -1594,7 +1677,7 @@ if mode == "📈 数据分析":
             st.subheader(f"📈 {output.get('test_name_zh', '分析结果')}")
             summary = format_result_summary(output)
             if summary:
-                st.markdown(f'<div class="info-box">{summary}</div>', unsafe_allow_html=True)
+                st.info(summary)
             render_result_table(result)
 
         charts_data = output.get("charts_data", {})
@@ -1629,7 +1712,7 @@ if mode == "📈 数据分析":
         st.divider()
         col_exp1, col_exp2, col_exp3, col_exp4 = st.columns(4)
         with col_exp1:
-            if st.button("📥 导出报告 (HTML)", use_container_width=True):
+            if st.button("📥 导出报告 (HTML)", width="stretch"):
                 # 效应量检查
                 es_ok, es_msg = check_effect_size_required(output)
                 if not es_ok:
@@ -1637,10 +1720,10 @@ if mode == "📈 数据分析":
                 else:
                     export_html(output, df)
         with col_exp2:
-            if st.button("📄 导出数据 (CSV)", use_container_width=True):
+            if st.button("📄 导出数据 (CSV)", width="stretch"):
                 export_csv(output)
         with col_exp3:
-            if st.button("💾 保存快照", use_container_width=True):
+            if st.button("💾 保存快照", width="stretch"):
                 try:
                     from src.analysis.runner import export_snapshot
                     snap_path = export_snapshot(output)
@@ -1650,7 +1733,7 @@ if mode == "📈 数据分析":
                 except Exception as e:
                     st.error(f"快照保存失败：{e}")
         with col_exp4:
-            if st.button("📦 导出作业包", type="primary", use_container_width=True):
+            if st.button("📦 导出作业包", type="primary", width="stretch"):
                 # 效应量检查
                 es_ok, es_msg = check_effect_size_required(output)
                 if not es_ok:
@@ -1660,7 +1743,8 @@ if mode == "📈 数据分析":
 
         # ── 学术诚信声明（分析结果底部） ──
         with st.expander("⚠️ 学术诚信与辅助工具声明"):
-            st.markdown("""
+            from src.version import APP_VERSION_LABEL
+            st.markdown(f"""
             <div style="font-size:0.9em;">
             <h4>📝 研究诚信提醒</h4>
             <ol>
@@ -1672,7 +1756,7 @@ if mode == "📈 数据分析":
             <h4>📄 辅助工具声明模板</h4>
             <p>如你的论文使用了本工具辅助分析，建议在方法部分添加以下声明：</p>
             <pre style="background:#f0f0f0; padding:8px; border-radius:4px; font-size:0.85em;">
-本研究使用心理学研究工具 v2.2 进行数据整理和描述性统计分析。
+本研究使用心理学研究工具 {APP_VERSION_LABEL} 进行数据整理和描述性统计分析。
 所有推断统计分析使用 [软件名称与版本] 完成，显著性水平设定为 α = .05（双侧）。
             </pre>
             <p><em>注：请在 [软件名称与版本] 中填写你实际使用的统计软件
@@ -1683,6 +1767,13 @@ if mode == "📈 数据分析":
     st.divider()
     st.caption("💡 提示：如果分析结果与预期不符，请尝试调整需求描述的措辞，使其更加具体明确。")
 
+
+# ============================================================
+# 实验设计
+# ============================================================
+elif mode == "🧪 实验设计":
+    from src.ui.experiment_design_ui import render_experiment_design_ui
+    render_experiment_design_ui()
 
 # ============================================================
 # 模式2: 问卷设计
@@ -1783,7 +1874,7 @@ elif mode == "📋 问卷设计":
     }
     for i, (label, prompt) in enumerate(_templates.items()):
         with _tpl_cols[i]:
-            if st.button(label, key=f"_qtpl_{i}", use_container_width=True):
+            if st.button(label, key=f"_qtpl_{i}", width="stretch"):
                 st.session_state["q_request_input"] = prompt
                 st.rerun()
 
@@ -1817,9 +1908,9 @@ elif mode == "📋 问卷设计":
         )
         design_btn = st.button(
             "🔍 开始设计" if not premium_mode else "⭐ 开始高质量设计",
-            type="primary", use_container_width=True,
+            type="primary", width="stretch",
         )
-        q_clear_btn = st.button("🗑 清空", use_container_width=True)
+        q_clear_btn = st.button("🗑 清空", width="stretch")
 
     if q_clear_btn:
         st.session_state.questionnaire_design = None
@@ -1864,7 +1955,7 @@ elif mode == "📋 问卷设计":
 
         col_cancel, _ = st.columns([1, 3])
         with col_cancel:
-            if st.button("❌ 取消生成", use_container_width=True, key="cancel_q_design"):
+            if st.button("❌ 取消生成", width="stretch", key="cancel_q_design"):
                 cancel_design_request(pending["cancel_id"])
                 try:
                     pending["future"].cancel()
@@ -2076,17 +2167,28 @@ elif mode == "📋 问卷设计":
                     "process_diagnostic": "🔍 流程诊断型（诊断流程薄弱环节）",
                     "multi_perspective_audit": "👥 多视角对照型",
                 }.get(rt, rt)
+                _safe_rt_label = html.escape(str(rt_label))
+                _safe_object = html.escape(str(rp.get("research_object", "?")))
+                _safe_population = html.escape(str(rp.get("population", "?")))
+                _safe_role = html.escape(str(rp.get("respondent_role", "?")))
+                _safe_subject = html.escape(str(rp.get("item_subject_template", "?")))
+                _safe_summary = html.escape(str(rp.get("summary", "")))
+                _framework = rp.get("theoretical_framework")
+                _safe_framework_line = (
+                    f"理论框架：<b>{html.escape(str(_framework))}</b><br>"
+                    if _framework else ""
+                )
                 st.markdown(
                     f"""<div style="background:#f0f7ff;border-left:4px solid #2e86de;
                     padding:12px 16px;border-radius:6px;margin:8px 0;">
                     <strong>📋 系统对你研究问题的理解</strong><br>
                     <span style="font-size:0.9em;">
-                    研究层次：<b>{rt_label}</b><br>
-                    评估对象：<b>{rp.get('research_object', '?')}</b><br>
-                    答题人群：<b>{rp.get('population', '?')}</b>（角色：{rp.get('respondent_role', '?')}）<br>
-                    题目主语：<b>{rp.get('item_subject_template', '?')}</b><br>
-                    {f"理论框架：<b>{rp['theoretical_framework']}</b><br>" if rp.get('theoretical_framework') else ""}
-                    研究意图：{rp.get('summary', '')}
+                    研究层次：<b>{_safe_rt_label}</b><br>
+                    评估对象：<b>{_safe_object}</b><br>
+                    答题人群：<b>{_safe_population}</b>（角色：{_safe_role}）<br>
+                    题目主语：<b>{_safe_subject}</b><br>
+                    {_safe_framework_line}
+                    研究意图：{_safe_summary}
                     </span></div>""",
                     unsafe_allow_html=True,
                 )
@@ -2265,10 +2367,12 @@ elif mode == "📋 问卷设计":
                 ("反向题", f"{sc['n_reverse']}题 ({sc['reverse_ratio']})"),
             ]
             for col, (label, value) in zip(tech_cols, _tech_cells):
+                _safe_label = html.escape(str(label))
+                _safe_value = html.escape(str(value))
                 col.markdown(
                     f"<div style='padding:8px 4px;'>"
-                    f"<div style='font-size:0.85em;color:#666;'>{label}</div>"
-                    f"<div style='font-size:1.5em;font-weight:600;'>{value}</div>"
+                    f"<div style='font-size:0.85em;color:#666;'>{_safe_label}</div>"
+                    f"<div style='font-size:1.5em;font-weight:600;'>{_safe_value}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -2411,32 +2515,48 @@ elif mode == "📋 问卷设计":
             export_clicked = st.button(
                 "📥 下载报告",
                 type="primary",
-                use_container_width=True,
+                width="stretch",
                 key="export_btn",
             )
 
         if export_clicked:
-            import base64
             try:
+                _construct_name = str(design.get("construct_name") or "问卷")
+                _safe_stem = "".join(
+                    ch for ch in _construct_name
+                    if ch.isalnum() or ch in "._-（）()"
+                )[:60] or "问卷"
                 if export_format.startswith("📄 Word"):
                     from src.questionnaire.exporters import export_to_docx
                     docx_bytes = export_to_docx(design)
-                    b64 = base64.b64encode(docx_bytes).decode()
-                    href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{design["construct_name"]}问卷设计报告.docx">点击下载 Word 报告 (.docx)</a>'
-                    st.markdown(href, unsafe_allow_html=True)
+                    st.download_button(
+                        "下载 Word 报告 (.docx)",
+                        data=docx_bytes,
+                        file_name=f"{_safe_stem}问卷设计报告.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        on_click="ignore",
+                    )
                     st.success("✅ Word 报告已生成，可用 Microsoft Word 或 WPS 打开编辑。")
 
                 elif export_format.startswith("📕 PDF"):
                     from src.questionnaire.exporters import export_to_pdf
                     pdf_bytes = export_to_pdf(design)
-                    b64 = base64.b64encode(pdf_bytes).decode()
-                    href = f'<a href="data:application/pdf;base64,{b64}" download="{design["construct_name"]}问卷设计报告.pdf">点击下载 PDF 报告 (.pdf)</a>'
-                    st.markdown(href, unsafe_allow_html=True)
+                    st.download_button(
+                        "下载 PDF 报告 (.pdf)",
+                        data=pdf_bytes,
+                        file_name=f"{_safe_stem}问卷设计报告.pdf",
+                        mime="application/pdf",
+                        on_click="ignore",
+                    )
                     st.success("✅ PDF 报告已生成。")
 
                 else:
                     full_report = generate_design_report(design)
-                    html = f"""<html><head><meta charset='utf-8'>
+                    # 下载的 HTML 可能在浏览器本地打开；先转义全部用户/LLM 文本，
+                    # 再只把受控的 Markdown 标题标记转换成固定标签。
+                    from src.ui.html_safety import questionnaire_report_to_html_fragment
+                    _safe_report = questionnaire_report_to_html_fragment(full_report)
+                    html_report = f"""<html><head><meta charset='utf-8'>
 <style>
 body {{ font-family: 'Microsoft YaHei', sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; line-height: 1.8; }}
 h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; }}
@@ -2446,11 +2566,15 @@ th, td {{ border: 1px solid #ddd; padding: 8px 12px; }}
 th {{ background-color: #f2f2f2; }}
 pre {{ background: #f8f8f8; padding: 1rem; border-radius: 4px; white-space: pre-wrap; }}
 </style></head><body>
-{full_report.replace(chr(10), '<br>').replace('## ', '<h2>').replace('# ', '<h1>').replace('---', '<hr>')}
+{_safe_report}
 </body></html>"""
-                    b64 = base64.b64encode(html.encode("utf-8")).decode()
-                    href = f'<a href="data:text/html;base64,{b64}" download="{design["construct_name"]}问卷设计报告.html">点击下载 HTML 报告 (.html)</a>'
-                    st.markdown(href, unsafe_allow_html=True)
+                    st.download_button(
+                        "下载 HTML 报告 (.html)",
+                        data=html_report,
+                        file_name=f"{_safe_stem}问卷设计报告.html",
+                        mime="text/html",
+                        on_click="ignore",
+                    )
                     st.success("✅ HTML 报告已生成。")
 
             except Exception as e:
@@ -2555,9 +2679,9 @@ elif mode == "📦 交付包导出":
             _pre_check_result["safe"],
         )
         if not _pre_check_result["safe"]:
-            st.warning(
+            st.error(
                 f"⚠️ 隐私预检发现 {_pre_check_result['high_count']} 项高风险敏感信息"
-                f"（共 {_pre_check_result['total_count']} 项）。建议在导出前检查并脱敏。"
+                f"（共 {_pre_check_result['total_count']} 项）。正式交付已阻止，请先检查并脱敏。"
             )
             with st.expander("查看详情"):
                 for _f in _pre_check_result["findings"]:

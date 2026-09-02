@@ -1,46 +1,62 @@
 """启动时一键环境检查
 
-5秒自检，用 st.toast() 弹出结果，不阻塞启动。
+毫秒级自检，用 st.toast() 弹出结果，不阻塞启动。
 检查项：semopy, factor_analyzer, LLM API Key, 关键依赖。
+
+v5.8 性能优化：所有依赖检查改用 importlib.util.find_spec 探测（只查
+安装状态、不真正 import）。此前版本在首次页面加载时同步 import
+pingouin/statsmodels/semopy/sklearn 等重型模块（冷启动累计 20s+），
+把「5 秒自检」变成了 30 秒白屏。真正的 import 留给功能首次使用时
+懒加载完成。
 """
 
-import sys
+import importlib.metadata
+import importlib.util
 from typing import Dict, List, Tuple
 
 
-def check_semopy() -> Tuple[bool, str]:
-    """检查 semopy (CFA/SEM) 是否可用"""
+def _probe(package: str, import_name: str | None = None) -> Tuple[bool, str]:
+    """探测包是否安装（find_spec 不执行模块代码，毫秒级）。
+
+    Args:
+        package: PyPI 包名（用于显示与版本查询）。
+        import_name: 顶层 import 名，缺省与 package 相同。
+
+    Returns:
+        (ok, message)。ok=False 时 message 为「未安装」提示。
+    """
+    spec = importlib.util.find_spec(import_name or package)
+    if spec is None:
+        return False, f"{package} 未安装"
     try:
-        import semopy
-        return True, f"semopy {semopy.__version__}"
-    except ImportError:
+        ver = importlib.metadata.version(package)
+        return True, f"{package} {ver}"
+    except importlib.metadata.PackageNotFoundError:
+        return True, f"{package} (已安装)"
+
+
+def check_semopy() -> Tuple[bool, str]:
+    """检查 semopy (CFA/SEM) 是否可用（仅探测，不 import）"""
+    ok, msg = _probe("semopy")
+    if not ok:
         return False, "semopy 未安装 — CFA 功能不可用，EFA 正常"
-    except Exception as e:
-        return False, f"semopy 加载异常: {e}"
+    return ok, msg
 
 
 def check_kaleido() -> Tuple[bool, str]:
-    """检查 kaleido (Plotly 图表静态导出) 是否可用"""
-    try:
-        import kaleido
-        ver = getattr(kaleido, "__version__", "unknown")
-        return True, f"kaleido {ver}"
-    except ImportError:
+    """检查 kaleido (Plotly 图表静态导出) 是否可用（仅探测，不 import）"""
+    ok, msg = _probe("kaleido")
+    if not ok:
         return False, "kaleido 未安装 — 论文版 PNG 导出不可用，HTML 导出正常"
-    except Exception as e:
-        return False, f"kaleido 加载异常: {e}"
+    return ok, msg
 
 
 def check_factor_analyzer() -> Tuple[bool, str]:
-    """检查 factor_analyzer 版本"""
-    try:
-        import factor_analyzer
-        ver = getattr(factor_analyzer, "__version__", "unknown")
-        return True, f"factor_analyzer {ver}"
-    except ImportError:
+    """检查 factor_analyzer 版本（仅探测，不 import）"""
+    ok, msg = _probe("factor-analyzer", import_name="factor_analyzer")
+    if not ok:
         return False, "factor_analyzer 未安装 — EFA 功能不可用"
-    except Exception as e:
-        return False, f"factor_analyzer 加载异常: {e}"
+    return ok, msg
 
 
 def check_llm_api() -> Tuple[bool, str]:
@@ -59,7 +75,7 @@ def check_llm_api() -> Tuple[bool, str]:
 
 
 def check_critical_deps() -> List[Tuple[str, bool, str]]:
-    """检查关键依赖"""
+    """检查关键依赖（find_spec 探测，不 import，毫秒级）"""
     deps = [
         ("pandas", "pandas"),
         ("numpy", "numpy"),
@@ -73,14 +89,15 @@ def check_critical_deps() -> List[Tuple[str, bool, str]]:
     ]
     results = []
     for name, import_name in deps:
-        try:
-            mod = __import__(import_name)
-            ver = getattr(mod, "__version__", "?")
-            results.append((name, True, ver))
-        except ImportError:
+        spec = importlib.util.find_spec(import_name)
+        if spec is None:
             results.append((name, False, "未安装"))
-        except Exception as e:
-            results.append((name, False, str(e)))
+            continue
+        try:
+            ver = importlib.metadata.version(name if name != "scikit-learn" else "scikit-learn")
+            results.append((name, True, ver))
+        except importlib.metadata.PackageNotFoundError:
+            results.append((name, True, "已安装"))
     return results
 
 
@@ -228,10 +245,14 @@ def _find_cjk_font_for_check() -> str:
     return ""
 
 
-def run_deep_environment_check() -> Dict:
+def run_deep_environment_check(fast: bool = True) -> Dict:
     """v2.9: 深度环境自检，返回详细的环境健康报告。
 
     用于 UI 顶部橙色提示条：任一项失败即提示用户。
+
+    v5.8: fast=True（默认，启动提示条路径）时跳过「生成测试 PDF/Word」
+    等秒级实测，仅做毫秒级探测；完整实测只在用户主动点「运行系统诊断」
+    时执行（fast=False），避免每次会话启动都被 PDF/Word 生成阻塞。
     """
     report = {
         "all_ok": True,
@@ -267,18 +288,19 @@ def run_deep_environment_check() -> Dict:
     if not cjk_ok:
         report["fix_actions"].append("Linux 用户运行：sudo apt install fonts-noto-cjk")
 
-    # 深度检查：生成测试 PDF/Word
-    pdf_ok, pdf_msg = deep_check_pdf_generation()
-    report["checks"].append(("PDF 生成", pdf_ok, pdf_msg))
-    if not pdf_ok:
-        report["all_ok"] = False
-        report["fix_actions"].append("pip install -U fpdf2")
+    # 深度检查：生成测试 PDF/Word（仅完整诊断时实测）
+    if not fast:
+        pdf_ok, pdf_msg = deep_check_pdf_generation()
+        report["checks"].append(("PDF 生成", pdf_ok, pdf_msg))
+        if not pdf_ok:
+            report["all_ok"] = False
+            report["fix_actions"].append("pip install -U fpdf2")
 
-    docx_ok, docx_msg = deep_check_docx_generation()
-    report["checks"].append(("Word 生成", docx_ok, docx_msg))
-    if not docx_ok:
-        report["all_ok"] = False
-        report["fix_actions"].append("pip install -U python-docx")
+        docx_ok, docx_msg = deep_check_docx_generation()
+        report["checks"].append(("Word 生成", docx_ok, docx_msg))
+        if not docx_ok:
+            report["all_ok"] = False
+            report["fix_actions"].append("pip install -U python-docx")
 
     return report
 

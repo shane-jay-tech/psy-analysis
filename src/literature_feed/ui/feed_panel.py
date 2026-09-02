@@ -159,7 +159,7 @@ def _render_daily_tab(store: FeedStore) -> None:
 
     with col_btn:
         disabled = running
-        if st.button("🚀 立即抓取", disabled=disabled, use_container_width=True,
+        if st.button("🚀 立即抓取", disabled=disabled, width="stretch",
                      help="后台异步触发；不会阻塞页面"):
             try:
                 maybe_trigger_async()
@@ -184,7 +184,7 @@ def _render_daily_tab(store: FeedStore) -> None:
         with batch_col1:
             if high_conf and st.button(
                 f"⚡ 一键批准高置信 ({len(high_conf)})",
-                use_container_width=True,
+                width="stretch",
                 help="批准置信度 >= 0.8 的全部候选",
             ):
                 for c in high_conf:
@@ -199,7 +199,7 @@ def _render_daily_tab(store: FeedStore) -> None:
                 st.warning(f"确定拒绝全部 {len(pending)} 条候选？")
                 c1, c2 = st.columns(2)
                 with c1:
-                    if st.button("确认拒绝", type="primary", use_container_width=True):
+                    if st.button("确认拒绝", type="primary", width="stretch"):
                         for c in pending:
                             store.update_candidate_status(
                                 c["candidate_id"], status="rejected", reviewer="batch_reject"
@@ -208,11 +208,11 @@ def _render_daily_tab(store: FeedStore) -> None:
                         st.toast(f"已拒绝全部 {len(pending)} 条候选", icon="🗑️")
                         st.rerun()
                 with c2:
-                    if st.button("取消", use_container_width=True):
+                    if st.button("取消", width="stretch"):
                         st.session_state[_reject_key] = False
                         st.rerun()
             else:
-                if st.button("🗑️ 全部拒绝", use_container_width=True, type="secondary"):
+                if st.button("🗑️ 全部拒绝", width="stretch", type="secondary"):
                     st.session_state[_reject_key] = True
                     st.rerun()
         with batch_col3:
@@ -260,11 +260,11 @@ def _render_daily_tab(store: FeedStore) -> None:
 
                 btn_l, btn_r, _ = st.columns([1, 1, 4])
                 with btn_l:
-                    if st.button("✅ 批准", key=f"approve_{cid}_{idx}", use_container_width=True):
+                    if st.button("✅ 批准", key=f"approve_{cid}_{idx}", width="stretch"):
                         store.update_candidate_status(cid, status="approved", reviewer="manual")
                         st.rerun()
                 with btn_r:
-                    if st.button("❌ 拒绝", key=f"reject_{cid}_{idx}", use_container_width=True, type="secondary"):
+                    if st.button("❌ 拒绝", key=f"reject_{cid}_{idx}", width="stretch", type="secondary"):
                         store.update_candidate_status(cid, status="rejected", reviewer="manual")
                         st.rerun()
 
@@ -286,7 +286,7 @@ def _render_daily_tab(store: FeedStore) -> None:
                 "issued": a.get("issued_date") or "",
                 "doi": a.get("doi") or "",
             })
-        st.dataframe(rows, use_container_width=True, hide_index=True,
+        st.dataframe(rows, width="stretch", hide_index=True,
                      column_config={
                          "source": st.column_config.TextColumn("来源", width="small"),
                          "title": st.column_config.TextColumn("标题", width="large"),
@@ -359,7 +359,7 @@ def _render_trend_tab(store: FeedStore, weights: DomainWeights, trending: "Trend
             "加权": round(r.weighted_count, 2),
             "最新": r.latest_issued_date or "",
         })
-    st.dataframe(table, use_container_width=True, hide_index=True,
+    st.dataframe(table, width="stretch", hide_index=True,
                  column_config={
                      "#": st.column_config.NumberColumn(width="small"),
                      "关键词": st.column_config.TextColumn(width="medium"),
@@ -420,7 +420,7 @@ def _render_trending_section(trending: "TrendingWeights") -> None:
         })
     st.dataframe(
         table,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "关键词": st.column_config.TextColumn(width="medium"),
@@ -526,7 +526,7 @@ def _render_sources_tab(store: FeedStore) -> None:
             "上次成功": (s.get("last_success_at") or "")[:19].replace("T", " "),
             "启用": bool(s.get("enabled", 1)),
         })
-    st.dataframe(rows, use_container_width=True, hide_index=True,
+    st.dataframe(rows, width="stretch", hide_index=True,
                  column_config={
                      "启用": st.column_config.CheckboxColumn(disabled=True, width="small"),
                  })
@@ -560,17 +560,17 @@ def _render_sources_tab(store: FeedStore) -> None:
                 "构念": summary.get("constructs", 0),
                 "方法": summary.get("methods", 0),
             })
-        st.dataframe(run_rows, use_container_width=True, hide_index=True)
+        st.dataframe(run_rows, width="stretch", hide_index=True)
 
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🚀 立即抓取所有来源", use_container_width=True,
+        if st.button("🚀 立即抓取所有来源", width="stretch",
                      help="启动子进程跑一次完整抓取（异步 / 不阻塞页面）"):
             _spawn_scheduler_subprocess()
             st.toast("子进程已启动，几分钟后看「📰 每日动态」", icon="🚀")
     with col2:
-        if st.button("🔄 刷新此页", use_container_width=True):
+        if st.button("🔄 刷新此页", width="stretch"):
             st.rerun()
 
 
@@ -678,7 +678,7 @@ def _render_settings_tab(store: FeedStore, weights: DomainWeights) -> None:
         edited = st.data_editor(
             editor_rows,
             num_rows="dynamic",
-            use_container_width=True,
+            width="stretch",
             column_config={
                 "domain": st.column_config.SelectboxColumn(
                     "域", options=["IO", "HR", "OB"], width="small", required=True,
@@ -751,7 +751,7 @@ def _render_settings_tab(store: FeedStore, weights: DomainWeights) -> None:
         m_edited = st.data_editor(
             method_rows,
             num_rows="dynamic",
-            use_container_width=True,
+            width="stretch",
             column_config={
                 "canonical": st.column_config.TextColumn(
                     "标准方法名", width="medium",

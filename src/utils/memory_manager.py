@@ -36,18 +36,33 @@ def _estimate_obj_size(obj: Any) -> int:
         return 0
 
 
-def estimate_session_state_memory() -> Dict[str, int]:
+# v5.8: 内存估算含 DataFrame.memory_usage(deep=True)（大 df 下每次 ~1s+），
+# 而 get_system_status 每个 rerun 都会被侧边栏调用。加 TTL 缓存：估算结果
+# 30 秒内复用，避免每次点击交互都重扫整个 session_state。
+_MEM_CACHE_TTL_SEC = 30.0
+_mem_cache: Dict[str, Any] = {"at": 0.0, "result": None}
+
+
+def estimate_session_state_memory(force: bool = False) -> Dict[str, int]:
     """估算 session_state 中各键的内存占用。
 
     返回 {"total_bytes": int, "items": {key: bytes, ...}}
+    结果带 30s TTL 缓存（force=True 立即重算）。
     """
+    now = time.monotonic()
+    if not force and _mem_cache["result"] is not None and (now - _mem_cache["at"]) < _MEM_CACHE_TTL_SEC:
+        return _mem_cache["result"]
+
     total = 0
     items = {}
     for key, val in st.session_state.items():
         size = _estimate_obj_size(val)
         items[key] = size
         total += size
-    return {"total_bytes": total, "items": items}
+    result = {"total_bytes": total, "items": items}
+    _mem_cache["at"] = now
+    _mem_cache["result"] = result
+    return result
 
 
 def get_memory_summary() -> str:
@@ -230,7 +245,7 @@ def render_memory_manager_ui():
     if total_mb > DEFAULT_MEMORY_MB:
         st.sidebar.warning(f"⚠ Session State 占用较高（{total_mb:.1f} MB），建议清理。")
 
-    if st.sidebar.button("🧹 一键清理", use_container_width=True, key="mem_cleanup"):
+    if st.sidebar.button("🧹 一键清理", width="stretch", key="mem_cleanup"):
         mem_result = auto_cleanup_session_state()
         cache_result = cleanup_literature_cache()
         cancel_result = cleanup_stale_cancel_ids()
