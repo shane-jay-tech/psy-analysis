@@ -38,4 +38,4 @@ test_artifacts/
 
 # ---- Public release: exclude research archives and raw feeds ----
 archive/
-data/literature_feed/
+data/
