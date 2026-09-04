@@ -39,3 +39,6 @@ test_artifacts/
 # ---- Public release: exclude research archives and raw feeds ----
 archive/
 data/
+
+# Local academic cache (user query history, privacy) — never track
+src/questionnaire/.academic_cache/
