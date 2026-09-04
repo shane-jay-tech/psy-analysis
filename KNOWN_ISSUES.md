@@ -48,8 +48,8 @@
 - **关键风险**：摘要 → LLM 抽构念，幻觉直接入库会**污染所有下游推荐**。必须有 staging + 人工 review gate，不能直接进 `construct_kb`。
 - **存储位置**：`D:\code\psy-analysis\data\literature_feed\`（不进 C 盘 .claude）。
 - **领域加权**：用户研究方向偏 IO / HR / 组织行为，关键词加权表（领导力/组织承诺/敬业度/职业倦怠/工作满意度/HR 实践/团队/绩效/选拔/培训/组织行为）需在抽取与趋势聚合时双重加权。
-- **触发**：Windows Task Scheduler 每日 + 应用启动检查（≥36 小时未抓时补拉）。
-- **状态**：2026-05-28 启动，Kimi 调研顶刊抓取可行性中，下一步 /debate 架构 → /implement 落地。
+- **触发**：Windows Task Scheduler 每日 + 应用启动检查（≥24 小时未抓时补拉，`bootstrap_check.py` 的 `DEFAULT_STALE_HOURS = 24`）。
+- **状态**：已落地——`src/literature_feed/` 已实现（fetchers / parsers / extract / scheduler 全链路），补拉阈值 24 小时。
 
 ### 🟡 #L2 F1 论文写作两入口合并
 
@@ -87,7 +87,7 @@
 
 | 严重度 | 局限 | 目标版本 | 状态 |
 |---|---|---|---|
-| 🔴 高 | #L1 自学习模块 | v4.7 主线 | 调研中 |
+| 🔴 高 | #L1 自学习模块 | v4.7 主线 | 已落地 |
 | 🟡 中 | #L2 F1 论文写作合并 | v4.7 | 待评估 |
 | 🟡 中 | #L3 N10 评分趋势观测 | v4.7 | 待开 |
 | 🟢 低 | #L4 自评报告刷新 | v4.7 收尾 | 待开 |
