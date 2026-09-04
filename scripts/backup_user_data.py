@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Backup psy-analysis user data.
+
+Packs %USERPROFILE%/.psy_analysis/projects/ (whole tree) plus the repo-local
+data/literature_feed/feed.sqlite into D:/code/backups/psy-analysis/psy-<stamp>.zip,
+keeping the newest 10 archives. Writing outside the repo is explicitly
+authorized by task 20260904-185801-12f1.
+"""
+import argparse
+import sys
+import tempfile
+import time
+import zipfile
+from datetime import datetime
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+PROJECTS_DIR = Path.home() / ".psy_analysis" / "projects"
+FEED_DB = REPO / "data" / "literature_feed" / "feed.sqlite"
+BACKUP_ROOT = Path(r"D:\code\backups\psy-analysis")
+KEEP = 10
+
+
+def create_backup() -> Path:
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
+    out = BACKUP_ROOT / f"psy-{stamp}.zip"
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        if PROJECTS_DIR.is_dir():
+            for p in sorted(PROJECTS_DIR.rglob("*")):
+                if p.is_file():
+                    zf.write(p, arcname=str(p.relative_to(PROJECTS_DIR.parent)))
+        else:
+            print(f"[backup] WARN projects dir missing: {PROJECTS_DIR}")
+        if FEED_DB.exists():
+            zf.write(FEED_DB, arcname="literature_feed/feed.sqlite")
+        else:
+            print(f"[backup] WARN feed db missing: {FEED_DB}")
+    return out
+
+
+def prune(keep: int = KEEP) -> int:
+    zips = sorted(BACKUP_ROOT.glob("psy-*.zip"), reverse=True)
+    removed = 0
+    for old in zips[keep:]:
+        try:
+            old.unlink()
+            removed += 1
+        except OSError as e:
+            print(f"[backup] WARN could not delete {old.name}: {e}")
+    return removed
+
+
+def verify(archive: Path) -> None:
+    with zipfile.ZipFile(archive) as zf:
+        bad = zf.testzip()
+        assert bad is None, f"corrupt member: {bad}"
+        names = zf.namelist()
+        with tempfile.TemporaryDirectory(prefix="psy_bak_") as tmp:
+            zf.extractall(tmp)
+            extracted = sum(1 for p in Path(tmp).rglob("*") if p.is_file())
+    assert extracted == len(names), f"extracted {extracted} != entries {len(names)}"
+    print(f"[backup] verify ok: {len(names)} entries, {archive.stat().st_size} bytes")
+
+
+def main():
+    ap = argparse.ArgumentParser(description="backup psy user data (retention 10)")
+    ap.add_argument("--verify-only", metavar="ZIP", help="verify an existing archive")
+    args = ap.parse_args()
+
+    t0 = time.time()
+    if args.verify_only:
+        verify(Path(args.verify_only))
+        return 0
+    out = create_backup()
+    verify(out)
+    removed = prune()
+    print(f"[backup] done in {time.time() - t0:.1f}s -> {out} (pruned {removed})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
