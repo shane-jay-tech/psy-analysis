@@ -33,7 +33,8 @@ def descriptive_stats(df: pd.DataFrame, columns: list = None) -> pd.DataFrame:
             "Min": round(s.min(), 2),
             "Max": round(s.max(), 2),
             "偏度": round(float(s.skew()), 3),
-            "峰度": round(float(s.kurtosis()), 3),
+            # pandas.kurtosis() 即超额峰度（Fisher 口径，正态=0），标签加注说明
+            "峰度(超额,Fisher)": round(float(s.kurtosis()), 3),
         })
 
     return pd.DataFrame(results)

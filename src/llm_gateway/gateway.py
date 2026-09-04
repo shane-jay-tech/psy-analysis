@@ -88,6 +88,8 @@ _trace_lock = threading.Lock()
 # 价格快照截至 2026-05；价格变动时手动更新。本地 ollama 模型计 0；
 # 未匹配的模型走 _DEFAULT_PRICING_CNY。
 # 数据来源：各 provider 官方定价页 / OpenAI USD 价 × 7.2 汇率。
+# 维护提示：以下价目 last_verified: 2026-05（官方价目快照），已超 3 个月未复核；
+# LLM 价格变动频繁，日间评审时请对照各官方 pricing 页刷新本表。
 MODEL_PRICING_CNY: Dict[str, Dict[str, float]] = {
     # DeepSeek
     "deepseek-chat":          {"input": 1.0,  "output": 2.0},

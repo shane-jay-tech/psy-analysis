@@ -615,11 +615,11 @@ def _interpret_cohens_d(d: float) -> str:
     if d < 0.2:
         return "效应量很小，实际意义可能有限。"
     elif d < 0.5:
-        return "属于小到中等效应量。"
+        return "属于小效应量（APA 惯例：0.2 为小）。"
     elif d < 0.8:
-        return "属于中等偏大效应量。"
+        return "属于中等效应量（APA 惯例：0.5 为中等）。"
     else:
-        return "属于大效应量，差异具有明显的实际意义。"
+        return "属于大效应量（APA 惯例：0.8 以上为大），差异具有明显的实际意义。"
 
 
 def _interpret_eta_sq(eta: float) -> str:
