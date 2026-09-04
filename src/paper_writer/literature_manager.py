@@ -26,6 +26,7 @@ class LiteratureEntry:
     keywords: List[str] = field(default_factory=list)
     source: str = ""                  # 来源: "user" | "crossref" | "cnki" | "llm"
     relevance_note: str = ""          # 与本文的相关性说明
+    publisher: str = ""               # 出版社（书籍类条目；期刊类留空）
 
     def format_citation(self) -> str:
         """生成正文中引用标记"""
@@ -58,9 +59,15 @@ class LiteratureEntry:
                 authors_str = self.authors[0]
             elif len(self.authors) == 2:
                 authors_str = f"{self.authors[0]}, & {self.authors[1]}"
+            elif len(self.authors) > 20:
+                # APA 7: 列出前 19 位后用省略号，再接末位作者
+                authors_str = ", ".join(self.authors[:19]) + f", …, & {self.authors[-1]}"
             else:
                 authors_str = ", ".join(self.authors[:-1]) + f", & {self.authors[-1]}"
             parts = [f"{authors_str} ({self.year}). {self.title}."]
+            if not self.journal and self.publisher:
+                # 书籍类条目：附录出版社（无出版地字段时仅出版社）
+                parts.append(f" {self.publisher}.")
             if self.journal:
                 # 期刊名斜体（Markdown用*表示）
                 parts.append(f" *{self.journal}*")
