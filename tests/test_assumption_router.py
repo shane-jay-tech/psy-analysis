@@ -164,3 +164,121 @@ class TestRoutingNoSilentSwitch:
         # 路由器只返回 RouteDecision，不应碰 output 的核心字段
         assert output["test_type"] == before["test_type"]
         assert output["assumptions"] is before["assumptions"]
+
+
+class TestMethodAssumptionSets:
+    """2026-09-05 夜 1002：假设集注册表（回归/logistic/多变量/SEM 族覆盖面）。"""
+
+    NAMES = [
+        "linear_regression", "multiple_regression", "hierarchical_regression",
+        "binary_logistic", "multinomial_logistic", "ordinal_logistic",
+        "manova", "mixed_anova", "hlm", "sem",
+        "partial_corr", "point_biserial", "chi_square_gof", "chi_square_independence",
+    ]
+
+    def test_all_fourteen_methods_registered(self):
+        for name in self.NAMES:
+            s = assumption_router.get_assumption_set(name)
+            assert s is not None, name
+            assert s.test_type == name and len(s.assumptions) >= 3
+
+    def test_unknown_method_returns_none(self):
+        assert assumption_router.get_assumption_set("cronbach_alpha") is None
+        assert assumption_router.get_assumption_set("no_such_method") is None
+
+    def test_existing_kinds_point_to_real_functions(self):
+        import src.analysis.assumptions as assumptions_mod
+        for name in self.NAMES:
+            s = assumption_router.get_assumption_set(name)
+            for a in s.existing_checks:
+                assert a.check_name in assumption_router._EXISTING_CHECK_NAMES, (name, a.check_name)
+                assert callable(getattr(assumptions_mod, a.check_name, None)), (name, a.check_name)
+
+    def test_placeholders_carry_generic_note_and_no_check(self):
+        for name in self.NAMES:
+            s = assumption_router.get_assumption_set(name)
+            for a in s.placeholders:
+                assert a.check_name == "" and a.note.strip() != "", (name, a.name)
+
+    def test_linear_regression_residual_normality_existing(self):
+        s = assumption_router.get_assumption_set("linear_regression")
+        assert any(
+            a.kind == "existing" and a.check_name == "check_normality" and "残差" in a.name
+            for a in s.assumptions
+        )
+
+    def test_binary_logistic_has_no_normality_assumption(self):
+        s = assumption_router.get_assumption_set("binary_logistic")
+        joined = " ".join(a.name for a in s.assumptions)
+        assert "正态" not in joined
+        assert len(s.existing_checks) == 0
+        assert any("logit" in a.name for a in s.assumptions)
+
+    def test_ordinal_logistic_proportionality_placeholder(self):
+        s = assumption_router.get_assumption_set("ordinal_logistic")
+        assert any("平行线" in a.name and a.kind == "placeholder" for a in s.assumptions)
+
+    def test_mixed_anova_maps_all_three_existing_checks(self):
+        s = assumption_router.get_assumption_set("mixed_anova")
+        assert {a.check_name for a in s.existing_checks} == {
+            "check_normality", "check_homogeneity", "check_sphericity",
+        }
+
+    def test_manova_multivariate_placeholders(self):
+        s = assumption_router.get_assumption_set("manova")
+        joined = " ".join(a.name for a in s.assumptions)
+        assert "多元正态" in joined and "Box" in joined
+        assert any(a.check_name == "check_homogeneity" for a in s.existing_checks)
+
+    def test_sem_all_placeholder_with_sample_size(self):
+        s = assumption_router.get_assumption_set("sem")
+        assert len(s.existing_checks) == 0
+        assert any("样本量" in a.name for a in s.assumptions)
+        assert any("多元正态" in a.name for a in s.assumptions)
+
+    def test_hlm_residual_normality_existing(self):
+        s = assumption_router.get_assumption_set("hlm")
+        assert any(
+            a.kind == "existing" and a.check_name == "check_normality" and "残差" in a.name
+            for a in s.assumptions
+        )
+
+    def test_corr_family_normality_existing(self):
+        for name in ("partial_corr", "point_biserial"):
+            s = assumption_router.get_assumption_set(name)
+            assert any(a.check_name == "check_normality" for a in s.existing_checks), name
+
+    def test_point_biserial_true_dichotomy_placeholder(self):
+        s = assumption_router.get_assumption_set("point_biserial")
+        assert any("真二分" in a.name and a.kind == "placeholder" for a in s.assumptions)
+
+    def test_chi_square_family_expected_frequency_no_normality(self):
+        for name in ("chi_square_gof", "chi_square_independence"):
+            s = assumption_router.get_assumption_set(name)
+            joined = " ".join(a.name for a in s.assumptions)
+            assert "期望频数" in joined and "独立" in joined
+            assert "正态" not in joined and len(s.existing_checks) == 0
+
+    def test_multiple_regression_vif_placeholder(self):
+        s = assumption_router.get_assumption_set("multiple_regression")
+        assert any("多重共线性" in a.name and a.kind == "placeholder" for a in s.assumptions)
+
+    def test_hierarchical_regression_nested_note(self):
+        s = assumption_router.get_assumption_set("hierarchical_regression")
+        assert any("嵌套" in a.name for a in s.assumptions)
+
+    def test_describe_routes_counts_consistent(self):
+        profile = assumption_router.describe_assumption_routes()
+        assert set(profile) == set(self.NAMES)
+        for name, cnt in profile.items():
+            s = assumption_router.get_assumption_set(name)
+            assert cnt["existing"] == len(s.existing_checks)
+            assert cnt["placeholder"] == len(s.placeholders)
+            assert cnt["existing"] + cnt["placeholder"] == len(s.assumptions)
+
+    def test_check_route_default_branch_unchanged_for_new_family(self):
+        df = _make_df(60)
+        plan = _plan("sem")
+        output = {"test_type": "sem", "descriptive": pd.DataFrame({"组别": ["A"], "N": [60]})}
+        d = assumption_router.check_route(df, plan, output)
+        assert d.has_suggestion is False and d.suggested_test is None

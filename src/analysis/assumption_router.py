@@ -209,3 +209,171 @@ def to_dict(decision: RouteDecision) -> Dict[str, Any]:
         "sample_size": decision.sample_size,
         "has_suggestion": decision.has_suggestion,
     }
+
+
+# ---------------------------------------------------------------------------
+# 方法假设集注册表（覆盖面补齐：回归 / logistic / 多变量 / SEM 族）
+#
+# 约束：每条假设只允许两种 kind——
+#   "existing"     指向 assumptions.py 既有 check 实现（check_name 为函数名）；
+#   "placeholder"  系统尚无对应实现，路由到通用提示（note），绝不新造统计计算。
+# 注册名与 runner.py @_register 完全对齐。
+# ---------------------------------------------------------------------------
+
+from .assumptions import (  # noqa: E402  (就近引用，便于核对既有实现清单)
+    check_homogeneity,
+    check_normality,
+    check_normality_groups,
+    check_sphericity,
+)
+
+_EXISTING = "existing"
+_PLACEHOLDER = "placeholder"
+
+_EXISTING_CHECK_NAMES = frozenset({
+    "check_normality", "check_normality_groups", "check_homogeneity", "check_sphericity",
+})
+
+_GEN_NOTE = "通用提示：请结合数据背景人工核查该假设；系统暂无自动检验实现。"
+
+
+@dataclass(frozen=True)
+class MethodAssumption:
+    """单个方法学假设的路由条目。"""
+    name: str                 # 假设名（中文，可含英文术语）
+    kind: str                 # _EXISTING | _PLACEHOLDER
+    check_name: str = ""      # kind=_EXISTING 时为既有函数名；占位为空
+    note: str = ""            # 应用说明 / 通用提示
+
+
+@dataclass(frozen=True)
+class MethodAssumptionSet:
+    """一个 test_type 的完整假设集合（只读）。"""
+    test_type: str
+    assumptions: tuple
+
+    @property
+    def existing_checks(self) -> tuple:
+        return tuple(a for a in self.assumptions if a.kind == _EXISTING)
+
+    @property
+    def placeholders(self) -> tuple:
+        return tuple(a for a in self.assumptions if a.kind == _PLACEHOLDER)
+
+
+def _ex(name: str, check_name: str, note: str = "") -> MethodAssumption:
+    return MethodAssumption(name=name, kind=_EXISTING, check_name=check_name, note=note)
+
+
+def _ph(name: str, note: str = _GEN_NOTE) -> MethodAssumption:
+    return MethodAssumption(name=name, kind=_PLACEHOLDER, note=note)
+
+
+_METHOD_ASSUMPTIONS: Dict[str, tuple] = {
+    # ---- 回归族 ----
+    "linear_regression": (
+        _ex("残差正态性", "check_normality", "应用于回归残差而非原始因变量"),
+        _ph("因变量与自变量的线性关系"),
+        _ph("残差同方差性（异方差诊断）"),
+        _ph("观测间相互独立"),
+    ),
+    "multiple_regression": (
+        _ex("残差正态性", "check_normality", "应用于回归残差而非原始因变量"),
+        _ph("自变量间无严重多重共线性（VIF）"),
+        _ph("残差同方差性（异方差诊断）"),
+        _ph("观测间相互独立"),
+        _ph("样本量充足（常见口径每预测变量 ≥10–20 例）"),
+    ),
+    "hierarchical_regression": (
+        _ex("残差正态性", "check_normality", "应用于回归残差而非原始因变量"),
+        _ph("自变量间无严重多重共线性（VIF）"),
+        _ph("嵌套模型间可比（逐层增变量，其余设定不变）"),
+        _ph("残差同方差性（异方差诊断）"),
+    ),
+    # ---- logistic 族（注意：不假设因变量或残差正态）----
+    "binary_logistic": (
+        _ph("连续自变量与 logit 线性（Box-Tidwell）"),
+        _ph("自变量间无严重多重共线性"),
+        _ph("观测间相互独立"),
+        _ph("因变量为真二分类"),
+    ),
+    "multinomial_logistic": (
+        _ph("连续自变量与 logit 线性"),
+        _ph("自变量间无严重多重共线性"),
+        _ph("观测间相互独立"),
+        _ph("因变量类别互斥且穷尽"),
+    ),
+    "ordinal_logistic": (
+        _ph("比例优势（平行线）假设"),
+        _ph("自变量间无严重多重共线性"),
+        _ph("观测间相互独立"),
+    ),
+    # ---- 多变量 / 混合族 ----
+    "manova": (
+        _ph("多元正态性（各因变量联合正态）"),
+        _ph("组间协方差矩阵齐性（Box's M）"),
+        _ex("各组方差齐性（逐因变量）", "check_homogeneity", "对每个因变量分别核查"),
+        _ph("因变量间存在线性相关"),
+        _ph("无极端多元异常值（如 Mahalanobis 距离）"),
+    ),
+    "mixed_anova": (
+        _ex("正态性", "check_normality", "组内水平上逐组核查"),
+        _ex("组间方差齐性", "check_homogeneity"),
+        _ex("球形假设", "check_sphericity", "违反时系统自动 Greenhouse-Geisser 校正"),
+        _ph("观测间相互独立（被试间）"),
+    ),
+    "hlm": (
+        _ex("残差正态性", "check_normality", "应用于固定效应残差"),
+        _ph("随机效应近似正态"),
+        _ph("各层级样本量充足（每层效应 ≥ 合理观测数）"),
+        _ph("残差同方差性（按层级分别核查）"),
+    ),
+    # ---- SEM 族 ----
+    "sem": (
+        _ph("观测变量多元正态性"),
+        _ph("样本量充足（常见口径 ≥ 10–20 × 自由参数）"),
+        _ph("模型可识别"),
+        _ph("指标间无严重多重共线性"),
+    ),
+    # ---- 相关族补充 ----
+    "partial_corr": (
+        _ex("双变量正态性", "check_normality", "控制变量后残差化的两变量"),
+        _ph("变量间线性关系"),
+        _ph("样本量充足"),
+    ),
+    "point_biserial": (
+        _ph("二分变量为真二分（非人为切分）"),
+        _ex("连续变量正态性", "check_normality"),
+        _ph("两组方差齐性与线性关系"),
+    ),
+    # ---- 卡方族 ----
+    "chi_square_gof": (
+        _ph("期望频数充足（各单元格期望 ≥ 5）"),
+        _ph("观测间相互独立"),
+        _ph("类别互斥且穷尽"),
+    ),
+    "chi_square_independence": (
+        _ph("期望频数充足（各单元格期望 ≥ 5）"),
+        _ph("观测间相互独立"),
+        _ph("类别互斥且穷尽"),
+    ),
+}
+
+
+def get_assumption_set(test_type: str) -> Optional[MethodAssumptionSet]:
+    """返回该 test_type 的方法学假设集合；未注册的方法返回 None（默认分支不变）。"""
+    assumptions = _METHOD_ASSUMPTIONS.get(test_type)
+    if assumptions is None:
+        return None
+    return MethodAssumptionSet(test_type=test_type, assumptions=assumptions)
+
+
+def describe_assumption_routes() -> Dict[str, Dict[str, int]]:
+    """注册表覆盖画像：每法 existing/placeholder 计数（供覆盖报告使用）。"""
+    return {
+        name: {
+            "existing": sum(1 for a in assumptions if a.kind == _EXISTING),
+            "placeholder": sum(1 for a in assumptions if a.kind == _PLACEHOLDER),
+        }
+        for name, assumptions in _METHOD_ASSUMPTIONS.items()
+    }
