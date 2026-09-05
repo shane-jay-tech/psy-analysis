@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.utils.app_paths import PROJECTS_DIR
+from src.utils.instance_lock import ProjectLockedError, project_lock
 
 logger = logging.getLogger(__name__)
 
@@ -74,11 +75,16 @@ def _ensure_dir():
 
 
 def _locked(func):
-    """串行化同一应用进程内的项目读改写操作。"""
+    """项目读改写的两级互斥：OS 文件锁挡跨实例，线程 RLock 串行同进程内并发线程。
+
+    v5.10 P1（任务 20260905-110400-1003）：原仅线程锁，跨进程无效。
+    OS 锁被其他实例持有时抛 ProjectLockedError，由上层转用户提示，不静默等待。
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        with _IO_LOCK:
-            return func(*args, **kwargs)
+        with project_lock(PROJECTS_DIR):
+            with _IO_LOCK:
+                return func(*args, **kwargs)
     return wrapper
 
 
