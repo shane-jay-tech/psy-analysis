@@ -206,12 +206,25 @@ def two_way_anova(
     else:
         es_val, es_name, es_ci = 0.0, "η²p", ""
 
+    # 方差齐性：对各单元格（iv1×iv2 组合）做 Levene 检验，口径与 one_way 对齐；
+    # 双因素无非参数等价检验，故仅在结果中报告，不进 fallback 路由
+    cells = [g[dv].values for _, g in clean.groupby([iv1, iv2]) if len(g) >= 2]
+    homogeneity = None
+    if len(cells) >= 2:
+        lev_stat, lev_p = stats.levene(*cells)
+        homogeneity = {
+            "passed": bool(lev_p > 0.05),
+            "statistic": round(float(lev_stat), 3),
+            "p_value": round(float(lev_p), 4),
+        }
+
     return ANOVAResult(
         test_type="two_way",
         table=pd.DataFrame(rows),
         effect_size=round(float(es_val), 4),
         effect_size_name=es_name,
         effect_size_ci=es_ci,
+        assumption_homogeneity=homogeneity,
     )
 
 

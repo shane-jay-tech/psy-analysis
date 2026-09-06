@@ -322,6 +322,12 @@ _METHOD_ASSUMPTIONS: Dict[str, tuple] = {
         _ex("球形假设", "check_sphericity", "违反时系统自动 Greenhouse-Geisser 校正"),
         _ph("观测间相互独立（被试间）"),
     ),
+    "two_way_anova": (
+        _ex("正态性", "check_normality", "逐单元格（iv1×iv2 组合）核查"),
+        _ex("单元格方差齐性", "check_homogeneity", "逐单元格核查；双因素无非参数等价，违反时建议谨慎解读或考虑数据变换"),
+        _ph("观测间相互独立（被试间）"),
+        _ph("各单元格样本量充足且无空单元格"),
+    ),
     "hlm": (
         _ex("残差正态性", "check_normality", "应用于固定效应残差"),
         _ph("随机效应近似正态"),

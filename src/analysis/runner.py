@@ -148,6 +148,8 @@ def _run_two_way_anova(df, plan, output):
         return
     result = anova.two_way_anova(df, dv, ivs[0], ivs[1])
     output["result"] = result
+    if result.assumption_homogeneity is not None:
+        output["assumptions"]["homogeneity"] = result.assumption_homogeneity
     output["charts_data"]["interaction_data"] = {"dv": dv, "iv1": ivs[0], "iv2": ivs[1]}
 
 

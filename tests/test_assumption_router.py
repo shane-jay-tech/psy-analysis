@@ -172,11 +172,11 @@ class TestMethodAssumptionSets:
     NAMES = [
         "linear_regression", "multiple_regression", "hierarchical_regression",
         "binary_logistic", "multinomial_logistic", "ordinal_logistic",
-        "manova", "mixed_anova", "hlm", "sem",
+        "manova", "mixed_anova", "two_way_anova", "hlm", "sem",
         "partial_corr", "point_biserial", "chi_square_gof", "chi_square_independence",
     ]
 
-    def test_all_fourteen_methods_registered(self):
+    def test_all_fifteen_methods_registered(self):
         for name in self.NAMES:
             s = assumption_router.get_assumption_set(name)
             assert s is not None, name
