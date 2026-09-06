@@ -18,6 +18,7 @@ from openai import (
 
 from .construct_kb import CONSTRUCTS
 from .item_templates import ALL_TEMPLATES
+from .item_quality import check_item_quality
 
 # 模块级线程池：最大2个并发LLM调用，避免阻塞Streamlit主线程
 _llm_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="llm_engine")
@@ -99,6 +100,16 @@ def design_questionnaire_llm(
     )
 
     raw = _parse_and_validate(response_text, research_question)
+
+    # ---- v5.11 Gap2：本地质量检查（best-effort，失败不阻塞出卷）----
+    # 只读检查：不改 raw["items"] 本体，结果放旁路字段 quality_gate 供 UI 选择性消费
+    try:
+        raw["quality_gate"] = _run_local_quality_gate(
+            raw.get("items", []), raw.get("construct_name", "")
+        )
+    except Exception:
+        raw["quality_gate"] = {"skipped": True}
+
     return _build_design_dict(raw, research_question)
 
 
@@ -767,6 +778,40 @@ def _record_design_trace(
 # ================================================================
 
 
+def _run_local_quality_gate(items: list, construct_name: str) -> Dict:
+    """v5.11 Gap2：对基础引擎产物跑本地质检（item_quality.check_item_quality）。
+
+    与 premium 的 Step2 本地质检语义对齐；errors 条目记入 items_flagged（1 基，
+    对应 design dict 的 items[index]），明细放 detail 供 UI 提示复核，不自动重生成。
+    """
+    report = check_item_quality(list(items), construct_name)
+    error_texts = set()
+    detail = []
+    for it in report.item_scores:
+        if any(iss.get("type") == "error" for iss in it.get("issues", [])):
+            error_texts.add(it.get("text", ""))
+        if it.get("issues"):
+            detail.append(it)
+    items_flagged = [
+        i + 1
+        for i, it in enumerate(items)
+        if it.get("item_type", "construct") == "construct"
+        and it.get("text", "") in error_texts
+    ]
+    scores = [it.get("score", 0) for it in report.item_scores]
+    score_avg = round(sum(scores) / len(scores), 1) if scores else None
+    return {
+        "engine": "local_item_quality",
+        "score_avg": score_avg,
+        "errors": report.errors,
+        "warnings": report.warnings,
+        "items_flagged": items_flagged,
+        "detail": detail,
+        "summary": report.summary,
+        "overall_warnings": report.overall_warnings,
+    }
+
+
 def _build_design_dict(raw: Dict, research_question: str) -> Dict:
     dims = raw["dimensions"]
     items = []
@@ -817,4 +862,5 @@ def _build_design_dict(raw: Dict, research_question: str) -> Dict:
         "llm_established_scales": raw.get("established_scales", []),
         "llm_generated": True,
         "llm_used": True,
+        "quality_gate": raw.get("quality_gate"),
     }
