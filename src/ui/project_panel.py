@@ -14,6 +14,14 @@ from datetime import datetime
 import streamlit as st
 
 from src.utils import project_manager as pm
+from src.utils.instance_lock import ProjectLockedError
+
+
+def _show_locked_banner(exc: ProjectLockedError) -> None:
+    """v5.10 P1 接线：ProjectLockedError → 用户可读的错误横幅（k321/pu1k）。"""
+    pid = exc.args[1] if len(exc.args) > 1 else None
+    holder = f"（持有者 pid={pid}）" if isinstance(pid, int) and pid > 0 else ""
+    st.sidebar.error(f"🔒 项目正被另一实例占用{holder}，请关闭对方或稍后重试。")
 
 
 # --------------------------------------------------------------------------- #
@@ -111,7 +119,11 @@ def render_project_panel():
     if not active:
         st.sidebar.warning("⚠ 当前无活跃项目")
         if st.sidebar.button("➕ 新建项目", width="stretch", key="proj_new_empty"):
-            new_proj = pm.create_project("我的研究")
+            try:
+                new_proj = pm.create_project("我的研究")
+            except ProjectLockedError as exc:
+                _show_locked_banner(exc)
+                return
             pm.set_active_project(st.session_state, new_proj.id)
             st.rerun()
         return
@@ -151,7 +163,12 @@ def render_project_panel():
 
     cols2 = st.sidebar.columns(2)
     if cols2[0].button("📋 复制", width="stretch", key="proj_copy"):
-        new_proj = pm.copy_project(active.id)
+        try:
+            new_proj = pm.copy_project(active.id)
+        except ProjectLockedError as exc:
+            _show_locked_banner(exc)
+            st.rerun()
+            return
         if new_proj:
             _save_active_then_load(new_proj.id)
             st.sidebar.success(f"已复制为「{new_proj.name}」")
@@ -168,7 +185,12 @@ def render_project_panel():
             confirm = cols3[0].form_submit_button("创建", type="primary")
             cancel = cols3[1].form_submit_button("取消")
             if confirm and new_name.strip():
-                new_proj = pm.create_project(new_name, note=new_note)
+                try:
+                    new_proj = pm.create_project(new_name, note=new_note)
+                except ProjectLockedError as exc:
+                    _show_locked_banner(exc)
+                    st.rerun()
+                    return
                 _save_active_then_load(new_proj.id)
                 st.session_state["_proj_show_new"] = False
                 st.rerun()
@@ -185,10 +207,15 @@ def render_project_panel():
             confirm = cols4[0].form_submit_button("保存", type="primary")
             cancel = cols4[1].form_submit_button("取消")
             if confirm:
-                if renamed.strip() and renamed.strip() != active.name:
-                    pm.rename_project(active.id, renamed.strip())
-                if new_note != active.note:
-                    pm.update_note(active.id, new_note)
+                try:
+                    if renamed.strip() and renamed.strip() != active.name:
+                        pm.rename_project(active.id, renamed.strip())
+                    if new_note != active.note:
+                        pm.update_note(active.id, new_note)
+                except ProjectLockedError as exc:
+                    _show_locked_banner(exc)
+                    st.rerun()
+                    return
                 st.session_state["_proj_show_rename"] = False
                 st.rerun()
             if cancel:
@@ -203,13 +230,18 @@ def render_project_panel():
             target_id = active.id
             # 先切到另一个项目（或新建空的）
             others = [p for p in projects if p.id != target_id]
-            if others:
-                _save_active_then_load(others[0].id)
-            else:
-                # 删除最后一个项目，新建空项目
-                new_proj = pm.create_project("我的研究")
-                _save_active_then_load(new_proj.id)
-            pm.delete_project(target_id)
+            try:
+                if others:
+                    _save_active_then_load(others[0].id)
+                else:
+                    # 删除最后一个项目，新建空项目
+                    new_proj = pm.create_project("我的研究")
+                    _save_active_then_load(new_proj.id)
+                pm.delete_project(target_id)
+            except ProjectLockedError as exc:
+                _show_locked_banner(exc)
+                st.rerun()
+                return
             st.session_state["_proj_show_delete"] = False
             st.rerun()
         if cols5[1].button("取消", key="proj_del_cancel"):

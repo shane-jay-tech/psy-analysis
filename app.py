@@ -694,6 +694,7 @@ with st.sidebar:
                 try:
                     from src.ui.session_reset import clear_research_session
                     from src.utils import project_manager as _pm
+                    from src.utils.instance_lock import ProjectLockedError
                     from src.utils.workspace import build_workspace_snapshot
 
                     _active_id = _pm.get_active_project_id(st.session_state)
@@ -701,9 +702,15 @@ with st.sidebar:
                         _current_snapshot = build_workspace_snapshot()
                         if not _pm.save_workspace(_active_id, _current_snapshot):
                             raise OSError("当前项目保存失败，请先导出项目快照")
-                    _new_project = _pm.create_project(
-                        f"新研究 {datetime.now().strftime('%Y-%m-%d %H%M')}"
-                    )
+                    try:
+                        _new_project = _pm.create_project(
+                            f"新研究 {datetime.now().strftime('%Y-%m-%d %H%M')}"
+                        )
+                    except ProjectLockedError as _ple:
+                        pid = _ple.args[1] if len(_ple.args) > 1 else None
+                        holder = f"（持有者 pid={pid}）" if isinstance(pid, int) and pid > 0 else ""
+                        st.error(f"🔒 项目正被另一实例占用{holder}，未能开始新研究；请关闭对方后重试。")
+                        st.stop()
                     _pm.set_active_project(st.session_state, _new_project.id)
                     clear_research_session(st.session_state)
                     st.session_state["_clear_session_confirm"] = False
