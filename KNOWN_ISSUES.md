@@ -62,10 +62,11 @@
 - **影响**：v3.7 加了 8 边界案例的金标，但单次对照；judge 漂移检测需要多次跑 + 历史曲线。
 - **计划**：CI 跑 `scripts/evaluate_socratic_benchmark.py` + 历史趋势记录到 `D:\code\psy-analysis\data\benchmark_history\`，与 #L1 共用 D 盘数据目录约定。
 
-### 🟢 #L4 SELF_ASSESSMENT_REPORT.md 严重过期
+### ✅ #L4 SELF_ASSESSMENT_REPORT.md 严重过期（2026-09-08 关闭：已归档）
 
-- **影响**：根目录 `SELF_ASSESSMENT_REPORT.md` 还停留在 2026-05-16 v2.0（74 个文件 / 11 测试 / 68 用例），与当前 v4.6（1239 collected / 几百个文件）已严重失真。
-- **计划**：v4.7 收尾时刷新到 v4.7 真实快照，或干脆删除（依赖 `UPGRADE_REPORT_V*.md` 序列即可看清演进）。
+- **原状**：根目录 `SELF_ASSESSMENT_REPORT.md` 停留在 2026-05-16 v2.0（74 个文件 / 11 测试 / 68 用例），与当前 v4.6+ 严重失真。
+- **闭环结论**：过期报告已于 2026-09-04 由 commit `4add02e`（chore: archive historical reports into docs/history）归档至 `docs/history/SELF_ASSESSMENT_REPORT.md`——根目录已无此文件（2026-09-08 实查 `git ls-files` 唯一命中 docs/history/ 路径；无删除记录，属归档移动）。内容定格为 v2.0 历史快照、不再刷新；项目演进史由 `docs/history/UPGRADE_REPORT_V*.md` 序列承载。
+- **证据命令**：`git log --oneline --diff-filter=A -- docs/history/SELF_ASSESSMENT_REPORT.md` → `4add02e`；`git log -S 'SELF_ASSESSMENT_REPORT' --oneline --all` → ec45485（新增根目录版）/ 17faa95（末次内容修改）。
 
 ### ✅ #L5 socratic_engine.ask_socratic 类型签名 lie（v5.8 已修）
 
@@ -90,7 +91,7 @@
 | 🔴 高 | #L1 自学习模块 | v4.7 主线 | 已落地 |
 | 🟡 中 | #L2 F1 论文写作合并 | v4.7 | 待评估 |
 | 🟡 中 | #L3 N10 评分趋势观测 | v4.7 | 待开 |
-| 🟢 低 | #L4 自评报告刷新 | v4.7 收尾 | 待开 |
+| 🟢 低 | #L4 自评报告刷新 | — | 已关闭（过期件已归档 docs/history/，commit 4add02e，不再刷新） |
 | 🟢 低 | #L5 socratic_engine 类型 lie | v5.8 | 已完成 |
 
 ## v5.10 后续硬化路线
