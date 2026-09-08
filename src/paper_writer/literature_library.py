@@ -623,6 +623,41 @@ def match_references(keywords: list, top_n: int = 5) -> list:
 
 
 def format_citation_apa7(entry: tuple) -> str:
-    """格式化单条引用为APA7格式"""
-    authors, year, title, source = entry
-    return f"{authors} ({year}). {title}. *{source}*."
+    """格式化单条引用为APA7格式。
+
+    v5.10（k321/pa3n）修复 apa7-gate-escape-scan-20260905 B 类必修项：
+    - B12–B14 前置清洗：各字段 strip、去换行、None 归空
+    - B2/B4/B5：None/空标题拒绝（ValueError，附缺失字段名）
+    - B1：作者缺失 → 标题上移作者位（APA7 无作者规则）
+    - B3：年份缺失 → "(n.d.)"
+    - B8：来源空（书籍无出版社信息）不再输出裸斜体标记
+    - B11：作者 >20 人 → 前 19 + … + 末位（与 manager 侧 format_reference 对齐）
+    已知残留（B8 完整修复需 tuple schema 增 publisher 字段，见报告 §四收敛建议）。
+    """
+    if not isinstance(entry, tuple) or len(entry) < 4:
+        raise ValueError("citation entry must be (authors, year, title, source)")
+
+    def _clean(v):
+        # 去换行 + 首尾空白（B13/B14）
+        return "" if v is None else " ".join(str(v).split()).strip()
+
+    authors = _clean(entry[0])
+    year = _clean(entry[1])
+    title = _clean(entry[2])
+    source = _clean(entry[3])
+    if not title:
+        raise ValueError("citation missing title (B5)")
+    if not year:
+        year = "n.d."  # B3/B4
+
+    # B11：按逗号粗分作者数，>20 人截断（tuple 无作者列表 schema，含姓逗号的西文
+    # 全名可能高估计数——已知边界，完整修复见收敛建议）
+    name_parts = [p.strip() for p in authors.split(",") if p.strip()] if authors else []
+    if len(name_parts) > 20:
+        authors = ", ".join(name_parts[:19]) + f", …, & {name_parts[-1]}"
+
+    # B1：无作者 → 标题上移作者位
+    head = authors if authors else title
+    if source:
+        return f"{head} ({year}). {title}. *{source}*."
+    return f"{head} ({year}). {title}."  # B8

@@ -200,15 +200,19 @@ def check_effect_size_required(output: Dict[str, Any]) -> Tuple[bool, str]:
         "r_squared", "adj_r_squared", "kappa",
     ]
 
+    def _is_valid_es(v):
+        # A3/A4（apa7-gate-escape-scan-20260905）：NaN/非数值不是有效效应量，须拦截
+        return isinstance(v, (int, float)) and v == v and abs(v) != float("inf")
+
     found_attrs = []
     for attr in effect_size_attrs:
         val = getattr(result, attr, None)
-        if val is not None and val != "":
+        if _is_valid_es(val):
             found_attrs.append(f"{attr}={val}")
 
     # 检查 output 字典中的顶级效应量字段
     for k in ["effect_size", "eta_squared", "cohens_d"]:
-        if k not in found_attrs and output.get(k) is not None:
+        if k not in found_attrs and _is_valid_es(output.get(k)):
             found_attrs.append(f"{k}={output[k]}")
 
     if not found_attrs:
