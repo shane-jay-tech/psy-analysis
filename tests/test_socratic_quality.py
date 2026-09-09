@@ -39,12 +39,15 @@ def _llm_config_from_env() -> Dict[str, str]:
         "zhipu":    "https://open.bigmodel.cn/api/paas/v4",
         "openai":   "https://api.openai.com/v1",
     }
+    # k62a 可加性覆盖：显式 base_url/timeout 未设置时行为与原先完全一致。
+    base_url = os.environ.get("BENCHMARK_LLM_BASE_URL", "") or base_urls.get(provider, "")
+    timeout = int(os.environ.get("BENCHMARK_LLM_TIMEOUT", "60"))
     return {
         "provider": provider,
-        "base_url": base_urls.get(provider, ""),
+        "base_url": base_url,
         "api_key": os.environ.get("BENCHMARK_LLM_API_KEY", ""),
         "model": os.environ.get("BENCHMARK_LLM_MODEL", "deepseek-chat"),
-        "timeout": 60,
+        "timeout": timeout,
     }
 
 
