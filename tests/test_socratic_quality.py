@@ -128,3 +128,55 @@ def test_benchmark_fixture_loadable():
             assert "input" in case
             assert "expected_dimensions" in case
             assert len(case["expected_dimensions"]) >= 2
+
+
+# ---------------------------------------------------------------------------
+# c448：fixture 离线回放模式（2026-09-10 夜）
+#
+# 两种模式用法：
+# - 离线回放（默认，无 BENCHMARK_LLM_API_KEY 即走）：复用最近一次 golden 报告
+#   （tests/fixtures/_benchmark_reports/benchmark_*.json）逐案例校验回放完整性，
+#   绝不发网络调用（ask_socratic 被计数 spy 包裹，真实调用数必须为 0）。
+# - 联网首跑（原有路径，未破坏）：设置 BENCHMARK_LLM_API_KEY 后 --run-benchmark，
+#   真实调用 LLM 产出新报告（成为下一次回放的 golden）。
+# ---------------------------------------------------------------------------
+
+def _load_golden_replay():
+    """取最新 golden 报告 → {case_id: llm_reply} 回放表。"""
+    reports = sorted(REPORT_DIR.glob("benchmark_*.json"))
+    assert reports, "无 golden 回放报告（tests/fixtures/_benchmark_reports/ 为空）"
+    latest = reports[-1]
+    data = json.loads(latest.read_text(encoding="utf-8"))
+    return {r["case_id"]: (r.get("llm_reply") or "") for r in data["results"]}, latest.name
+
+
+@pytest.mark.benchmark
+def test_socratic_quality_replay_offline(monkeypatch):
+    """离线回放 30 案例：无 key 全绿、回放命中 30、真实 LLM 调用计数 = 0。"""
+    monkeypatch.delenv("BENCHMARK_LLM_API_KEY", raising=False)
+    golden, golden_name = _load_golden_replay()
+    benchmark = _load_benchmark()
+
+    from src.upstream import socratic_engine
+
+    calls = {"real": 0}
+    real_ask = socratic_engine.ask_socratic
+
+    def _spy(*args, **kwargs):
+        calls["real"] += 1
+        return real_ask(*args, **kwargs)
+
+    monkeypatch.setattr(socratic_engine, "ask_socratic", _spy)
+
+    total, empty = 0, []
+    for stage_str, cases in benchmark["stages"].items():
+        for case in cases:
+            total += 1
+            reply = golden.get(case["id"], "")
+            if not reply:
+                empty.append(case["id"])
+
+    assert total == 30, f"基准案例数异常: {total}"
+    assert not empty, f"回放缺 reply 的案例: {empty}"
+    assert calls["real"] == 0, f"回放模式发生了真实 LLM 调用: {calls['real']} 次"
+    print(f"[replay] golden={golden_name} hit={total}/30 real_calls={calls['real']}")

@@ -22,6 +22,12 @@ LOCK_FILENAME = ".psy_project.lock"
 DEFAULT_STALE_SECONDS = 600.0  # 10 分钟
 
 
+def locked_user_prompt(resource: str, holder: str = "") -> str:
+    """锁定占用的统一用户提示（dab0 同源化）：project_panel 与文献面板共用。"""
+    holder_part = f"（持有者: {holder}）" if holder else ""
+    return f"🔒 {resource}正被另一实例占用{holder_part}，请关闭对方或稍后重试。"
+
+
 class ProjectLockedError(RuntimeError):
     """项目工作区被另一个实例持有。"""
 

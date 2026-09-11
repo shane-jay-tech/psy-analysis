@@ -7,6 +7,8 @@
 基于 APA7 格式生成引用。关键词匹配时根据用户分析变量自动推荐。
 """
 
+from src.paper_writer.literature_manager import LiteratureEntry
+
 # 文献条目: key -> list of (authors, year, title, source)
 LITERATURE_LIBRARY = {}
 
@@ -623,6 +625,7 @@ def match_references(keywords: list, top_n: int = 5) -> list:
 
 
 def format_citation_apa7(entry: tuple) -> str:
+    """(ecdb 收敛) tuple 路径统一走 LiteratureEntry.format_reference；5 元组支持 publisher。"""
     """格式化单条引用为APA7格式。
 
     v5.10（k321/pa3n）修复 apa7-gate-escape-scan-20260905 B 类必修项：
@@ -658,6 +661,15 @@ def format_citation_apa7(entry: tuple) -> str:
 
     # B1：无作者 → 标题上移作者位
     head = authors if authors else title
-    if source:
-        return f"{head} ({year}). {title}. *{source}*."
-    return f"{head} ({year}). {title}."  # B8
+    # (ecdb 收敛) tuple 路径统一走 LiteratureEntry.format_reference：
+    # 5 元组支持 publisher（B8 完整修复）；样式与 manager 侧一致、无裸斜体。
+    publisher = _clean(entry[4]) if len(entry) >= 5 else ""
+    entry_obj = LiteratureEntry(
+        key=f"tmp-{abs(hash((head, year, title))) & 0xffffff}",
+        authors=[p.strip() for p in head.split(',') if p.strip()],
+        year=year,
+        title=title,
+        journal=source,
+        publisher=publisher,
+    )
+    return entry_obj.format_reference()

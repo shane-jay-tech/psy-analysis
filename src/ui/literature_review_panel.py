@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
+from src.utils.instance_lock import locked_user_prompt
 
 from src.utils.export_naming import export_filename as _efn
 
@@ -77,10 +78,10 @@ def _check_lock_or_warn(resource: str) -> bool:
     lock = SessionLock(st.session_state)
     if lock.is_locked(resource, by_others=True):
         holder = lock.get_holder(resource)
-        st.warning(
-            f"⚠️ 当前数据正在另一个标签页中被编辑（持有者: {holder}）。"
-            "请稍后再试或关闭其他标签页。"
-        )
+        # dab0 同源化：提示文案与 project 锁共用 locked_user_prompt；
+        # bool 返回契约保留——SessionLock 为 streamlit 会话咨询锁，异常路径
+        # （ProjectLockedError）属跨进程 project_lock 职责，两者提示同源、机制分层。
+        st.warning(locked_user_prompt(resource, holder))
         return False
     # 尝试获取锁（即便没人锁也获取，TTL 30s 自动过期）
     my_id = ensure_tab_id(st.session_state)

@@ -53,6 +53,9 @@ class LiteratureEntry:
                 parts.append(".")
             if self.doi:
                 parts.append(f" https://doi.org/{self.doi.replace('doi:', '').replace('https://doi.org/', '')}")
+            if not self.journal and self.publisher:
+                # 书籍类条目（无期刊）：附录出版社（ecdb 同源化：与英文分支同语义）
+                parts.append(f" {self.publisher}.")
         else:
             # 英文 APA7 格式
             if len(self.authors) == 1:

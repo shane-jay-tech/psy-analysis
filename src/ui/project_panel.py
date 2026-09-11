@@ -14,14 +14,15 @@ from datetime import datetime
 import streamlit as st
 
 from src.utils import project_manager as pm
-from src.utils.instance_lock import ProjectLockedError
+from src.utils.instance_lock import ProjectLockedError, locked_user_prompt
 
 
 def _show_locked_banner(exc: ProjectLockedError) -> None:
-    """v5.10 P1 接线：ProjectLockedError → 用户可读的错误横幅（k321/pu1k）。"""
+    """v5.10 P1 接线：ProjectLockedError → 用户可读的错误横幅（k321/pu1k）。
+    4acb 同源化：文案改走 locked_user_prompt（与文献面板共用），不再自拼。"""
     pid = exc.args[1] if len(exc.args) > 1 else None
-    holder = f"（持有者 pid={pid}）" if isinstance(pid, int) and pid > 0 else ""
-    st.sidebar.error(f"🔒 项目正被另一实例占用{holder}，请关闭对方或稍后重试。")
+    holder = f"pid={pid}" if isinstance(pid, int) and pid > 0 else ""
+    st.sidebar.error(locked_user_prompt("项目", holder))
 
 
 # --------------------------------------------------------------------------- #

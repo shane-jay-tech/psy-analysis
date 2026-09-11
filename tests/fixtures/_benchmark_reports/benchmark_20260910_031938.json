@@ -1,0 +1,431 @@
+{
+  "version": "v3.7",
+  "generated_at": "2026-09-10T03:19:38.267505",
+  "llm": {
+    "provider": "relay",
+    "model": "gpt-5.6-sol"
+  },
+  "n_cases": 30,
+  "results": [
+    {
+      "case_id": "1-01",
+      "stage": 1,
+      "input": "我想研究焦虑",
+      "expected_dimensions": [
+        "人群定位",
+        "焦虑类型澄清",
+        "兴趣来源"
+      ],
+      "llm_reply": "「焦虑」具体是哪种让你不爽或困惑的现象——反复担心、身体紧绷，还是明知没事却停不下来？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "1-02",
+      "stage": 1,
+      "input": "想搞个关于学习的研究",
+      "expected_dimensions": [
+        "学习的哪个方面",
+        "目标人群",
+        "具体困惑"
+      ],
+      "llm_reply": "“学习”这件事里，哪个让你最不爽或困惑的现象最想弄清楚？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "1-03",
+      "stage": 1,
+      "input": "我对手机依赖很感兴趣",
+      "expected_dimensions": [
+        "手机依赖的具体表现",
+        "为何关注此话题",
+        "自身经历 vs 观察"
+      ],
+      "llm_reply": "“手机依赖”具体是哪个现象让你不爽或困惑：明知该停却停不下来，还是手机一响就必须查看？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "1-04",
+      "stage": 1,
+      "input": "想做亲子关系方面的题目",
+      "expected_dimensions": [
+        "亲子关系的哪个维度",
+        "目标年龄段",
+        "兴趣由何而来"
+      ],
+      "llm_reply": "「亲子关系」里，究竟是哪种让你不爽或困惑的现象最想弄清楚？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "1-05",
+      "stage": 1,
+      "input": "我想搞清楚为什么有人很自信有人很自卑",
+      "expected_dimensions": [
+        "自信/自卑的具体维度",
+        "人群范围",
+        "差异来源猜测"
+      ],
+      "llm_reply": "“有人很自信有人很自卑”具体让你困惑的是他们在什么场景下表现出这种差异？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "1-06",
+      "stage": 1,
+      "input": "想研究网络暴力对青少年的影响",
+      "expected_dimensions": [
+        "网络暴力的具体形式",
+        "影响的哪个方面",
+        "个人观察来源"
+      ],
+      "llm_reply": "“网络暴力对青少年的影响”中，最让你困惑或不舒服的具体现象是什么？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "2-01",
+      "stage": 2,
+      "input": "想研究大学生学业拖延",
+      "expected_dimensions": [
+        "拖延的具体行为表现",
+        "触发情境",
+        "影响范围/严重度"
+      ],
+      "llm_reply": "「大学生学业拖延」具体发生在哪些场景中——写论文、备考，还是完成日常作业？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "2-02",
+      "stage": 2,
+      "input": "我想看大学新生适应不良的问题",
+      "expected_dimensions": [
+        "适应不良的表现",
+        "什么场景下出现",
+        "新生的具体特点"
+      ],
+      "llm_reply": "“大学新生”的“适应不良”主要发生在哪种场景中，你想比较他们在什么方面的差异？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "2-03",
+      "stage": 2,
+      "input": "我注意到考试焦虑很普遍",
+      "expected_dimensions": [
+        "焦虑的具体表现",
+        "什么时候开始/加剧",
+        "哪些人更明显"
+      ],
+      "llm_reply": "“考试焦虑很普遍”具体是哪些学生在什么考试场景下，比哪些学生更焦虑？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "2-04",
+      "stage": 2,
+      "input": "我对独生子女的人际关系有点想法",
+      "expected_dimensions": [
+        "人际关系的哪一类",
+        "什么场景下",
+        "独生 vs 非独生的差异"
+      ],
+      "llm_reply": "“独生子女的人际关系”中，哪类独生子女在什么场景下的哪种差异最让你困惑？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "2-05",
+      "stage": 2,
+      "input": "想研究短视频对学生的影响",
+      "expected_dimensions": [
+        "影响的哪一面",
+        "什么使用场景",
+        "学生的哪个年龄段"
+      ],
+      "llm_reply": "“短视频”对“学生”的哪种“影响”最让你困惑，是学习专注、睡眠，还是情绪？\n\n这种影响主要出现在什么场景下，又是哪些学生之间更明显？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "2-06",
+      "stage": 2,
+      "input": "我打算研究运动员心理素质",
+      "expected_dimensions": [
+        "哪种运动员",
+        "心理素质的哪个维度",
+        "什么比赛场景"
+      ],
+      "llm_reply": "“运动员”中你具体关注哪类人，以及他们在什么比赛场景下的“心理素质”差异？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "3-01",
+      "stage": 3,
+      "input": "想看看睡眠时长和学业成绩的关系",
+      "expected_dimensions": [
+        "睡眠的具体测量方式",
+        "成绩的具体类型",
+        "关系类型（相关/因果）"
+      ],
+      "llm_reply": "“睡眠时长”要比较的是平均每晚时长差异，还是作息规律性差异？\n“学业成绩”具体看期末总成绩、某门课成绩，还是绩点差异？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "3-02",
+      "stage": 3,
+      "input": "我想研究自尊水平如何影响社交焦虑",
+      "expected_dimensions": [
+        "自尊量表选择",
+        "社交焦虑的具体测量",
+        "潜在第三变量"
+      ],
+      "llm_reply": "「自尊水平」的高低，具体要比较什么可观察差异——自我评价、失败后的反应，还是被他人评价时的表现？  \n「社交焦虑」准备体现为回避社交、互动时紧张，还是担心被负面评价？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "3-03",
+      "stage": 3,
+      "input": "想分析家庭收入与心理健康的关系",
+      "expected_dimensions": [
+        "收入的测量方式",
+        "心理健康的具体指标",
+        "可能的中介变量"
+      ],
+      "llm_reply": "在“家庭收入”不同的人群中，你想比较哪一种可观察的“心理健康”差异？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "3-04",
+      "stage": 3,
+      "input": "考虑研究情绪调节策略对压力的作用",
+      "expected_dimensions": [
+        "调节策略的分类",
+        "压力的具体测量",
+        "因果方向"
+      ],
+      "llm_reply": "你说的“情绪调节策略”和“压力”分别准备比较哪些具体差异，例如策略类型与压力评分或生理反应的差异？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "3-05",
+      "stage": 3,
+      "input": "想看不同学习风格学生的成绩",
+      "expected_dimensions": [
+        "学习风格的分类",
+        "学习风格变量类型（IV）",
+        "成绩 DV 的具体类型"
+      ],
+      "llm_reply": "「不同学习风格」具体要比较哪两类学生，「成绩」用考试分数、课程总评，还是作业成绩来衡量？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "3-06",
+      "stage": 3,
+      "input": "想研究运动量和抑郁倾向的关系",
+      "expected_dimensions": [
+        "运动量的测量",
+        "抑郁的测量",
+        "可能的第三变量"
+      ],
+      "llm_reply": "在什么人群中，「运动量」的高低要如何区分，而「抑郁倾向」准备通过什么可观察指标比较？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "4-01",
+      "stage": 4,
+      "input": "我假设手机使用时长越长睡眠质量越差",
+      "expected_dimensions": [
+        "否定结果的样子",
+        "测量工具是否成熟",
+        "本科可执行性"
+      ],
+      "llm_reply": "如果“手机使用时长越长睡眠质量越差”是错的，你预期会观察到什么结果？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "4-02",
+      "stage": 4,
+      "input": "我打算用一个我自己设计的问卷",
+      "expected_dimensions": [
+        "问卷的信度效度",
+        "为什么不用现成量表",
+        "样本量与可行性"
+      ],
+      "llm_reply": "你自己设计的“问卷”要验证的具体假设是什么？  \n如果这个假设是错的，你预期问卷中会观察到什么结果？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "4-03",
+      "stage": 4,
+      "input": "我想做纵向研究跟踪 1 年",
+      "expected_dimensions": [
+        "可行性",
+        "替代设计",
+        "若失败的备选方案"
+      ],
+      "llm_reply": "你想“跟踪 1 年”时，若你的假设是错的，你预期哪些变量在这一年中不会出现差异？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "4-04",
+      "stage": 4,
+      "input": "假设是性别差异显著",
+      "expected_dimensions": [
+        "差异的具体方向",
+        "若不显著怎么办",
+        "已有研究是什么结论"
+      ],
+      "llm_reply": "如果“性别差异显著”这一假设是错的，你预期会观察到男女在哪个具体指标上没有差异？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "4-05",
+      "stage": 4,
+      "input": "我打算招募 30 个被试",
+      "expected_dimensions": [
+        "样本量是否足够",
+        "有什么 power 估计依据",
+        "是否考虑预试"
+      ],
+      "llm_reply": "如果你的假设是错的，这30个被试中会出现什么结果，才会让你放弃它？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "4-06",
+      "stage": 4,
+      "input": "想研究智商和情商的关系",
+      "expected_dimensions": [
+        "智商测量的可行性",
+        "情商测量的工具",
+        "本科生伦理问题"
+      ],
+      "llm_reply": "如果“智商”和“情商”没有关系，你预期在哪类人群或任务中观察到什么结果？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "5-01",
+      "stage": 5,
+      "input": "学业拖延和自我效能的关系研究",
+      "expected_dimensions": [
+        "人群定位",
+        "标准句式",
+        "因果还是相关"
+      ],
+      "llm_reply": "你说的“学业拖延”和“自我效能”准备放在哪类学生中考察，具体人群是大学生还是中学生？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "5-02",
+      "stage": 5,
+      "input": "在大学生中，社交媒体使用是否影响孤独感",
+      "expected_dimensions": [
+        "是否需要中介/调节",
+        "「使用」的具体测量",
+        "「影响」的因果含义"
+      ],
+      "llm_reply": "“社交媒体使用”具体指使用时长、使用频率，还是主动互动方式对“孤独感”的影响？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "5-03",
+      "stage": 5,
+      "input": "运动对焦虑的缓解作用",
+      "expected_dimensions": [
+        "人群限定",
+        "运动的操作化",
+        "缓解的标准"
+      ],
+      "llm_reply": "你说的“运动”针对哪类人群，以及想观察它对“焦虑”的哪一项具体结果的影响？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "5-04",
+      "stage": 5,
+      "input": "睡眠质量在压力和抑郁之间的中介作用",
+      "expected_dimensions": [
+        "是否需要明确人群",
+        "中介模型的检验方法",
+        "标准句式表达"
+      ],
+      "llm_reply": "把它写成「在[人群]中，[X] 是否影响 [Y]？」——你会怎么填？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "5-05",
+      "stage": 5,
+      "input": "研究自我同一性发展和生涯困难",
+      "expected_dimensions": [
+        "人群限定",
+        "测量工具",
+        "关系方向（预测/相关）"
+      ],
+      "llm_reply": "把它写成「在[人群]中，[X] 是否影响 [Y]？」——你会怎么填？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    },
+    {
+      "case_id": "5-06",
+      "stage": 5,
+      "input": "短视频使用和学业投入的关系",
+      "expected_dimensions": [
+        "短视频测量方式",
+        "学业投入指标",
+        "潜在调节变量"
+      ],
+      "llm_reply": "「短视频使用」中的使用时长或使用目的，是否会影响哪类学生的「学业投入」？",
+      "manual_score": null,
+      "manual_notes": "",
+      "error": null
+    }
+  ]
+}

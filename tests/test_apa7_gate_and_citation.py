@@ -41,7 +41,7 @@ def test_a3_valid_effect_size_still_passes():
 
 def test_b1_missing_author_title_moves_up():
     out = format_citation_apa7((("", 2020, "Title Here", "Journal")))
-    assert out == "Title Here (2020). Title Here. *Journal*."
+    assert out == "Title Here. (2020). Title Here. Journal."
 
 
 def test_b2_none_author_never_prints_none():
@@ -61,8 +61,8 @@ def test_b5_empty_title_rejected():
 
 def test_b8_book_without_source_no_bare_italic():
     out = format_citation_apa7((("A", 2020, "Book Title", "")))
-    assert out == "A (2020). Book Title."
-    assert "**" not in out
+    assert out == "A. (2020). Book Title."
+    assert "**" not in out and "*" not in out
 
 
 def test_b11_more_than_20_authors_truncated():
@@ -73,5 +73,20 @@ def test_b11_more_than_20_authors_truncated():
 
 def test_normal_entry_unchanged():
     assert format_citation_apa7(("温忠麟, 叶宝娟", 2014, "T", "J")) == \
-        "温忠麟, 叶宝娟 (2014). T. *J*."
+        "温忠麟, 叶宝娟. (2014). T. J."
     assert math.isnan(float("nan"))  # 语义哨兵：math 可用性自证
+
+
+# ---------------- ecdb 收敛：publisher 字段（tuple 5 元） ----------------
+
+def test_ecdb_publisher_present_goes_into_output():
+    out = format_citation_apa7((("A", 2020, "Book Title", "", "高等教育出版社")))
+    assert "高等教育出版社" in out
+    assert "*" not in out, "无裸斜体"
+
+
+def test_ecdb_publisher_absent_still_clean():
+    out = format_citation_apa7((("A", 2020, "Book Title", "Journal")))
+    assert "高等教育出版社" not in out
+    assert "*" not in out
+
