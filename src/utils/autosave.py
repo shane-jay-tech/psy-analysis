@@ -11,6 +11,7 @@ v3.1 行为变化：
 
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import os
@@ -49,8 +50,92 @@ SESSION_LAST_ERROR_KEY = "_autosave_last_error"
 SESSION_LAST_SAVED_LABEL_KEY = "_workspace_last_saved"
 
 
+# --------------------------------------------------------------------------- #
+# 方案B：后台保存（2026-09-11，psy-snapshot-perf-20260911.md §③）
+# --------------------------------------------------------------------------- #
+
+# 回滚开关：置 False 全量退回同步保存（设计稿迁移步骤的回滚点）
+BACKGROUND_AUTOSAVE_ENABLED = True
+
+
+class FakeSessionState:
+    """非 dict 会话态包装（测试/脚本用）。
+
+    trigger_autosave 以「非 dict ⇒ Streamlit 运行时」判定是否走后台路径，
+    本类让脚本环境也能显式走后台分支。
+    """
+
+    def __init__(self, data: Optional[Dict[str, Any]] = None):
+        self._data = dict(data or {})
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def pop(self, key, *args):
+        return self._data.pop(key, *args)
+
+    def keys(self):
+        return self._data.keys()
+
+
+def _capture_refs(session_state: Any) -> Optional[Dict[str, Any]]:
+    """主线程引用级捕获全部键值（零序列化、零深拷贝）。
+
+    大对象（df 等）按 Streamlit 惯例「整体替换、不就地改」；捕获失败返回 None，
+    调用方落回同步路径。
+    """
+    try:
+        return {k: session_state[k] for k in list(session_state.keys())}
+    except Exception:
+        logger.debug("autosave: 引用捕获失败，回退同步保存", exc_info=True)
+        return None
+
+
+def _drain_background_result(session_state: Any) -> None:
+    """把已完成的后台结果结转进 session_state（必须只在主线程调用）。"""
+    try:
+        from src.utils import autosave_bg
+    except Exception:
+        return
+    res = autosave_bg.drain_result()
+    if res is None:
+        return
+    if res.get("ok"):
+        session_state[SESSION_LAST_SAVED_LABEL_KEY] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        session_state.pop(SESSION_LAST_ERROR_KEY, None)
+    elif res.get("error"):
+        session_state[SESSION_LAST_ERROR_KEY] = res["error"]
+
+
+def flush_background(timeout: float = 10.0):
+    """等待后台保存队列清空（退出钩子/测试/脚本用）。返回 (是否完成, 末次 worker 毫秒)。"""
+    try:
+        from src.utils import autosave_bg
+        return autosave_bg.flush(timeout)
+    except Exception:
+        return True, 0.0
+
+
+atexit.register(flush_background, 5.0)
+
+
 def trigger_autosave(session_state: Any, workspace_builder, *, force: bool = False):
-    """v3.1: 把工作区保存到当前活跃项目。
+    """v3.6: 把工作区保存到当前活跃项目。
+
+    方案B（2026-09-11）：Streamlit 运行时（非 dict 会话态）走后台队列 ——
+    主线程只做引用级捕获（零序列化）后立即返回 True（受理）；序列化+落盘在
+    autosave_bg worker 完成，保存标签/错误键在后续 trigger 调用时结转。
+    dict 会话态（测试/脚本）保持原同步语义：返回时已落盘。
+    回滚：BACKGROUND_AUTOSAVE_ENABLED = False。
 
     Args:
         session_state: streamlit session_state
@@ -58,8 +143,12 @@ def trigger_autosave(session_state: Any, workspace_builder, *, force: bool = Fal
         force: 跳过节流
 
     Returns:
-        是否实际保存
+        是否实际保存（同步路径）/ 是否受理（后台路径）
     """
+    # 后台路径先结转上一次的后台结果（主线程 atomic swap，即使本轮节流跳过也反馈）
+    if BACKGROUND_AUTOSAVE_ENABLED and not isinstance(session_state, dict):
+        _drain_background_result(session_state)
+
     # 拿当前活跃项目
     try:
         from src.utils import project_manager as pm
@@ -82,6 +171,21 @@ def trigger_autosave(session_state: Any, workspace_builder, *, force: bool = Fal
         and now - last < DEFAULT_THROTTLE_SECONDS
     ):
         return False  # 同一项目仍在节流冷却中
+
+    # 方案B 主路径：引用捕获 → 后台队列（捕获失败才落回同步）
+    if BACKGROUND_AUTOSAVE_ENABLED and not isinstance(session_state, dict):
+        try:
+            from src.utils import autosave_bg
+        except Exception:
+            logger.debug("autosave: autosave_bg 导入失败，回退同步", exc_info=True)
+            autosave_bg = None
+        if autosave_bg is not None:
+            refs = _capture_refs(session_state)
+            if refs is not None:
+                autosave_bg.submit(active_id, refs)
+                session_state[SESSION_LAST_SAVE_KEY] = now
+                session_state[SESSION_LAST_PROJECT_KEY] = active_id
+                return True  # 已受理；落盘结果由后续调用的 _drain_background_result 结转
 
     try:
         ws = workspace_builder()
