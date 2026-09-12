@@ -44,31 +44,25 @@ class CrawledReference:
     url: str = ""
 
     def to_apa7(self, is_chinese: bool = False) -> str:
-        """转换为 APA 7th Edition 格式"""
-        if is_chinese:
-            authors_str = ", ".join(self.authors)
-        else:
-            if len(self.authors) == 1:
-                authors_str = f"{self.authors[0]}"
-            elif len(self.authors) == 2:
-                authors_str = f"{self.authors[0]}, & {self.authors[1]}"
-            elif len(self.authors) <= 7:
-                authors_str = ", ".join(self.authors[:-1]) + f", & {self.authors[-1]}"
-            else:
-                authors_str = ", ".join(self.authors[:6]) + ", ... " + self.authors[-1]
+        """转换为 APA 7th Edition 格式（p911r-31 收敛：构造 LiteratureEntry 委托
+        literature_manager.format_reference，单一定义源；中文分支按 ecdb 口径无斜体）"""
+        from .literature_manager import LiteratureEntry
 
-        ref = f"{authors_str} ({self.year}). {self.title}."
-        if self.journal:
-            ref += f" {self.journal}"
-        if self.volume:
-            ref += f", {self.volume}"
-            if self.issue:
-                ref += f"({self.issue})"
-        if self.pages:
-            ref += f", {self.pages}"
-        if self.doi:
-            ref += f". https://doi.org/{self.doi}"
-        return ref
+        entry = LiteratureEntry(
+            key=f"crawled-{self.doi or abs(hash(self.title))}",
+            authors=self.authors,
+            year=str(self.year),
+            title=self.title,
+            journal=self.journal,
+            volume=self.volume,
+            issue=self.issue,
+            pages=self.pages,
+            doi=self.doi,
+            is_chinese=is_chinese,
+            abstract=self.abstract,
+            source=self.source or "crossref",
+        )
+        return entry.format_reference()
 
     def to_dict(self) -> Dict:
         return {
