@@ -30,6 +30,16 @@ logger = logging.getLogger(__name__)
 
 _SRC_MODULE = 'src.utils.workspace'
 
+# 换案监控阈值（2026-09-12 h912-06 实测入码，替代设计稿 5MB 假设）。
+# 实测基准（tmp/measure_snapshot_threshold_h91206.py，DataFrame.to_csv + base64，
+# 与 workspace.build_workspace_snapshot 的序列化配方一致，.venv python 单线程）：
+#   CSV 0.37MB→95ms / 5.2MB→1119ms / 21.8MB→4253ms / 44.9MB→8410ms（≈190ms/MB，线性）
+#   驻留内存峰值 ≈ 5.2×CSV 体量（21.8MB→114MB / 44.9MB→234MB）
+# 阈值取 CSV 10MB ≈ worker 单次序列化 ~2s、内存峰值 ~52MB；超过即日志告警，
+# 建议按 docs/insights/psy-snapshot-bg-queue-20260911.md §五 评估方案 A（增量资产化）。
+SNAPSHOT_WORKER_CSV_MB_THRESHOLD = 10.0
+SNAPSHOT_WORKER_B64_BYTES_THRESHOLD = int(SNAPSHOT_WORKER_CSV_MB_THRESHOLD * 1048576 * 4 / 3)
+
 _lock = threading.Lock()
 _cond = threading.Condition(_lock)
 _pending: Optional[Dict[str, Any]] = None  # {'project_id':..., 'refs':...}
@@ -70,6 +80,14 @@ def _worker_loop():
             mod = _get_private_builder()
             mod.st.session_state = job['refs']
             ws = mod.build_workspace_snapshot()
+            b64 = ws.get('df_b64') or ''
+            df_mb = round(len(b64) * 3 / 4 / 1048576, 2) if b64 else 0.0
+            if len(b64) > SNAPSHOT_WORKER_B64_BYTES_THRESHOLD:
+                logger.warning(
+                    'autosave-bg: 快照 df 序列化体量 %.1fMB 超换案阈值 %.0fMB（CSV 口径），'
+                    '建议评估方案 A 增量资产化',
+                    df_mb, SNAPSHOT_WORKER_CSV_MB_THRESHOLD,
+                )
             from src.utils import project_manager as pm
             ok = pm.save_workspace(job['project_id'], ws)
             if not ok:
@@ -77,9 +95,10 @@ def _worker_loop():
         except Exception:
             logger.debug('autosave-bg: 后台保存失败', exc_info=True)
             err = '自动保存写入失败，请检查磁盘空间或导出快照'
+            df_mb = 0.0
         ms = (time.perf_counter() - t0) * 1000
         with _cond:
-            _result = {'ok': ok, 'error': err, 'project_id': job['project_id']}
+            _result = {'ok': ok, 'error': err, 'project_id': job['project_id'], 'df_b64_mb': df_mb}
             _last_worker_ms = ms
             _busy = False
             _cond.notify_all()

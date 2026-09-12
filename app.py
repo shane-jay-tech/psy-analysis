@@ -408,7 +408,13 @@ render_restore_prompt(st)
 
 
 def _autosave_current_workspace(*, force: bool = False) -> bool:
-    """保存当前项目；所有失败由 autosave 状态统一反馈，不阻断主流程。"""
+    """保存当前项目；所有失败由 autosave 状态统一反馈，不阻断主流程。
+
+    返回值契约（h912-06「返回＝受理」）：True＝受理——方案 B 后台路径下仅代表
+    已入队（落盘由 worker 异步完成，atexit flush 兜底），调用方不得据 True 断言
+    已落盘；同步路径（dict 会话态/回滚开关关闭）下 True＝已落盘。是否真正落盘
+    以 session_state['_workspace_last_saved'] / '_autosave_last_error' 为准。
+    """
     try:
         from src.utils.workspace import build_workspace_snapshot
         return trigger_autosave(
