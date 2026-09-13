@@ -34,6 +34,19 @@ class TestAppStartup:
 
 
 class TestDataUploadFlow:
+    @pytest.fixture(autouse=True)
+    def _sync_autosave(self, monkeypatch):
+        """d913b-47 顺序依赖修复：关闭方案B后台路径，autosave 走同步落盘。
+
+        根因：`_workspace_last_saved` 仅在 drain 到后台完成结果时写入，而结果槽
+        是 autosave_bg 的模块级全局——全量跑时被先前测试的入队/完成「喂饱」，本
+        用例子集单独跑则无人入队 → 键缺失 → KeyError（tests/test_e2e_ui.py:52）。
+        置 BACKGROUND_AUTOSAVE_ENABLED=False 走同步分支（autosave.py 文档化回滚
+        开关），保存与标签键在当次 run 内确定生效，不再依赖全局队列状态。
+        """
+        from src.utils import autosave as _autosave
+        monkeypatch.setattr(_autosave, "BACKGROUND_AUTOSAVE_ENABLED", False)
+
     def test_upload_csv_triggers_analysis(self):
         at = _ready_app()
         assert len(at.file_uploader) >= 1
