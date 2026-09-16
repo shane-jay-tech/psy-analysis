@@ -47,7 +47,7 @@ python launcher.pyw
 ```text
 DEEPSEEK_API_KEY=...
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
-DEEPSEEK_MODEL=deepseek-v4-pro
+DEEPSEEK_MODEL=deepseek-chat
 ```
 
 ## 分析方法
