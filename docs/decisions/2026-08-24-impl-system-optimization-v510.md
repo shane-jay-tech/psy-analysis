@@ -113,7 +113,7 @@
 - `python scripts/release_gate.py --mode full`：完整门禁通过（最终修复后再次执行）。
 - 定向回归：导航、模板项目隔离、HTML 转义、上传、安全重置、自动保存、偏好与推荐方案测试均通过。
 - 性能 smoke：0 FAIL、0 WARN；7 条关键路径均低于预算，核心冷启动约 3.1–3.3 秒。
-- 测试收集：2544 个离线项目；最终数值同步写入 `docs/SYSTEM_REPORT.md` 与 `UPGRADE_REPORT_V5.10.md`。
+- 测试收集：2544 个离线项目【历史值】；最终数值同步写入 `docs/SYSTEM_REPORT.md` 与 `UPGRADE_REPORT_V5.10.md`。
 - 未创建 commit，等待用户确认。
 
 ## 残余风险与路线图
