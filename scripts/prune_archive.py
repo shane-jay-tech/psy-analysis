@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Archive retention for psy-analysis.
 
-Rule 1: repo archive/ holds timestamped snapshot dirs; when more than 20
-        exist, the oldest are deleted until 20 remain.
+Rule 1: repo archive/ holds entries of any kind (snapshot dirs AND loose
+        files, name-sorted); when more than 20 entries exist, the oldest are
+        deleted until 20 remain. Non-directory entries in the excess set are
+        skipped and counted (is_dir guard, 916p-a4-007/917-33).
 Rule 2: data/literature_feed/raw/ keeps only the last 90 days.
 
 Default is --dry-run (print only). Pass --apply to actually delete.
@@ -29,12 +31,20 @@ def rule_archive(apply: bool) -> list:
     entries = [p for p in ARCHIVE_DIR.iterdir()]
     entries.sort(key=lambda p: p.name)
     excess = entries[:-ARCHIVE_KEEP] if len(entries) > ARCHIVE_KEEP else []
+    skipped_non_dir = 0
     print(f"[prune] rule1 archive/: {len(entries)} entries, keep {ARCHIVE_KEEP}, "
           f"to delete {len(excess)}")
     for p in excess:
         print(f"  - {p.name}")
         if apply:
+            if not p.is_dir():
+                # 917-33 is_dir 守卫：非目录超额条目跳过并记录，绝不 rmtree
+                print(f"  - [skip] non-directory entry, not removed: {p.name}")
+                skipped_non_dir += 1
+                continue
             shutil.rmtree(p)
+    if skipped_non_dir:
+        print(f"[prune] skipped non-directory entries: {skipped_non_dir}")
     return excess
 
 

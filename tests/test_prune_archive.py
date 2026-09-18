@@ -52,8 +52,8 @@ def test_sort_order_keeping_which_batch(monkeypatch):
     assert names == [f"2026_03_{i:02d}" for i in range(5)]  # 最小命名 5 个进超额
 
 
-def test_non_dir_entry_in_excess_fixed_current_behaviour(monkeypatch):
-    """现状固定：混入非目录条目（index.json）落入超额集合 → rmtree 抛 NotADirectoryError（无捕获）。"""
+def test_non_dir_entry_in_excess_skipped_by_is_dir_guard(monkeypatch):
+    """917-33 收敛后行为：非目录超额条目被 is_dir 守卫跳过（不再抛 NotADirectoryError）。"""
     import tempfile, pathlib
     root = pathlib.Path(tempfile.mkdtemp())
     archive = root / "archive"
@@ -63,10 +63,10 @@ def test_non_dir_entry_in_excess_fixed_current_behaviour(monkeypatch):
     (archive / "00_index.json").write_text("{}", encoding="utf-8")  # 名称最小 → 必落入超额
     monkeypatch.setattr(prune_archive, "ARCHIVE_DIR", archive)
     monkeypatch.setattr(prune_archive, "ARCHIVE_KEEP", 20)
-    # 排序按名称：index.json 排最前（数字目录名 '2' 开头大于 'i'？实测 'i'>'2'，
-    # index.json 排最后）→ 必进超额集合，rmtree 对文件抛 NotADirectoryError
-    with pytest.raises(OSError):  # NotADirectoryError 是 OSError 子类（按现状钉死）
-        prune_archive.rule_archive(apply=True)
+    # 排序按名称：index.json 排最前 → 必进超额集合；守卫跳过非目录（文件保留）
+    prune_archive.rule_archive(apply=True)
+    assert (archive / "00_index.json").exists(), "守卫应跳过非目录条目（不删文件）"
+    assert len([p for p in archive.iterdir() if p.is_dir()]) == 20, "20 个快照目录应全部保留"
 
 
 def test_rule_raw_age_filter_and_dry_run(monkeypatch, tmp_path):
@@ -92,3 +92,23 @@ def test_archive_dir_missing_returns_empty(monkeypatch, tmp_path):
     assert prune_archive.rule_archive(apply=True) == []
     monkeypatch.setattr(prune_archive, "RAW_DIR", tmp_path / "raw_not_there")
     assert prune_archive.rule_raw(apply=True) == []
+
+
+# ---------- 917-33：is_dir 守卫钉住（非目录超额条目跳过并计数） ----------
+
+def test_non_dir_excess_entry_skipped_and_counted(monkeypatch):
+    """超额集合含非目录条目（名称最小必进超额）→ apply 时不删除、跳过计数 +1。"""
+    import tempfile, pathlib
+    root = pathlib.Path(tempfile.mkdtemp())
+    archive = root / "archive"
+    archive.mkdir()
+    (archive / "00_index.json").write_text("{}", encoding="utf-8")  # 名称最小→必进超额
+    for i in range(1, 21):
+        d = archive / f"2026_03_{i:02d}"
+        d.mkdir()
+        (d / "snap.txt").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(prune_archive, "ARCHIVE_DIR", archive)
+    monkeypatch.setattr(prune_archive, "ARCHIVE_KEEP", 20)
+    excess = prune_archive.rule_archive(apply=True)
+    assert (archive / "00_index.json").exists(), "非目录条目必须被守卫跳过"
+    assert len(excess) == 1 and excess[0].name == "00_index.json"

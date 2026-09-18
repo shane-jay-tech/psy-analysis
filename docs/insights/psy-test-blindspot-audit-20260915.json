@@ -1,0 +1,2896 @@
+{
+ "generated_at": "2026-09-15T01:49:29+08:00",
+ "method": "symbol-level-ast",
+ "total_src_modules": 244,
+ "blind_spots": [
+  {
+   "module": "src.version",
+   "path": "src/version.py",
+   "lines": 5,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.__init__",
+   "path": "src/__init__.py",
+   "lines": 0,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.analysis.advanced",
+   "path": "src/analysis/advanced.py",
+   "lines": 507,
+   "top_level_symbols": [
+    "AdvancedResult",
+    "ancova",
+    "mediation_analysis",
+    "moderation_analysis"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.anova",
+   "path": "src/analysis/anova.py",
+   "lines": 718,
+   "top_level_symbols": [
+    "ANOVAResult",
+    "one_way_anova",
+    "two_way_anova",
+    "repeated_measures_anova",
+    "welch_anova",
+    "mixed_anova"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.assumptions",
+   "path": "src/analysis/assumptions.py",
+   "lines": 165,
+   "top_level_symbols": [
+    "AssumptionResult",
+    "check_normality",
+    "check_normality_groups",
+    "check_homogeneity",
+    "check_sphericity"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.assumption_router",
+   "path": "src/analysis/assumption_router.py",
+   "lines": 385,
+   "top_level_symbols": [
+    "RouteDecision",
+    "check_route",
+    "to_dict",
+    "MethodAssumption",
+    "MethodAssumptionSet",
+    "get_assumption_set",
+    "describe_assumption_routes"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.cfa",
+   "path": "src/analysis/cfa.py",
+   "lines": 524,
+   "top_level_symbols": [
+    "CFAResult",
+    "confirmatory_factor_analysis",
+    "single_factor_cfa",
+    "multi_factor_cfa_compare"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.chi_square",
+   "path": "src/analysis/chi_square.py",
+   "lines": 144,
+   "top_level_symbols": [
+    "ChiSquareResult",
+    "chi_square_independence",
+    "chi_square_gof"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.contracts",
+   "path": "src/analysis/contracts.py",
+   "lines": 30,
+   "top_level_symbols": [
+    "AnalysisResult"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.correlation",
+   "path": "src/analysis/correlation.py",
+   "lines": 238,
+   "top_level_symbols": [
+    "CorrResult",
+    "correlation_matrix",
+    "partial_correlation",
+    "point_biserial_corr"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.data_quality",
+   "path": "src/analysis/data_quality.py",
+   "lines": 299,
+   "top_level_symbols": [
+    "DataQualityReport",
+    "handle_missing",
+    "data_quality_check"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.descriptive",
+   "path": "src/analysis/descriptive.py",
+   "lines": 84,
+   "top_level_symbols": [
+    "descriptive_stats",
+    "grouped_descriptive",
+    "frequency_table"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.effect_size_ci",
+   "path": "src/analysis/effect_size_ci.py",
+   "lines": 164,
+   "top_level_symbols": [
+    "fisher_z_ci",
+    "chi_square_v_ci",
+    "chi_square_w_ci",
+    "correlation_matrix_ci"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.factor_analysis",
+   "path": "src/analysis/factor_analysis.py",
+   "lines": 281,
+   "top_level_symbols": [
+    "EFAResult",
+    "exploratory_factor_analysis"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.hlm",
+   "path": "src/analysis/hlm.py",
+   "lines": 327,
+   "top_level_symbols": [
+    "HLMResult",
+    "run_hlm",
+    "format_hlm_report"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.logistic_regression",
+   "path": "src/analysis/logistic_regression.py",
+   "lines": 435,
+   "top_level_symbols": [
+    "LogisticResult",
+    "binary_logistic",
+    "ordinal_logistic",
+    "multinomial_logistic"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.manova",
+   "path": "src/analysis/manova.py",
+   "lines": 211,
+   "top_level_symbols": [
+    "MANOVAResult",
+    "manova"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.meta_analysis",
+   "path": "src/analysis/meta_analysis.py",
+   "lines": 333,
+   "top_level_symbols": [
+    "MetaResult",
+    "run_meta_analysis",
+    "format_meta_report"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.method_catalog",
+   "path": "src/analysis/method_catalog.py",
+   "lines": 156,
+   "top_level_symbols": [
+    "MethodDefinition",
+    "get_method_definition",
+    "resolve_method_id",
+    "get_table_route_group",
+    "get_card_builder_id",
+    "get_method_level",
+    "known_method_ids",
+    "canonical_id_map",
+    "validate_method_contracts"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.method_ids",
+   "path": "src/analysis/method_ids.py",
+   "lines": 15,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.analysis.method_recommender",
+   "path": "src/analysis/method_recommender.py",
+   "lines": 449,
+   "top_level_symbols": [
+    "MethodRecommendation",
+    "ResearchDesignInput",
+    "recommend_method",
+    "AnalysisRecipe",
+    "recommendation_to_recipe"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.nonparametric",
+   "path": "src/analysis/nonparametric.py",
+   "lines": 399,
+   "top_level_symbols": [
+    "NonParamResult",
+    "mann_whitney",
+    "wilcoxon_signed_rank",
+    "kruskal_wallis",
+    "friedman_test"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.post_hoc_power",
+   "path": "src/analysis/post_hoc_power.py",
+   "lines": 316,
+   "top_level_symbols": [
+    "pd_isnan",
+    "abs_arr_off_diag",
+    "estimate_post_hoc"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.regression",
+   "path": "src/analysis/regression.py",
+   "lines": 396,
+   "top_level_symbols": [
+    "RegressionResult",
+    "linear_regression",
+    "multiple_regression",
+    "hierarchical_regression"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.reliability",
+   "path": "src/analysis/reliability.py",
+   "lines": 496,
+   "top_level_symbols": [
+    "ReliabilityResult",
+    "cronbach_alpha",
+    "split_half_reliability",
+    "mcdonald_omega",
+    "composite_reliability",
+    "intraclass_correlation",
+    "test_retest_reliability",
+    "cohens_kappa",
+    "fleiss_kappa"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.result_card",
+   "path": "src/analysis/result_card.py",
+   "lines": 1395,
+   "top_level_symbols": [
+    "AnalysisResultCard",
+    "build_card_from_output"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.runner",
+   "path": "src/analysis/runner.py",
+   "lines": 1083,
+   "top_level_symbols": [
+    "run_analysis",
+    "register_custom_handler",
+    "export_snapshot"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.sem",
+   "path": "src/analysis/sem.py",
+   "lines": 252,
+   "top_level_symbols": [
+    "SEMResult",
+    "structural_equation_model"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.ttest",
+   "path": "src/analysis/ttest.py",
+   "lines": 342,
+   "top_level_symbols": [
+    "TTestResult",
+    "independent_ttest",
+    "paired_ttest",
+    "one_sample_ttest"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.validity",
+   "path": "src/analysis/validity.py",
+   "lines": 492,
+   "top_level_symbols": [
+    "ValidityResult",
+    "content_validity_index",
+    "average_variance_extracted",
+    "discriminant_fornell_larcker",
+    "discriminant_htmt",
+    "criterion_validity",
+    "known_groups_validity"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.analysis.__init__",
+   "path": "src/analysis/__init__.py",
+   "lines": 0,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.data.demo_datasets",
+   "path": "src/data/demo_datasets.py",
+   "lines": 172,
+   "top_level_symbols": [
+    "generate_demo_questionnaire_data",
+    "generate_demo_experiment_data",
+    "generate_demo_repeated_measures_data",
+    "generate_demo_multi_group_data",
+    "generate_demo_mediation_data"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.data.demo_datasets_hr",
+   "path": "src/data/demo_datasets_hr.py",
+   "lines": 348,
+   "top_level_symbols": [
+    "generate_demo_engagement_data",
+    "generate_demo_performance_data",
+    "generate_demo_turnover_data",
+    "generate_demo_360_review_data",
+    "list_hr_datasets"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.data.inspector",
+   "path": "src/data/inspector.py",
+   "lines": 115,
+   "top_level_symbols": [
+    "infer_column_type",
+    "inspect_dataframe",
+    "generate_missing_report"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.data.loader",
+   "path": "src/data/loader.py",
+   "lines": 508,
+   "top_level_symbols": [
+    "load_csv",
+    "load_excel",
+    "load_spss",
+    "load_jspsych_json",
+    "pivot_jspsych_to_wide",
+    "load_word_table",
+    "load_markdown_table",
+    "load_data",
+    "validate_data"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.data.transforms",
+   "path": "src/data/transforms.py",
+   "lines": 321,
+   "top_level_symbols": [
+    "TransformResult",
+    "compute_mean",
+    "compute_sum",
+    "compute_formula",
+    "reverse_score",
+    "recode_bins",
+    "recode_map",
+    "filter_by_condition",
+    "filter_outliers",
+    "filter_by_values"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.data.__init__",
+   "path": "src/data/__init__.py",
+   "lines": 0,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.experiment_design.design_engine",
+   "path": "src/experiment_design/design_engine.py",
+   "lines": 701,
+   "top_level_symbols": [
+    "ExperimentDesign",
+    "ExperimentDesignEngine"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.experiment_design.experiment_templates",
+   "path": "src/experiment_design/experiment_templates.py",
+   "lines": 551,
+   "top_level_symbols": [
+    "DesignTemplate",
+    "get_template",
+    "list_templates",
+    "recommend_template"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.experiment_design.jspsych_data_importer",
+   "path": "src/experiment_design/jspsych_data_importer.py",
+   "lines": 568,
+   "top_level_symbols": [
+    "JsPsychData",
+    "parse_jspsych_csv",
+    "parse_jspsych_json",
+    "to_wide_format",
+    "extract_condition_variables",
+    "get_summary_stats",
+    "get_trial_timeline"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.experiment_design.llm_engine",
+   "path": "src/experiment_design/llm_engine.py",
+   "lines": 300,
+   "top_level_symbols": [
+    "LLMEngineError",
+    "LLMResponseParseError",
+    "CancelledLLMError",
+    "cancel_design_request",
+    "design_experiment_llm",
+    "design_experiment_llm_async"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.experiment_design.power_analysis",
+   "path": "src/experiment_design/power_analysis.py",
+   "lines": 404,
+   "top_level_symbols": [
+    "PowerResult",
+    "calculate_sample_size",
+    "format_power_report",
+    "quick_sample_size"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.experiment_design.preregistration",
+   "path": "src/experiment_design/preregistration.py",
+   "lines": 496,
+   "top_level_symbols": [
+    "PreregistrationDoc",
+    "generate_preregistration",
+    "generate_preregistration_from_analysis",
+    "validate_preregistration"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.experiment_design.procedure_builder",
+   "path": "src/experiment_design/procedure_builder.py",
+   "lines": 441,
+   "top_level_symbols": [
+    "ExperimentProcedure",
+    "build_timeline",
+    "generate_randomization",
+    "generate_latin_square",
+    "generate_balanced_latin_square",
+    "generate_full_counterbalancing",
+    "generate_instructions",
+    "build_full_procedure"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.experiment_design.psychopy_generator",
+   "path": "src/experiment_design/psychopy_generator.py",
+   "lines": 513,
+   "top_level_symbols": [
+    "PsychoPyExperiment",
+    "generate_psychopy_script",
+    "generate_standard_paradigm",
+    "generate_latin_square_psychopy"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.experiment_design.script_generator",
+   "path": "src/experiment_design/script_generator.py",
+   "lines": 674,
+   "top_level_symbols": [
+    "JsPsychScript",
+    "generate_jspsych_script",
+    "convert_items_to_jspsych_likert",
+    "convert_instructions_to_jspsych"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.experiment_design.single_subject",
+   "path": "src/experiment_design/single_subject.py",
+   "lines": 424,
+   "top_level_symbols": [
+    "SingleSubjectDesign",
+    "SingleSubjectResult",
+    "create_ab_design",
+    "create_multiple_baseline_design",
+    "analyze_single_subject",
+    "analyze_multiple_behaviors",
+    "format_single_subject_report"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.experiment_design.__init__",
+   "path": "src/experiment_design/__init__.py",
+   "lines": 76,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature.bibtex_ris_io",
+   "path": "src/literature/bibtex_ris_io.py",
+   "lines": 206,
+   "top_level_symbols": [
+    "BibEntry",
+    "parse_bibtex",
+    "parse_ris",
+    "entries_to_bibtex",
+    "entries_to_ris"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature.evidence_record",
+   "path": "src/literature/evidence_record.py",
+   "lines": 151,
+   "top_level_symbols": [
+    "EvidenceRecord",
+    "EvidenceStore"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.paths",
+   "path": "src/literature_feed/paths.py",
+   "lines": 39,
+   "top_level_symbols": [
+    "ensure_dirs"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature_feed.review_queue_ui",
+   "path": "src/literature_feed/review_queue_ui.py",
+   "lines": 177,
+   "top_level_symbols": [
+    "QueueItem",
+    "QueueSummary",
+    "ReviewAction",
+    "build_queue_items",
+    "compute_queue_summary",
+    "filter_queue",
+    "format_review_event"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.review_service",
+   "path": "src/literature_feed/review_service.py",
+   "lines": 125,
+   "top_level_symbols": [
+    "ReviewDecision",
+    "RejectionReason",
+    "review_candidate",
+    "bulk_review_candidates",
+    "list_review_events"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.__init__",
+   "path": "src/literature_feed/__init__.py",
+   "lines": 28,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature_review.completeness",
+   "path": "src/literature_review/completeness.py",
+   "lines": 147,
+   "top_level_symbols": [
+    "CompletenessSubScore",
+    "CompletenessResult",
+    "calculate_completeness"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.ingest",
+   "path": "src/literature_review/ingest.py",
+   "lines": 148,
+   "top_level_symbols": [
+    "IngestedDoc",
+    "ingest_file",
+    "ingest_files"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.matrix",
+   "path": "src/literature_review/matrix.py",
+   "lines": 317,
+   "top_level_symbols": [
+    "create_matrix",
+    "add_literature_to_matrix",
+    "remove_literature_from_matrix",
+    "auto_fill_abstract_info",
+    "export_matrix_csv",
+    "render_matrix_html"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.models",
+   "path": "src/literature_review/models.py",
+   "lines": 260,
+   "top_level_symbols": [
+    "LiteratureItem",
+    "ReadingNote",
+    "ThemeCluster",
+    "GapAnalysis",
+    "LiteratureMatrix"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.notes",
+   "path": "src/literature_review/notes.py",
+   "lines": 157,
+   "top_level_symbols": [
+    "create_note",
+    "edit_note",
+    "delete_note",
+    "get_notes_by_literature",
+    "get_notes_by_theme",
+    "filter_notes_by_type",
+    "export_notes_markdown",
+    "notes_to_dict_list",
+    "notes_from_dict_list"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.review_import",
+   "path": "src/literature_review/review_import.py",
+   "lines": 177,
+   "top_level_symbols": [
+    "export_for_review",
+    "import_review_comments",
+    "apply_review_comments_to_state"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.search",
+   "path": "src/literature_review/search.py",
+   "lines": 249,
+   "top_level_symbols": [
+    "search_literature",
+    "deduplicate_by_doi",
+    "rank_by_relevance",
+    "rescore_existing_items",
+    "search_summary"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.summarize",
+   "path": "src/literature_review/summarize.py",
+   "lines": 137,
+   "top_level_symbols": [
+    "PaperSummary",
+    "summarize_paper",
+    "summarize_papers"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.synthesize",
+   "path": "src/literature_review/synthesize.py",
+   "lines": 158,
+   "top_level_symbols": [
+    "ReviewResult",
+    "synthesize_review"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.themes",
+   "path": "src/literature_review/themes.py",
+   "lines": 383,
+   "top_level_symbols": [
+    "auto_cluster_themes",
+    "cluster_themes_with_meta",
+    "identify_gaps",
+    "generate_gap_report"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_review.__init__",
+   "path": "src/literature_review/__init__.py",
+   "lines": 25,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.llm_gateway.active_config",
+   "path": "src/llm_gateway/active_config.py",
+   "lines": 95,
+   "top_level_symbols": [
+    "get_active_temperature",
+    "get_active_llm_config",
+    "is_llm_active"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.llm_gateway.gateway",
+   "path": "src/llm_gateway/gateway.py",
+   "lines": 959,
+   "top_level_symbols": [
+    "LLMUnavailableError",
+    "CancelledLLMError",
+    "LLMResponse",
+    "LLMTrace",
+    "estimate_cost_cny",
+    "get_trace_summary",
+    "clear_traces",
+    "set_cache_enabled",
+    "clear_cache",
+    "register_llm_backend",
+    "is_llm_available",
+    "chat_with_smart_fallback",
+    "cancel_request",
+    "llm_chat",
+    "llm_chat_stream",
+    "llm_chat_async_stream",
+    "llm_chat_async",
+    "FallbackResult",
+    "llm_chat_with_fallback"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.llm_gateway.quick_models",
+   "path": "src/llm_gateway/quick_models.py",
+   "lines": 191,
+   "top_level_symbols": [
+    "QuickModel",
+    "load_env_local",
+    "get_quick_model_by_id",
+    "get_quick_model_config",
+    "get_forced_temperature",
+    "list_available_quick_models"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.llm_gateway.__init__",
+   "path": "src/llm_gateway/__init__.py",
+   "lines": 54,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.output.ai_trace_detector",
+   "path": "src/output/ai_trace_detector.py",
+   "lines": 376,
+   "top_level_symbols": [
+    "TracePattern",
+    "TraceHit",
+    "AITraceReport",
+    "detect_ai_traces",
+    "score_ai_likelihood",
+    "rewrite_suggestion",
+    "render_report_markdown"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.apa_figures",
+   "path": "src/output/apa_figures.py",
+   "lines": 719,
+   "top_level_symbols": [
+    "APAFigure",
+    "generate_mean_se_figure",
+    "generate_group_comparison_figure",
+    "generate_scatter_figure",
+    "generate_repeated_measures_line",
+    "generate_interaction_plot",
+    "generate_regression_fit_figure",
+    "generate_mediation_path_figure",
+    "generate_reliability_item_figure",
+    "generate_regression_diagnostics_figure",
+    "generate_simple_slopes_figure",
+    "generate_factor_loading_heatmap",
+    "generate_figures_from_card"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.apa_tables",
+   "path": "src/output/apa_tables.py",
+   "lines": 875,
+   "top_level_symbols": [
+    "APATable",
+    "descriptive_stats_table",
+    "correlation_matrix_table",
+    "ttest_result_table",
+    "anova_result_table",
+    "regression_result_table",
+    "reliability_table",
+    "table_to_dataframe",
+    "table_to_markdown",
+    "table_to_csv",
+    "factor_loading_table",
+    "model_fit_table",
+    "hlm_result_table",
+    "nonparametric_result_table",
+    "chi_square_result_table",
+    "mediation_result_table",
+    "moderation_result_table",
+    "logistic_result_table",
+    "generate_tables_from_card"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.delivery_package",
+   "path": "src/output/delivery_package.py",
+   "lines": 144,
+   "top_level_symbols": [
+    "DeliverySpec",
+    "build_delivery_package"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.docx_exporter",
+   "path": "src/output/docx_exporter.py",
+   "lines": 1247,
+   "top_level_symbols": [
+    "ThesisMeta",
+    "FigureItem",
+    "plotly_figs_to_figure_items",
+    "build_thesis_with_custom_cover",
+    "count_protocol_placeholders",
+    "build_experiment_protocol_docx",
+    "build_thesis_docx",
+    "build_questionnaire_docx",
+    "build_review_docx",
+    "build_deliverable_docx"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.docx_styles",
+   "path": "src/output/docx_styles.py",
+   "lines": 40,
+   "top_level_symbols": [],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.output.formatter",
+   "path": "src/output/formatter.py",
+   "lines": 302,
+   "top_level_symbols": [
+    "format_result_summary",
+    "check_effect_size_required",
+    "build_apa7_report"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.interpretation",
+   "path": "src/output/interpretation.py",
+   "lines": 648,
+   "top_level_symbols": [
+    "generate_interpretation"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.learning_card",
+   "path": "src/output/learning_card.py",
+   "lines": 1682,
+   "top_level_symbols": [
+    "LearningCard",
+    "generate_learning_card",
+    "format_learning_card_text"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.output.pdf_exporter",
+   "path": "src/output/pdf_exporter.py",
+   "lines": 180,
+   "top_level_symbols": [
+    "PDFResult",
+    "convert_docx_to_pdf",
+    "check_pdf_availability"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.plotly_renderers",
+   "path": "src/output/plotly_renderers.py",
+   "lines": 159,
+   "top_level_symbols": [
+    "plotly_correlation_heatmap",
+    "plotly_interaction_plot",
+    "plotly_meta_forest"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.reasoning",
+   "path": "src/output/reasoning.py",
+   "lines": 664,
+   "top_level_symbols": [
+    "StepCheck",
+    "AnalysisReasoning",
+    "generate_reasoning"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.output.snapshot",
+   "path": "src/output/snapshot.py",
+   "lines": 254,
+   "top_level_symbols": [
+    "SnapshotConfig",
+    "create_snapshot",
+    "load_snapshot"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.output.zip_exporter",
+   "path": "src/output/zip_exporter.py",
+   "lines": 280,
+   "top_level_symbols": [
+    "build_deliverable_zip"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.output.__init__",
+   "path": "src/output/__init__.py",
+   "lines": 30,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.paper_writer.adapters",
+   "path": "src/paper_writer/adapters.py",
+   "lines": 157,
+   "top_level_symbols": [
+    "bundle_from_wizard_template",
+    "bundle_from_ai_result",
+    "bundle_from_paper_engine",
+    "bundle_with_selected_sections"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.ai_tutor",
+   "path": "src/paper_writer/ai_tutor.py",
+   "lines": 498,
+   "top_level_symbols": [
+    "TutorContext",
+    "ChatMessage",
+    "build_tutor_system_prompt",
+    "build_tutor_messages",
+    "TutorAPIError",
+    "chat_with_tutor",
+    "chat_with_tutor_stream",
+    "context_from_analysis",
+    "get_suggested_questions"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.bundle_export",
+   "path": "src/paper_writer/bundle_export.py",
+   "lines": 179,
+   "top_level_symbols": [
+    "ExportMeta",
+    "ExportResult",
+    "bundle_to_markdown",
+    "bundle_to_docx_args",
+    "bundle_to_export_result",
+    "validate_bundle_for_export"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.citation_in_text",
+   "path": "src/paper_writer/citation_in_text.py",
+   "lines": 96,
+   "top_level_symbols": [
+    "InTextCitationResult",
+    "format_in_text_citation",
+    "replace_inline_citations"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.defense_qa",
+   "path": "src/paper_writer/defense_qa.py",
+   "lines": 1023,
+   "top_level_symbols": [
+    "QAItem",
+    "generate_defense_qa",
+    "PaperAwareQAResult",
+    "generate_paper_aware_qa",
+    "render_qa_as_markdown",
+    "group_qa_by_difficulty",
+    "apply_mastered_state",
+    "calculate_mastery_progress",
+    "all_mastered",
+    "HandbookMeta",
+    "export_defense_handbook_pdf"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.defense_qa_kb",
+   "path": "src/paper_writer/defense_qa_kb.py",
+   "lines": 1713,
+   "top_level_symbols": [
+    "QATemplate",
+    "difficulty_emoji",
+    "difficulty_label"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.draft_bundle",
+   "path": "src/paper_writer/draft_bundle.py",
+   "lines": 75,
+   "top_level_symbols": [
+    "PaperSection",
+    "PaperDraftBundle"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.interactive_qa",
+   "path": "src/paper_writer/interactive_qa.py",
+   "lines": 236,
+   "top_level_symbols": [
+    "Question",
+    "QAResult",
+    "InteractiveQA"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.paper_writer.literature_crawler",
+   "path": "src/paper_writer/literature_crawler.py",
+   "lines": 921,
+   "top_level_symbols": [
+    "CrawledReference",
+    "CrawlResult",
+    "search_crossref",
+    "search_semantic_scholar",
+    "search_all",
+    "search_for_construct",
+    "recommend_literature",
+    "search_chinese_literature",
+    "search_idata",
+    "resolve_cnki_doi",
+    "clear_cache"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.literature_expansion",
+   "path": "src/paper_writer/literature_expansion.py",
+   "lines": 1556,
+   "top_level_symbols": [
+    "get_expansion_entries"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.paper_writer.literature_library",
+   "path": "src/paper_writer/literature_library.py",
+   "lines": 675,
+   "top_level_symbols": [
+    "get_total_entry_count",
+    "match_references",
+    "format_citation_apa7"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.literature_manager",
+   "path": "src/paper_writer/literature_manager.py",
+   "lines": 2007,
+   "top_level_symbols": [
+    "LiteratureEntry",
+    "LiteratureManager",
+    "validate_doi",
+    "autofill_from_doi",
+    "enrich_reference",
+    "CitationCheckResult",
+    "cross_check_citations",
+    "cross_check_references_list"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.literature_search_async",
+   "path": "src/paper_writer/literature_search_async.py",
+   "lines": 145,
+   "top_level_symbols": [
+    "CancelledSearchError",
+    "cancel_search_request",
+    "search_literature_with_online",
+    "search_literature_async"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.paper_engine",
+   "path": "src/paper_writer/paper_engine.py",
+   "lines": 1126,
+   "top_level_symbols": [
+    "PaperState",
+    "PaperEngine",
+    "generate_reviewer_questions",
+    "generate_revised_with_questions",
+    "generate_revised_with_questions_stream",
+    "polish_with_llm",
+    "polish_paper_sections"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.psychology_report_format",
+   "path": "src/paper_writer/psychology_report_format.py",
+   "lines": 74,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.paper_writer.research_deliverable",
+   "path": "src/paper_writer/research_deliverable.py",
+   "lines": 130,
+   "top_level_symbols": [
+    "ResearchDeliverableBundle"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.section_diff",
+   "path": "src/paper_writer/section_diff.py",
+   "lines": 144,
+   "top_level_symbols": [
+    "ParagraphDiff",
+    "SectionDiff",
+    "compute_section_diff"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.section_writers",
+   "path": "src/paper_writer/section_writers.py",
+   "lines": 996,
+   "top_level_symbols": [
+    "PaperContext",
+    "write_title",
+    "write_abstract",
+    "write_keywords",
+    "write_introduction",
+    "write_methods",
+    "write_results",
+    "write_discussion",
+    "write_references",
+    "UnusualResult",
+    "detect_unusual_results",
+    "generate_unusual_results_section",
+    "write_discussion_deep"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.paper_writer.workflow_service",
+   "path": "src/paper_writer/workflow_service.py",
+   "lines": 120,
+   "top_level_symbols": [
+    "QuickPaperRequest",
+    "PaperResult",
+    "generate_paper_quick",
+    "regenerate_section"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.paper_writer.__init__",
+   "path": "src/paper_writer/__init__.py",
+   "lines": 36,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.parser.intent_resolver",
+   "path": "src/parser/intent_resolver.py",
+   "lines": 303,
+   "top_level_symbols": [
+    "AnalysisPlan",
+    "resolve"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.parser.keyword_dict",
+   "path": "src/parser/keyword_dict.py",
+   "lines": 289,
+   "top_level_symbols": [],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.parser.tokenizer",
+   "path": "src/parser/tokenizer.py",
+   "lines": 76,
+   "top_level_symbols": [
+    "tokenize",
+    "tokenize_keep_numbers"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.parser.__init__",
+   "path": "src/parser/__init__.py",
+   "lines": 0,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.questionnaire.academic_literature",
+   "path": "src/questionnaire/academic_literature.py",
+   "lines": 455,
+   "top_level_symbols": [
+    "search_established_scales",
+    "get_academic_reference_for_construct",
+    "generate_academic_report"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.ai_content_review",
+   "path": "src/questionnaire/ai_content_review.py",
+   "lines": 575,
+   "top_level_symbols": [
+    "AIItemReviewResult",
+    "ai_content_review"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.construct_kb",
+   "path": "src/questionnaire/construct_kb.py",
+   "lines": 1199,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.questionnaire.construct_kb_extended",
+   "path": "src/questionnaire/construct_kb_extended.py",
+   "lines": 7,
+   "top_level_symbols": [],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.questionnaire.design_engine",
+   "path": "src/questionnaire/design_engine.py",
+   "lines": 567,
+   "top_level_symbols": [
+    "design_questionnaire",
+    "get_unreviewed_reverse_items"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.dimensions_paste_parser",
+   "path": "src/questionnaire/dimensions_paste_parser.py",
+   "lines": 370,
+   "top_level_symbols": [
+    "parse_indices_text",
+    "parse_dimensions_text"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.exporters",
+   "path": "src/questionnaire/exporters.py",
+   "lines": 572,
+   "top_level_symbols": [
+    "export_to_docx",
+    "export_to_pdf",
+    "build_questionnaire_pdf"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.import_cleaning",
+   "path": "src/questionnaire/import_cleaning.py",
+   "lines": 250,
+   "top_level_symbols": [
+    "ColumnClassification",
+    "ScaleDimension",
+    "CleaningLogEntry",
+    "CleaningResult",
+    "classify_columns",
+    "reverse_score",
+    "compute_dimension_scores",
+    "detect_invalid_responses",
+    "run_questionnaire_cleaning",
+    "export_cleaning_log"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.intent_recognizer",
+   "path": "src/questionnaire/intent_recognizer.py",
+   "lines": 552,
+   "top_level_symbols": [
+    "IntentCandidate",
+    "IntentResult",
+    "IntentStrategy",
+    "KeywordIntentStrategy",
+    "TFIDFIntentStrategy",
+    "LLMIntentStrategy",
+    "IntentRecognitionChain",
+    "create_default_chain",
+    "recognize_intent"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.questionnaire.items_loader",
+   "path": "src/questionnaire/items_loader.py",
+   "lines": 444,
+   "top_level_symbols": [
+    "ItemsDoc",
+    "parse_items_file",
+    "items_doc_from_lines"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.item_quality",
+   "path": "src/questionnaire/item_quality.py",
+   "lines": 934,
+   "top_level_symbols": [
+    "ItemQualityReport",
+    "check_item_quality",
+    "evaluate_reverse_item_naturalness",
+    "verify_semantic_polarity",
+    "verify_all_pairs",
+    "diagnose_reverse_item",
+    "DiscriminationReport",
+    "estimate_item_discrimination"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.item_templates",
+   "path": "src/questionnaire/item_templates.py",
+   "lines": 733,
+   "top_level_symbols": [
+    "get_recommended_template",
+    "generate_items_for_dimension"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.questionnaire.kb_search",
+   "path": "src/questionnaire/kb_search.py",
+   "lines": 359,
+   "top_level_symbols": [
+    "search_literature",
+    "verify_by_doi",
+    "clear_cache"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.llm_engine",
+   "path": "src/questionnaire/llm_engine.py",
+   "lines": 866,
+   "top_level_symbols": [
+    "LLMEngineError",
+    "LLMResponseParseError",
+    "CancelledLLMError",
+    "cancel_design_request",
+    "design_questionnaire_llm",
+    "rewrite_reverse_item_llm",
+    "rewrite_all_reverse_items",
+    "design_questionnaire_llm_async",
+    "clear_design_cache"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.llm_engine_premium",
+   "path": "src/questionnaire/llm_engine_premium.py",
+   "lines": 1640,
+   "top_level_symbols": [
+    "design_questionnaire_premium",
+    "design_questionnaire_direct",
+    "design_questionnaire_premium_async"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.psychometrics",
+   "path": "src/questionnaire/psychometrics.py",
+   "lines": 167,
+   "top_level_symbols": [
+    "content_validity_guidance",
+    "face_validity_checklist",
+    "construct_validity_guidance",
+    "reliability_guidance",
+    "social_desirability_guidance",
+    "generate_psychometric_report"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.questionnaire.report_generator",
+   "path": "src/questionnaire/report_generator.py",
+   "lines": 220,
+   "top_level_symbols": [
+    "generate_design_report",
+    "generate_design_summary"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.questionnaire.scale_guidance",
+   "path": "src/questionnaire/scale_guidance.py",
+   "lines": 110,
+   "top_level_symbols": [
+    "recommend_scale_points",
+    "get_anchor_labels",
+    "recommend_scoring",
+    "recommend_item_count",
+    "reverse_item_ratio"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.questionnaire.__init__",
+   "path": "src/questionnaire/__init__.py",
+   "lines": 0,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.templates.registry",
+   "path": "src/templates/registry.py",
+   "lines": 156,
+   "top_level_symbols": [
+    "ProjectTemplate",
+    "list_templates",
+    "get_template",
+    "create_project_from_template"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.templates.__init__",
+   "path": "src/templates/__init__.py",
+   "lines": 1,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.accessibility",
+   "path": "src/ui/accessibility.py",
+   "lines": 58,
+   "top_level_symbols": [
+    "render_accessibility_support"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.cleaning_wizard",
+   "path": "src/ui/cleaning_wizard.py",
+   "lines": 334,
+   "top_level_symbols": [
+    "CleaningStep",
+    "drop_rows_with_missing",
+    "drop_constant_columns",
+    "impute_mean",
+    "impute_median",
+    "winsorize_outliers",
+    "coerce_to_numeric",
+    "is_complex_missing_scenario",
+    "render_scope_panel",
+    "render_cleaning_wizard",
+    "cleaning_log_to_method_paragraph"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.deliverable_center_panel",
+   "path": "src/ui/deliverable_center_panel.py",
+   "lines": 321,
+   "top_level_symbols": [
+    "render_deliverable_center_panel",
+    "get_deliverable_bundle"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.design_system",
+   "path": "src/ui/design_system.py",
+   "lines": 406,
+   "top_level_symbols": [
+    "render_design_system"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.evidence_table_panel",
+   "path": "src/ui/evidence_table_panel.py",
+   "lines": 273,
+   "top_level_symbols": [
+    "render_evidence_table_panel",
+    "get_evidence_store"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.experiment_design_ui",
+   "path": "src/ui/experiment_design_ui.py",
+   "lines": 461,
+   "top_level_symbols": [
+    "render_experiment_design_ui"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.export_gate",
+   "path": "src/ui/export_gate.py",
+   "lines": 127,
+   "top_level_symbols": [
+    "collect_project_state",
+    "run_export_gate",
+    "render_export_gate"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.health_panel",
+   "path": "src/ui/health_panel.py",
+   "lines": 139,
+   "top_level_symbols": [
+    "render_health_sidebar",
+    "render_health_panel",
+    "check_export_allowed"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.ui.heavy_preload",
+   "path": "src/ui/heavy_preload.py",
+   "lines": 33,
+   "top_level_symbols": [
+    "preload_heavy_deps",
+    "start_heavy_preload_once"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.ui.html_safety",
+   "path": "src/ui/html_safety.py",
+   "lines": 20,
+   "top_level_symbols": [
+    "questionnaire_report_to_html_fragment"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.items_upload_panel",
+   "path": "src/ui/items_upload_panel.py",
+   "lines": 610,
+   "top_level_symbols": [
+    "render_items_upload_panel"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.literature_review_panel",
+   "path": "src/ui/literature_review_panel.py",
+   "lines": 957,
+   "top_level_symbols": [
+    "render_literature_review"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.literature_review_queue_panel",
+   "path": "src/ui/literature_review_queue_panel.py",
+   "lines": 219,
+   "top_level_symbols": [
+    "render_review_queue",
+    "render_review_sidebar_badge"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.ui.method_recommender_panel",
+   "path": "src/ui/method_recommender_panel.py",
+   "lines": 213,
+   "top_level_symbols": [
+    "render_method_recommender_panel",
+    "get_analysis_recipe",
+    "get_recommendation_for_deliverable",
+    "get_current_recommendation"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.navigation",
+   "path": "src/ui/navigation.py",
+   "lines": 31,
+   "top_level_symbols": [
+    "get_mode_index"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.next_step_panel",
+   "path": "src/ui/next_step_panel.py",
+   "lines": 41,
+   "top_level_symbols": [
+    "render_next_step_panel"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.onboarding",
+   "path": "src/ui/onboarding.py",
+   "lines": 274,
+   "top_level_symbols": [
+    "is_first_visit",
+    "mark_onboarding_done",
+    "skip_onboarding",
+    "restart_onboarding",
+    "render_onboarding_card",
+    "render_post_demo_highlight"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.paper_preview_panel",
+   "path": "src/ui/paper_preview_panel.py",
+   "lines": 208,
+   "top_level_symbols": [
+    "render_paper_preview",
+    "render_ai_diff_panel",
+    "render_export_panel"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.paper_writing_ui",
+   "path": "src/ui/paper_writing_ui.py",
+   "lines": 678,
+   "top_level_symbols": [
+    "render_paper_writing_ui"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.ui.project_panel",
+   "path": "src/ui/project_panel.py",
+   "lines": 291,
+   "top_level_symbols": [
+    "ensure_active_project_on_first_visit",
+    "render_project_panel"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.project_status_panel",
+   "path": "src/ui/project_status_panel.py",
+   "lines": 77,
+   "top_level_symbols": [
+    "render_project_status_panel"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.ui.questionnaire_import_panel",
+   "path": "src/ui/questionnaire_import_panel.py",
+   "lines": 209,
+   "top_level_symbols": [
+    "render_questionnaire_import_panel",
+    "get_cleaned_result",
+    "get_cleaning_log_for_deliverable"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.questionnaire_panel",
+   "path": "src/ui/questionnaire_panel.py",
+   "lines": 790,
+   "top_level_symbols": [
+    "render_questionnaire_page"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.ui.quick_entries",
+   "path": "src/ui/quick_entries.py",
+   "lines": 727,
+   "top_level_symbols": [
+    "render_quick_entry_homepage",
+    "render_quick_entry_detail"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.ui.renderers",
+   "path": "src/ui/renderers.py",
+   "lines": 757,
+   "top_level_symbols": [
+    "render_assumption",
+    "render_routing_banner",
+    "render_post_hoc_power",
+    "render_result_table",
+    "render_charts",
+    "export_html",
+    "export_csv"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.result_card_panel",
+   "path": "src/ui/result_card_panel.py",
+   "lines": 171,
+   "top_level_symbols": [
+    "render_result_card",
+    "render_result_card_from_card",
+    "render_result_cards_list"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.session_reset",
+   "path": "src/ui/session_reset.py",
+   "lines": 166,
+   "top_level_symbols": [
+    "clear_research_session"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.startup_checks",
+   "path": "src/ui/startup_checks.py",
+   "lines": 41,
+   "top_level_symbols": [
+    "run_once_startup_cleanup",
+    "run_once_env_check"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.state_keys",
+   "path": "src/ui/state_keys.py",
+   "lines": 34,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.state_store",
+   "path": "src/ui/state_store.py",
+   "lines": 122,
+   "top_level_symbols": [
+    "PaperDiffSelectionState",
+    "get_diff_selection",
+    "save_diff_selection",
+    "append_result_card",
+    "get_result_cards",
+    "set_health_check_result",
+    "is_export_allowed"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.template_center_panel",
+   "path": "src/ui/template_center_panel.py",
+   "lines": 289,
+   "top_level_symbols": [
+    "render_template_center_panel"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.undergrad_wizard",
+   "path": "src/ui/undergrad_wizard.py",
+   "lines": 3715,
+   "top_level_symbols": [
+    "render_pii_warning",
+    "render_common_mistake_warnings",
+    "render_assumption_failure_guidance",
+    "render_undergrad_wizard"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.upload_state",
+   "path": "src/ui/upload_state.py",
+   "lines": 40,
+   "top_level_symbols": [
+    "uploaded_file_identity",
+    "commit_loaded_dataset"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.upstream_panel",
+   "path": "src/ui/upstream_panel.py",
+   "lines": 847,
+   "top_level_symbols": [
+    "render_funnel",
+    "render_advanced_skip_form",
+    "warn_if_low_quality_reply"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.ui.__init__",
+   "path": "src/ui/__init__.py",
+   "lines": 0,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.upstream.feasibility_check",
+   "path": "src/upstream/feasibility_check.py",
+   "lines": 522,
+   "top_level_symbols": [
+    "check_falsifiability",
+    "check_measurability",
+    "OperabilityResult",
+    "check_operability",
+    "suggest_significance_reflection"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.upstream.routing",
+   "path": "src/upstream/routing.py",
+   "lines": 188,
+   "top_level_symbols": [
+    "RouteNotFoundError",
+    "resolve_route",
+    "list_all_routes",
+    "is_valid_route",
+    "get_phase_lifecycle",
+    "next_phase",
+    "validate_routing_table_at_startup"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.upstream.semantic_alignment",
+   "path": "src/upstream/semantic_alignment.py",
+   "lines": 416,
+   "top_level_symbols": [
+    "AlignmentWarning",
+    "AlignmentResult",
+    "check_alignment"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.upstream.socratic_benchmark",
+   "path": "src/upstream/socratic_benchmark.py",
+   "lines": 311,
+   "top_level_symbols": [
+    "JudgeScore",
+    "evaluate_with_judge",
+    "batch_evaluate_benchmark",
+    "compare_judge_vs_human"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.upstream.socratic_engine",
+   "path": "src/upstream/socratic_engine.py",
+   "lines": 473,
+   "top_level_symbols": [
+    "extract_theme_from_question",
+    "ask_socratic_stream",
+    "ask_socratic"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.upstream.tier",
+   "path": "src/upstream/tier.py",
+   "lines": 128,
+   "top_level_symbols": [
+    "ResearchTier",
+    "detect_tier_from_input",
+    "get_active_tier",
+    "set_active_tier",
+    "tier_at_least"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.upstream.topic_funnel",
+   "path": "src/upstream/topic_funnel.py",
+   "lines": 619,
+   "top_level_symbols": [
+    "FunnelStage",
+    "get_stage",
+    "get_stage_data",
+    "update_stage_data",
+    "advance_stage",
+    "go_to_stage",
+    "restart_funnel",
+    "complete_funnel",
+    "recognize_constructs",
+    "set_candidate_vars",
+    "FunnelBranch",
+    "get_funnel_history",
+    "archive_current_branch",
+    "archive_current_branch_and_restart",
+    "switch_to_branch",
+    "delete_branch",
+    "generate_motivation_qa_from_advanced"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.upstream.topic_funnel_kb",
+   "path": "src/upstream/topic_funnel_kb.py",
+   "lines": 511,
+   "top_level_symbols": [
+    "get_fallback_question",
+    "get_examples_by_domain",
+    "list_all_domains",
+    "list_all_examples",
+    "match_examples_by_semantics",
+    "render_examples_for_prompt"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.upstream.__init__",
+   "path": "src/upstream/__init__.py",
+   "lines": 24,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.utils.app_paths",
+   "path": "src/utils/app_paths.py",
+   "lines": 27,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.utils.archive_manager",
+   "path": "src/utils/archive_manager.py",
+   "lines": 198,
+   "top_level_symbols": [
+    "archive_analysis",
+    "list_archives",
+    "list_tags",
+    "load_archive",
+    "get_archive_count",
+    "get_tag_counts"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.autosave",
+   "path": "src/utils/autosave.py",
+   "lines": 259,
+   "top_level_symbols": [
+    "AutosaveStatus",
+    "FakeSessionState",
+    "flush_background",
+    "trigger_autosave",
+    "has_legacy_autosave",
+    "render_restore_prompt",
+    "get_active_workspace_status"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.autosave_bg",
+   "path": "src/utils/autosave_bg.py",
+   "lines": 141,
+   "top_level_symbols": [
+    "submit",
+    "drain_result",
+    "flush"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.cache_manager",
+   "path": "src/utils/cache_manager.py",
+   "lines": 148,
+   "top_level_symbols": [
+    "CacheEntry",
+    "CacheReport",
+    "scan_cache",
+    "clear_category",
+    "clear_all_cache",
+    "clear_expired",
+    "format_size"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.concurrency",
+   "path": "src/utils/concurrency.py",
+   "lines": 154,
+   "top_level_symbols": [
+    "ensure_tab_id",
+    "SessionLock",
+    "with_lock"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.environment_diagnosis",
+   "path": "src/utils/environment_diagnosis.py",
+   "lines": 163,
+   "top_level_symbols": [
+    "DiagnosisItem",
+    "EnvironmentDiagnosis",
+    "run_full_diagnosis",
+    "format_diagnosis_for_streamlit"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.env_check",
+   "path": "src/utils/env_check.py",
+   "lines": 338,
+   "top_level_symbols": [
+    "check_semopy",
+    "check_kaleido",
+    "check_factor_analyzer",
+    "check_llm_api",
+    "check_critical_deps",
+    "run_startup_check",
+    "render_env_status_toasts",
+    "deep_check_pdf_generation",
+    "deep_check_docx_generation",
+    "run_deep_environment_check",
+    "render_env_health_banner"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.error_messages",
+   "path": "src/utils/error_messages.py",
+   "lines": 160,
+   "top_level_symbols": [
+    "UserFriendlyError",
+    "table_generation_failed",
+    "privacy_precheck_blocked",
+    "llm_unavailable",
+    "pdf_unavailable",
+    "cfa_sem_not_converged",
+    "next_steps_empty",
+    "export_missing_dependency",
+    "format_error_for_streamlit"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.utils.evidence_quality",
+   "path": "src/utils/evidence_quality.py",
+   "lines": 352,
+   "top_level_symbols": [
+    "EvidenceGrade",
+    "CitationAuditIssue",
+    "EvidenceQualityReport",
+    "grade_evidence",
+    "audit_citations",
+    "generate_quality_report"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.export_naming",
+   "path": "src/utils/export_naming.py",
+   "lines": 41,
+   "top_level_symbols": [
+    "export_filename"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.feedback_logger",
+   "path": "src/utils/feedback_logger.py",
+   "lines": 175,
+   "top_level_symbols": [
+    "FeedbackEvent",
+    "FeedbackLogger",
+    "generate_diagnostic_package",
+    "clear_feedback_logs"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.figure_collection",
+   "path": "src/utils/figure_collection.py",
+   "lines": 202,
+   "top_level_symbols": [
+    "FigureEntry",
+    "FigureCollection",
+    "get_collection_from_session",
+    "set_collection_to_session"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.friendly_errors",
+   "path": "src/utils/friendly_errors.py",
+   "lines": 329,
+   "top_level_symbols": [
+    "FriendlyError",
+    "friendly_explain",
+    "is_unknown_error",
+    "build_help_request_markdown",
+    "render_friendly_error",
+    "friendly_handler"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.guardrails",
+   "path": "src/utils/guardrails.py",
+   "lines": 435,
+   "top_level_symbols": [
+    "GuardrailResult",
+    "check_variable_type_match",
+    "check_sample_size",
+    "check_multiple_comparisons",
+    "check_effect_size_present",
+    "hash_column",
+    "detect_name_columns",
+    "detect_pii_columns",
+    "redact_dataframe_for_storage"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.i18n",
+   "path": "src/utils/i18n.py",
+   "lines": 271,
+   "top_level_symbols": [
+    "get_test_name_zh"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.utils.instance_lock",
+   "path": "src/utils/instance_lock.py",
+   "lines": 146,
+   "top_level_symbols": [
+    "locked_user_prompt",
+    "ProjectLockedError",
+    "project_lock"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.llm_timer",
+   "path": "src/utils/llm_timer.py",
+   "lines": 104,
+   "top_level_symbols": [
+    "request_cancel",
+    "set_active_cancel_id",
+    "is_cancel_requested",
+    "clear_cancel",
+    "llm_status"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.utils.memory_manager",
+   "path": "src/utils/memory_manager.py",
+   "lines": 273,
+   "top_level_symbols": [
+    "estimate_session_state_memory",
+    "get_memory_summary",
+    "auto_cleanup_session_state",
+    "cleanup_literature_cache",
+    "cleanup_stale_cancel_ids",
+    "get_cache_stats",
+    "get_system_status",
+    "render_memory_manager_ui"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.method_exposure",
+   "path": "src/utils/method_exposure.py",
+   "lines": 64,
+   "top_level_symbols": [
+    "get_method_level",
+    "get_method_warning",
+    "is_safe_for_newbie",
+    "list_methods_by_level"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.next_step_engine",
+   "path": "src/utils/next_step_engine.py",
+   "lines": 392,
+   "top_level_symbols": [
+    "NextStep",
+    "evaluate_project_state",
+    "recommend_next_steps"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.perf_logger",
+   "path": "src/utils/perf_logger.py",
+   "lines": 111,
+   "top_level_symbols": [
+    "perf_timer",
+    "log_perf_event",
+    "read_perf_log",
+    "clear_perf_log",
+    "perf_summary"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.pipeline_manager",
+   "path": "src/utils/pipeline_manager.py",
+   "lines": 224,
+   "top_level_symbols": [
+    "PipelineStep",
+    "AnalysisPipeline",
+    "save_current_analysis_to_pipeline",
+    "replay_pipeline",
+    "export_pipeline",
+    "import_pipeline",
+    "clear_pipeline",
+    "render_pipeline_ui"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.privacy_ethics",
+   "path": "src/utils/privacy_ethics.py",
+   "lines": 194,
+   "top_level_symbols": [
+    "SensitiveFinding",
+    "scan_text_for_sensitive",
+    "redact_sensitive_text",
+    "scan_dataframe_for_sensitive",
+    "get_cache_dirs",
+    "clear_cache",
+    "export_pre_check"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.professional_consistency",
+   "path": "src/utils/professional_consistency.py",
+   "lines": 785,
+   "top_level_symbols": [
+    "ConsistencyIssue",
+    "check_consistency"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.project_health",
+   "path": "src/utils/project_health.py",
+   "lines": 137,
+   "top_level_symbols": [
+    "ProjectHealthIssue",
+    "run_health_checks",
+    "has_blocking_issues",
+    "issues_summary"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.project_manager",
+   "path": "src/utils/project_manager.py",
+   "lines": 375,
+   "top_level_symbols": [
+    "Project",
+    "list_projects",
+    "get_project",
+    "create_project",
+    "rename_project",
+    "update_note",
+    "delete_project",
+    "copy_project",
+    "touch_project",
+    "save_workspace",
+    "load_workspace",
+    "migrate_legacy_autosave",
+    "get_active_project_id",
+    "set_active_project",
+    "get_active_project"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.readiness_scorer",
+   "path": "src/utils/readiness_scorer.py",
+   "lines": 281,
+   "top_level_symbols": [
+    "ReadinessItem",
+    "ReadinessReport",
+    "compute_readiness"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.recent_files",
+   "path": "src/utils/recent_files.py",
+   "lines": 194,
+   "top_level_symbols": [
+    "load_index",
+    "save_dataset",
+    "restore_dataset",
+    "get_entry",
+    "clear_all",
+    "remove_one",
+    "load_recent",
+    "add_recent"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.usage_hooks",
+   "path": "src/utils/usage_hooks.py",
+   "lines": 92,
+   "top_level_symbols": [
+    "on_page_visit",
+    "on_template_select",
+    "on_next_step_show",
+    "on_next_step_click",
+    "on_data_upload",
+    "on_method_recommend",
+    "on_analysis_execute",
+    "on_table_generate",
+    "on_consistency_check",
+    "on_privacy_precheck",
+    "on_export",
+    "on_error_display",
+    "on_diagnosis_run",
+    "AnalysisTimer"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.utils.usage_logger",
+   "path": "src/utils/usage_logger.py",
+   "lines": 194,
+   "top_level_symbols": [
+    "set_enabled",
+    "is_enabled",
+    "log_event",
+    "log_error",
+    "get_usage_summary",
+    "get_error_summary",
+    "export_feedback_package",
+    "clear_logs"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.user_prefs",
+   "path": "src/utils/user_prefs.py",
+   "lines": 156,
+   "top_level_symbols": [
+    "load_prefs",
+    "save_prefs",
+    "update_pref",
+    "apply_to_session",
+    "sync_from_session",
+    "update_runtime_models",
+    "reset_prefs"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.workspace",
+   "path": "src/utils/workspace.py",
+   "lines": 841,
+   "top_level_symbols": [
+    "get_literature_review_state",
+    "set_literature_review_state",
+    "get_upstream_state",
+    "set_upstream_state",
+    "build_workspace_snapshot",
+    "FutureSchemaError",
+    "restore_workspace",
+    "update_last_position",
+    "get_last_position",
+    "humanize_elapsed",
+    "is_at_last_position"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.utils.workspace_state",
+   "path": "src/utils/workspace_state.py",
+   "lines": 256,
+   "top_level_symbols": [
+    "FunnelState",
+    "LiteratureReviewState",
+    "WizardState",
+    "AnalysisState",
+    "AdvancedMeta",
+    "UIState",
+    "WorkspaceState",
+    "get_workspace",
+    "set_workspace"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.visualization.charts",
+   "path": "src/visualization/charts.py",
+   "lines": 598,
+   "top_level_symbols": [
+    "bar_with_error",
+    "box_plot",
+    "contingency_heatmap",
+    "scatter_with_regression",
+    "correlation_heatmap",
+    "distribution_plot",
+    "qq_plot",
+    "forest_plot",
+    "scree_plot",
+    "mediation_diagram",
+    "interaction_plot"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.visualization.fonts",
+   "path": "src/visualization/fonts.py",
+   "lines": 63,
+   "top_level_symbols": [
+    "find_chinese_font",
+    "get_font_family",
+    "get_chinese_font"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.visualization.paper_export",
+   "path": "src/visualization/paper_export.py",
+   "lines": 352,
+   "top_level_symbols": [
+    "KaleidoMissingError",
+    "apply_paper_style",
+    "to_paper_png",
+    "to_paper_svg",
+    "get_palette_label",
+    "export_all_figures_zip"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.visualization.__init__",
+   "path": "src/visualization/__init__.py",
+   "lines": 0,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature_feed.extract.extractor",
+   "path": "src/literature_feed/extract/extractor.py",
+   "lines": 471,
+   "top_level_symbols": [
+    "ExtractionError",
+    "ExtractionStats",
+    "LLMExtractor"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.extract.grounding",
+   "path": "src/literature_feed/extract/grounding.py",
+   "lines": 64,
+   "top_level_symbols": [
+    "quote_in_abstract",
+    "parse_llm_json"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.extract.headless_llm",
+   "path": "src/literature_feed/extract/headless_llm.py",
+   "lines": 89,
+   "top_level_symbols": [
+    "resolve_headless_model",
+    "make_headless_llm_chat"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.extract.prompts",
+   "path": "src/literature_feed/extract/prompts.py",
+   "lines": 106,
+   "top_level_symbols": [
+    "build_construct_prompt",
+    "build_method_prompt"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.extract.__init__",
+   "path": "src/literature_feed/extract/__init__.py",
+   "lines": 42,
+   "top_level_symbols": [
+    "extract_for_article"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.fetchers.base",
+   "path": "src/literature_feed/fetchers/base.py",
+   "lines": 128,
+   "top_level_symbols": [
+    "FetchError",
+    "SchemaChangedError",
+    "RateLimitedError",
+    "RawArticle",
+    "FetchResult",
+    "SourceConfig",
+    "SourceFetcher"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.fetchers.crossref",
+   "path": "src/literature_feed/fetchers/crossref.py",
+   "lines": 180,
+   "top_level_symbols": [
+    "CrossrefFetcher"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.fetchers.manual_ingest",
+   "path": "src/literature_feed/fetchers/manual_ingest.py",
+   "lines": 196,
+   "top_level_symbols": [
+    "detect_input_type",
+    "parse_citation_text",
+    "ManualIngestFetcher"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.fetchers.psy_science_official",
+   "path": "src/literature_feed/fetchers/psy_science_official.py",
+   "lines": 272,
+   "top_level_symbols": [
+    "PsyScienceOfficialFetcher"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.fetchers.__init__",
+   "path": "src/literature_feed/fetchers/__init__.py",
+   "lines": 24,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature_feed.parsers.csl_normalizer",
+   "path": "src/literature_feed/parsers/csl_normalizer.py",
+   "lines": 268,
+   "top_level_symbols": [
+    "normalize_iso_date",
+    "coerce_authors",
+    "extract_iohr_hits",
+    "crossref_to_raw"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.parsers.meta_tag_parser",
+   "path": "src/literature_feed/parsers/meta_tag_parser.py",
+   "lines": 82,
+   "top_level_symbols": [
+    "parse_citation_meta",
+    "extract_keywords_from_meta"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.parsers.__init__",
+   "path": "src/literature_feed/parsers/__init__.py",
+   "lines": 21,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature_feed.scheduler.bootstrap_check",
+   "path": "src/literature_feed/scheduler/bootstrap_check.py",
+   "lines": 133,
+   "top_level_symbols": [
+    "BootstrapDecision",
+    "evaluate",
+    "maybe_trigger_async",
+    "last_async_result",
+    "is_running"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.scheduler.daily_runner",
+   "path": "src/literature_feed/scheduler/daily_runner.py",
+   "lines": 674,
+   "top_level_symbols": [
+    "build_fetcher",
+    "SourceSummary",
+    "RunSummary",
+    "DailyRunner",
+    "run_daily"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.scheduler.lock_manager",
+   "path": "src/literature_feed/scheduler/lock_manager.py",
+   "lines": 227,
+   "top_level_symbols": [
+    "LockBusyError",
+    "LockManager"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.scheduler.__init__",
+   "path": "src/literature_feed/scheduler/__init__.py",
+   "lines": 36,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature_feed.scheduler.__main__",
+   "path": "src/literature_feed/scheduler/__main__.py",
+   "lines": 90,
+   "top_level_symbols": [],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.literature_feed.storage.budget_tracker",
+   "path": "src/literature_feed/storage/budget_tracker.py",
+   "lines": 218,
+   "top_level_symbols": [
+    "estimate_cost_usd",
+    "BudgetExceededError",
+    "BudgetTracker"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.storage.feed_store",
+   "path": "src/literature_feed/storage/feed_store.py",
+   "lines": 666,
+   "top_level_symbols": [
+    "ArticleRow",
+    "CandidateRow",
+    "normalize_title",
+    "normalize_doi",
+    "normalize_keyword",
+    "utc_now_iso",
+    "hash_abstract",
+    "FeedStore"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.storage.jsonl_archive",
+   "path": "src/literature_feed/storage/jsonl_archive.py",
+   "lines": 98,
+   "top_level_symbols": [
+    "sha256_text",
+    "JsonlArchive"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.storage.migrations",
+   "path": "src/literature_feed/storage/migrations.py",
+   "lines": 129,
+   "top_level_symbols": [
+    "run_migrations"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.storage.__init__",
+   "path": "src/literature_feed/storage/__init__.py",
+   "lines": 14,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature_feed.trend.aggregator",
+   "path": "src/literature_feed/trend/aggregator.py",
+   "lines": 130,
+   "top_level_symbols": [
+    "TrendRow",
+    "compute_keyword_trends",
+    "compute_domain_summary"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.trend.domain_weights",
+   "path": "src/literature_feed/trend/domain_weights.py",
+   "lines": 196,
+   "top_level_symbols": [
+    "DomainWeights"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.trend.method_weights",
+   "path": "src/literature_feed/trend/method_weights.py",
+   "lines": 169,
+   "top_level_symbols": [
+    "MethodWeights"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.trend.scorer",
+   "path": "src/literature_feed/trend/scorer.py",
+   "lines": 213,
+   "top_level_symbols": [
+    "compute_recency_decay",
+    "compute_domain_score",
+    "compute_method_score",
+    "compute_priority_score",
+    "update_candidate_scores"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.trend.trending_weights",
+   "path": "src/literature_feed/trend/trending_weights.py",
+   "lines": 329,
+   "top_level_symbols": [
+    "TrendingEntry",
+    "TrendingWeights",
+    "compute_trending_weights",
+    "write_trending_yaml",
+    "load_trending_weights",
+    "load_default_trending"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.trend.__init__",
+   "path": "src/literature_feed/trend/__init__.py",
+   "lines": 92,
+   "top_level_symbols": [
+    "default_weights_path",
+    "load_default_weights",
+    "default_method_weights_path",
+    "load_default_method_weights"
+   ],
+   "verdict": "covered"
+  },
+  {
+   "module": "src.literature_feed.ui.feed_panel",
+   "path": "src/literature_feed/ui/feed_panel.py",
+   "lines": 882,
+   "top_level_symbols": [
+    "render_literature_feed"
+   ],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.literature_feed.ui.__init__",
+   "path": "src/literature_feed/ui/__init__.py",
+   "lines": 5,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  },
+  {
+   "module": "src.ui.pages.privacy_gate",
+   "path": "src/ui/pages/privacy_gate.py",
+   "lines": 42,
+   "top_level_symbols": [
+    "render_privacy_gate"
+   ],
+   "verdict": "blind"
+  },
+  {
+   "module": "src.ui.pages.__init__",
+   "path": "src/ui/pages/__init__.py",
+   "lines": 1,
+   "top_level_symbols": [],
+   "verdict": "covered_by_module_name"
+  }
+ ]
+}
