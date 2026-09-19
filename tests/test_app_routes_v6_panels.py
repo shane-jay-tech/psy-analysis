@@ -59,7 +59,11 @@ class TestV6PanelStateIntegration:
         assert store is not None
         assert _STORE_KEY in state
 
-    def test_questionnaire_panel_writes_to_state(self):
+    def test_questionnaire_import_panel_state_starts_empty(self):
+        # s919-21 改名：原名 test_questionnaire_panel_writes_to_state 名不副实——
+        # 本例 import 的是 src.ui.questionnaire_import_panel（问卷"导入"面板），
+        # 与 src/ui/questionnaire_panel.py（问卷面板本体，目前零测试）是两个模块；
+        # 且断言的是空 state 下的读取结果，并没有验证写入。见 s918-28 结果「遗留 1」。
         from src.ui.questionnaire_import_panel import (
             _CLEANED_KEY, _RAW_DF_KEY, _DIMENSIONS_KEY,
             get_cleaned_result, get_cleaning_log_for_deliverable,
