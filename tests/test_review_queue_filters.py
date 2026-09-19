@@ -216,3 +216,62 @@ def test_service_failure_becomes_an_error_and_does_not_rerun(monkeypatch, fake_s
     assert fake_st.errors == ["审核失败: db locked"]
     assert fake_st.successes == []
     assert fake_st.reruns == 0
+
+
+# ───────────── s920-04：四种决策的成功文案分型（只改回显，落库参数一字未动） ─────────────
+def _ok_review(fake_st, svc, decision, **kw):
+    fake_st.successes.clear()                              # 每次只看这一条回显
+    with pytest.raises(RerunRequested):
+        pnl._do_review(FakeStore([]), 21, decision, **kw)
+    assert len(fake_st.successes) == 1
+    return fake_st.successes[0]
+
+
+def test_each_decision_gets_its_own_sentence_naming_the_object(fake_st, svc):
+    msgs = {
+        "approved": _ok_review(fake_st, svc, "approved", title="工作压力与绩效"),
+        "deferred": _ok_review(fake_st, svc, "deferred", title="工作压力与绩效"),
+        "rejected": _ok_review(fake_st, svc, "rejected", title="工作压力与绩效",
+                              rejection_reason="weak_evidence"),
+        "merged": _ok_review(fake_st, svc, "merged", title="工作压力与绩效", target_kb_id="kb-7"),
+    }
+
+    assert len(set(msgs.values())) == 4                        # 四句彼此不同
+    assert all("工作压力与绩效" in m for m in msgs.values())    # 每条都说得出动了哪篇
+    assert msgs["approved"] == "已纳入《工作压力与绩效》"
+    assert msgs["deferred"] == "已标记《工作压力与绩效》为待定"
+    assert msgs["rejected"].startswith("已排除《工作压力与绩效》")
+    assert msgs["rejected"] == "已排除《工作压力与绩效》（原因：证据薄弱）"   # 回显中文标签，不是内部键
+    assert msgs["merged"].endswith("→ 目标 kb-7")
+
+
+def test_missing_title_falls_back_to_the_bare_status_label(fake_st, svc):
+    for title in (None, "", "   "):
+        fake_st.successes.clear()
+        svc.clear()
+        assert _ok_review(fake_st, svc, "approved", title=title) == "已纳入"   # 绝不渲染空的《》
+
+
+def test_the_new_copy_argument_never_reaches_the_persistence_layer(fake_st, svc):
+    with pytest.raises(RerunRequested):
+        pnl._do_review(FakeStore([]), 31, "merged", title="只给我看", target_kb_id="kb-9")
+
+    cid, decision, reviewer, kw = svc[-1]
+    assert (cid, decision, reviewer) == (31, "merged", "user")
+    assert kw == {"rejection_reason": None, "target_kb_id": "kb-9"}   # 落库参数与改前完全同形
+    assert "title" not in kw and "只给我看" not in repr(svc)
+
+
+def test_validation_gate_still_runs_before_any_copy(fake_st, svc):
+    """文案分型不许把校验挤后：validate 不过 ⇒ 零入库、零 success。"""
+    pnl._do_review(FakeStore([]), 41, "merged", title="有标题也不给过")
+
+    assert svc == [] and fake_st.successes == []
+    assert fake_st.errors == ["合并操作必须选择目标文献"]
+
+
+def test_unknown_decision_still_echoes_instead_of_inventing_a_sentence(fake_st, svc):
+    from src.literature_feed.review_queue_ui import review_success_message
+
+    assert review_success_message("ship_it", title="X") == "ship_it"
+    assert review_success_message("ship_it") == "ship_it"

@@ -20,6 +20,7 @@ from src.literature_feed.review_queue_ui import (
     compute_queue_summary,
     filter_queue,
     format_review_event,
+    review_success_message,
 )
 from src.literature_feed.review_service import (
     ReviewDecision,
@@ -143,11 +144,11 @@ def _render_review_actions(store: Any, item: QueueItem) -> None:
 
     with cols[0]:
         if st.button("✅ 纳入", key=f"approve_{item.candidate_id}"):
-            _do_review(store, item.candidate_id, "approved")
+            _do_review(store, item.candidate_id, "approved", title=item.title)
 
     with cols[1]:
         if st.button("⏸️ 待定", key=f"defer_{item.candidate_id}"):
-            _do_review(store, item.candidate_id, "deferred")
+            _do_review(store, item.candidate_id, "deferred", title=item.title)
 
     with cols[2]:
         reason = st.selectbox(
@@ -157,7 +158,8 @@ def _render_review_actions(store: Any, item: QueueItem) -> None:
             key=f"reject_reason_{item.candidate_id}",
         )
         if st.button("❌ 排除", key=f"reject_{item.candidate_id}"):
-            _do_review(store, item.candidate_id, "rejected", rejection_reason=reason)
+            _do_review(store, item.candidate_id, "rejected", rejection_reason=reason,
+                       title=item.title)
 
     with cols[3]:
         target = st.text_input("合并目标 ID", key=f"merge_target_{item.candidate_id}")
@@ -165,7 +167,8 @@ def _render_review_actions(store: Any, item: QueueItem) -> None:
             if not target:
                 st.error("合并操作必须填写目标文献 ID")
             else:
-                _do_review(store, item.candidate_id, "merged", target_kb_id=target)
+                _do_review(store, item.candidate_id, "merged", target_kb_id=target,
+                           title=item.title)
 
 
 def _do_review(
@@ -175,8 +178,12 @@ def _do_review(
     *,
     rejection_reason: str | None = None,
     target_kb_id: str | None = None,
+    title: str | None = None,
 ) -> None:
-    """执行审核操作（带前端校验）。"""
+    """执行审核操作（带前端校验）。
+
+    `title` 只用于回显文案，不进 `ReviewAction`、不落库。
+    """
     action = ReviewAction(
         candidate_id=candidate_id,
         decision=decision,
@@ -196,7 +203,12 @@ def _do_review(
             rejection_reason=rejection_reason,
             target_kb_id=target_kb_id,
         )
-        st.success(STATUS_LABELS.get(decision, decision))
+        st.success(review_success_message(
+            decision,
+            title=title,
+            target_kb_id=target_kb_id,
+            rejection_reason=rejection_reason,
+        ))
         st.rerun()
     except Exception as e:
         st.error(f"审核失败: {e}")

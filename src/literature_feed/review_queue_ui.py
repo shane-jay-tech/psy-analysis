@@ -83,6 +83,34 @@ class QueueSummary:
         return (self.total - self.pending) / self.total
 
 
+def review_success_message(
+    decision: str,
+    *,
+    title: str | None = None,
+    target_kb_id: str | None = None,
+    rejection_reason: str | None = None,
+) -> str:
+    """审核成功后的回显文案（s920-04：四种决策不再共用一句光秃秃的状态词）。
+
+    只做展示：决策白名单、落库参数、`ReviewAction.validate` 一概不经过这里。
+    标题拿不到（空/None）就退回 `STATUS_LABELS` 的原短句，**不渲染空的《》**。
+    """
+    label = STATUS_LABELS.get(decision, decision)
+    name = (title or "").strip()
+    if not name:
+        return label
+    if decision == "approved":
+        return f"已纳入《{name}》"
+    if decision == "rejected":
+        reason = REJECTION_REASON_LABELS.get(rejection_reason or "", rejection_reason or "")
+        return f"已排除《{name}》（原因：{reason}）" if reason else f"已排除《{name}》"
+    if decision == "deferred":
+        return f"已标记《{name}》为待定"
+    if decision == "merged":
+        return f"已合并《{name}》→ 目标 {target_kb_id}"
+    return label
+
+
 @dataclass
 class ReviewAction:
     """一次审核操作的参数包。"""
