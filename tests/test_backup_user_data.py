@@ -1,0 +1,119 @@
+"""scripts/backup_user_data.py 备份三分支特征化测试（s918-35）。
+
+钉住现状：create 落 zip / prune 按 keep 截断 / verify 双向校验。
+备份根与用户目录全部 monkeypatch 到 tmp，真实 D:/code/backups 零触碰。
+"""
+import zipfile
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from scripts import backup_user_data as bud
+
+STAMPS = [f"2026{m:02d}01-000000" for m in range(1, 13)]
+
+
+@pytest.fixture
+def sandbox(tmp_path, monkeypatch):
+    projects = tmp_path / "home" / ".psy_analysis" / "projects"
+    (projects / "p1").mkdir(parents=True)
+    (projects / "p1" / "notes.md").write_text("note", encoding="utf-8")
+    feed = tmp_path / "repo" / "data" / "literature_feed" / "feed.sqlite"
+    feed.parent.mkdir(parents=True)
+    feed.write_bytes(b"fake-sqlite")
+    root = tmp_path / "backups"
+    monkeypatch.setattr(bud, "PROJECTS_DIR", projects)
+    monkeypatch.setattr(bud, "FEED_DB", feed)
+    monkeypatch.setattr(bud, "BACKUP_ROOT", root)
+    return SimpleNamespace(projects=projects, feed=feed, root=root)
+
+
+def _seed_archives(root: Path, stamps=STAMPS):
+    root.mkdir(parents=True, exist_ok=True)
+    for stamp in stamps:
+        (root / f"psy-{stamp}.zip").write_bytes(b"PK")
+    return sorted(root.glob("psy-*.zip"))
+
+
+def test_create_backup_packs_projects_tree_and_feed_db(sandbox):
+    out = bud.create_backup()
+
+    assert out.parent == sandbox.root
+    assert out.name.startswith("psy-") and out.suffix == ".zip"
+    with zipfile.ZipFile(out) as zf:
+        names = [n.replace("\\", "/") for n in zf.namelist()]
+    assert "literature_feed/feed.sqlite" in names
+    # arcname 相对 PROJECTS_DIR.parent，故 ".psy_analysis" 这一层不进归档名
+    assert "projects/p1/notes.md" in names
+
+
+def test_verify_accepts_archive_right_after_create(sandbox, capsys):
+    out = bud.create_backup()
+
+    bud.verify(out)
+
+    assert "verify ok" in capsys.readouterr().out
+
+
+def test_prune_keeps_newest_and_removes_oldest(sandbox):
+    seeded = _seed_archives(sandbox.root)
+
+    removed = bud.prune(keep=10)
+
+    assert removed == 2
+    assert sorted(sandbox.root.glob("psy-*.zip")) == seeded[2:]
+    assert (sandbox.root / "psy-20261201-000000.zip").exists()
+    assert not (sandbox.root / "psy-20260101-000000.zip").exists()
+    assert not (sandbox.root / "psy-20260201-000000.zip").exists()
+
+
+def test_prune_with_fewer_archives_than_keep_deletes_nothing(sandbox):
+    seeded = _seed_archives(sandbox.root, STAMPS[:3])
+
+    assert bud.prune() == 0
+    assert sorted(sandbox.root.glob("psy-*.zip")) == seeded
+
+
+def test_prune_keep_zero_clears_the_whole_root(sandbox):
+    """keep=0 会清空备份根——无下限保护，防线在调用方（默认 KEEP=10）。"""
+    _seed_archives(sandbox.root, STAMPS[:3])
+
+    assert bud.prune(keep=0) == 3
+    assert list(sandbox.root.glob("psy-*.zip")) == []
+
+
+def test_verify_rejects_crc_corrupted_member(sandbox, tmp_path):
+    bogus = tmp_path / "psy-bogus.zip"
+    with zipfile.ZipFile(bogus, "w", zipfile.ZIP_STORED) as zf:
+        zf.writestr("payload.txt", "hello")
+    raw = bytearray(bogus.read_bytes())
+    raw[raw.index(b"hello"):raw.index(b"hello") + 5] = b"HELLO"
+    bogus.write_bytes(bytes(raw))
+
+    with pytest.raises(AssertionError, match="corrupt member"):
+        bud.verify(bogus)
+
+
+def test_verify_rejects_archive_carrying_directory_entries(sandbox, tmp_path):
+    """含目录项的 zip 过不了 verify：extractall 不落文件，计数必然小于 namelist。"""
+    with_dirs = tmp_path / "psy-dirs.zip"
+    with zipfile.ZipFile(with_dirs, "w") as zf:
+        zf.writestr("payload.txt", "hello")
+        zf.writestr("empty_dir/", "")
+
+    with pytest.raises(AssertionError, match=r"extracted 1 != entries 2"):
+        bud.verify(with_dirs)
+
+
+def test_create_backup_degrades_loudly_when_sources_missing(sandbox, capsys):
+    sandbox.projects.replace(sandbox.root.parent / "elsewhere")
+    sandbox.feed.unlink()
+
+    out = bud.create_backup()
+
+    printed = capsys.readouterr().out
+    assert out.exists()
+    assert "projects dir missing" in printed and "feed db missing" in printed
+    with zipfile.ZipFile(out) as zf:
+        assert zf.namelist() == []

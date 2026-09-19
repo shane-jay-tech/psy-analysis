@@ -126,3 +126,55 @@ def test_original_json_guard_trips_when_bytes_change(isolated, monkeypatch):
     monkeypatch.setattr(mod.json, "dumps", tampering_dumps)
     with pytest.raises(AssertionError, match="原始基准 JSON 发生了变化"):
         mod.apply_sidecar(bench_path=bench, sidecar_path=sidecar)
+
+
+# ---------- s918-12 追加：同路径并发与 .bak 残留语义（不改生产实现，锁现状） ----------
+
+def _bench_copy(tmp_path, name):
+    dst = tmp_path / name
+    dst.write_bytes(BENCH.read_bytes())
+    return dst
+
+
+def test_first_write_leaves_no_bak_and_second_backs_it_up(isolated):
+    """顺序两写：首写不留 .bak；第二写先把首写整份备份为 `.json.bak` 再覆写。"""
+    bench, sidecar = isolated
+    bak = sidecar.with_suffix(".json.bak")
+
+    mod.apply_sidecar(bench_path=bench, sidecar_path=sidecar)
+    assert sidecar.exists() and not bak.exists()
+    first = sidecar.read_bytes()
+
+    mod.apply_sidecar(bench_path=bench, sidecar_path=sidecar)
+
+    assert bak.exists() and bak.read_bytes() == first
+    assert sidecar.read_bytes() == first          # 同源幂等：覆写内容与首写逐字相同
+    assert sidecar.read_text(encoding="utf-8").count('"source_sha256"') == 1
+
+
+def test_concurrent_same_path_never_yields_a_torn_result(tmp_path):
+    """同路径并发 last-writer-wins 的**不变量**：最终 side-car 必须是某一位写入者的整份产物，
+    不得混合、不得半成品；失败形态允许为 Windows 读写争用下的 PermissionError（备份读被占）。"""
+    import concurrent.futures
+
+    target = tmp_path / "sidecar.json"
+    a = _bench_copy(tmp_path, "bench_a.json")
+    b = _bench_copy(tmp_path, "bench_b.json")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(mod.apply_sidecar, bench_path=a, sidecar_path=target),
+                   pool.submit(mod.apply_sidecar, bench_path=b, sidecar_path=target)]
+        outcomes = [f for f in futures]
+        results, errors = [], []
+        for f in outcomes:
+            try:
+                results.append(f.result())
+            except Exception as e:            # 允许 PermissionError；其余异常一律当缺陷
+                errors.append(e)
+
+    assert len(results) >= 1, f"两位写入者全部失败: {errors}"
+    assert all(isinstance(e, PermissionError) for e in errors), f"出现非争用型异常: {errors}"
+    final = json.loads(target.read_text(encoding="utf-8"))
+    assert final["source_file"] in {"bench_a.json", "bench_b.json"}
+    assert final["n_entries"] == 30 and len(final["entries"]) == 30
+    assert {r["source_file"] for r in results} | {final["source_file"]} <= {"bench_a.json", "bench_b.json"}
