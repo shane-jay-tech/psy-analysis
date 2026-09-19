@@ -64,7 +64,8 @@ def test_wildcard_search_is_the_last_resort(monkeypatch, tmp_path):
     assert fnt.find_chinese_font() == os.path.join(str(root), "msyh.ttc")
 
 
-def test_returns_none_when_nothing_found_though_annotated_str(monkeypatch, tmp_path):
+def test_returns_none_when_nothing_found(monkeypatch, tmp_path):
+    """旧名后缀「though_annotated_str」记的是注解与实现不符；s919-07 已把注解改成 Optional[str]，后缀失去意义。"""
     _fake_fs(monkeypatch, tmp_path, existing=set(), glob_hits=[])
 
     assert fnt.find_chinese_font() is None
@@ -79,14 +80,36 @@ def test_returns_none_when_nothing_found_though_annotated_str(monkeypatch, tmp_p
         ("simhei.ttf", "SimHei"),
         ("simsun.ttc", "SimSun"),
         ("simkai.ttf", "KaiTi"),
-        ("Deng.ttf", "sans-serif"),
-        ("msjh.ttc", "sans-serif"),
+        ("Deng.ttf", "DengXian"),                  # s919-07 翻正（原钉 sans-serif＝方框现状）
+        ("Dengb.ttf", "DengXian"),                 # 等线粗体同名族
+        ("msjh.ttc", "Microsoft JhengHei"),        # s919-07 翻正（微软正黑体）
     ],
 )
-def test_family_name_mapping_only_knows_four_families(monkeypatch, tmp_path, filename, family):
+def test_family_name_mapping_covers_six_families(monkeypatch, tmp_path, filename, family):
+    """族名字符串取自本机 Fonts 目录的 name 表 ID=1（fontTools 实测），不是猜的别名。"""
     root = _fake_fs(monkeypatch, tmp_path, existing={filename})
 
     assert fnt.get_font_family() == family
+
+
+def test_only_unknown_font_falls_back_to_sans_serif(monkeypatch, tmp_path):
+    """六个族名之外的字体仍须落回 sans-serif（翻正不能顺手放宽兜底）。"""
+    _fake_fs(monkeypatch, tmp_path, existing={"arial.ttf"})
+
+    assert fnt.get_font_family() == "sans-serif"
+
+
+def test_find_chinese_font_annotation_is_optional():
+    """`find_chinese_font()` 一直可能返回 None，注解 s919-07 起改为 Optional[str]。
+
+    钉注解而非行为（行为由 `test_returns_none_when_nothing_found` 覆盖）：
+    注解与实现不符会让调用方按 str 做字符串拼接而静默炸。
+    """
+    import typing
+
+    ret = typing.get_type_hints(fnt.find_chinese_font)["return"]
+    args = typing.get_args(ret)
+    assert type(None) in args, f"返回注解应允许 None，实得 {ret}"
 
 
 def test_chinese_font_name_is_cached_after_first_call(monkeypatch, tmp_path):

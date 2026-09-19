@@ -2,12 +2,14 @@
 
 import os
 import glob
+from typing import Optional
 
 
-def find_chinese_font() -> str:
+def find_chinese_font() -> Optional[str]:
     """
     在 Windows 系统上查找可用的中文字体。
-    优先级：微软雅黑 > SimHei > SimSun > KaiTi
+    优先级：微软雅黑 > SimHei > SimSun > KaiTi > 微软正黑体 > 等线（DengXian）
+    找不到返回 None（调用方 `get_font_family()` 会落回 "sans-serif"）。
     """
     font_dir = os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts")
 
@@ -47,6 +49,10 @@ def get_font_family() -> str:
         return "SimSun"
     elif font_path and "simkai" in font_path.lower():
         return "KaiTi"
+    elif font_path and "msjh" in font_path.lower():
+        return "Microsoft JhengHei"
+    elif font_path and "deng" in font_path.lower():
+        return "DengXian"
     else:
         return "sans-serif"
 
