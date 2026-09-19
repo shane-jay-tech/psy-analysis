@@ -23,8 +23,10 @@ import src.ui.questionnaire_import_panel as qip
 import src.ui.questionnaire_panel as qp
 
 
-class PageStopped(Exception):
-    """建模真实 st.stop() 的抛异常语义。"""
+class PageStopped(BaseException):
+    """建模真实 `st.stop()`：它抛 `StopException`，基类是 **`BaseException`**
+    （`streamlit/runtime/scriptrunner_utils/exceptions.py:22`）⇒ 业务侧 `except Exception` 吞不掉。
+    假 st 的 stop 只返回等于把"提前终止"钉成"继续往下跑"。"""
 
 
 class StrictSt:
