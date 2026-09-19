@@ -10,6 +10,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from src.output.learning_card import generate_learning_card
+from src.analysis.reliability_bands import (ACCEPTABLE, EXCELLENT, EXPLORATORY, GOOD, UNACCEPTABLE)
 
 
 @dataclass
@@ -274,7 +275,9 @@ TEST_TEMPLATES: Dict[str, Dict[str, Any]] = {
         ],
         "guide": (
             "当前α="
-            "α ≥ 0.90 优秀；0.80-0.90 良好；0.70-0.80 可接受；0.60-0.70 探索性边界；< 0.60 不可接受。"
+            f"α ≥ {EXCELLENT.text} {EXCELLENT.label}；{GOOD.text}-{EXCELLENT.text} {GOOD.label}；"
+            f"{ACCEPTABLE.text}-{GOOD.text} {ACCEPTABLE.label}；{EXPLORATORY.text}-{ACCEPTABLE.text} "
+            f"{EXPLORATORY.label}；< {UNACCEPTABLE.text} {UNACCEPTABLE.label}。"
             "查看'删除后α'：若删除某题后α显著上升，说明该题可能质量较差。"
             "题总相关(CITC)应 ≥ 0.30，否则建议删除该题。"
         ),
@@ -649,7 +652,7 @@ _RELIABILITY_MAIN_LABEL = {
 def _strip_uninjected_alpha(guide: str, replacement: str = "") -> str:
     """处理「当前α=」占位符：有实测值就注入，拿不到就整段去掉。
 
-    留裸标记会渲染成「当前α=α ≥ 0.90 优秀」这种连着读的句子，所以三条出口
+    留裸标记会渲染成「当前α=α ≥ 阈值 优秀」这种连着读的句子，所以三条出口
     （result 为 None / 结果对象没有 alpha 字段 / 有值）都必须经过这里。
     """
     return guide.replace("当前α=", replacement)

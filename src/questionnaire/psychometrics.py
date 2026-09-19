@@ -2,6 +2,8 @@
 
 from typing import Dict
 
+from src.analysis.reliability_bands import ACCEPTABLE, EXCELLENT, GOOD, UNACCEPTABLE
+
 
 def content_validity_guidance(construct: dict) -> str:
     """
@@ -99,10 +101,10 @@ def reliability_guidance(construct: dict) -> str:
     """
     return (
         "**内部一致性信度 (Cronbach's α)：**\n"
-        "- α ≥ 0.90：优秀\n"
-        "- α ≥ 0.80：良好\n"
-        "- α ≥ 0.70：可接受（探索性研究可放宽至0.60）\n"
-        "- α < 0.60：需要修订\n\n"
+        f"- α ≥ {EXCELLENT.text}：优秀\n"
+        f"- α ≥ {GOOD.text}：良好\n"
+        f"- α ≥ {ACCEPTABLE.text}：可接受（探索性研究可放宽至{UNACCEPTABLE.text}）\n"
+        f"- α < {UNACCEPTABLE.text}：需要修订\n\n"
         "注意事项：\n"
         "1. α受题量影响，题量多α偏高。推荐同时报告平均题间相关 (0.15-0.50为理想)\n"
         "2. 每个维度应单独计算α，而非整个量表一个α\n"
