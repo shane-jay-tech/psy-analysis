@@ -49,14 +49,24 @@ cd /d/code/psy-analysis
 .venv/Scripts/python.exe -m pytest -m "not online and not benchmark" --ignore=tests/test_playwright_e2e.py --ignore=tests/test_e2e_v52_paths.py -q > /tmp/mix.txt 2>&1; tail -3 /tmp/mix.txt
 ```
 
-## 四、一个能解释当年现象的替代假设（**未证实，仅登记**）
+## 四、替代假设**已实跑演示**（1 秒复现，不必全量重跑）
 
-`autosave.py:128` 注册的 `flush_background(5.0)` 会在 **pytest 打完汇总行之后**再阻塞最多 5 秒（等后台保存队列排空）。
-如果当时的人是用 **`pytest -q | head -20`** 这类**提前关闭管道**的方式看结果，
-`head` 退出让管道关闭，尾行（以及那 5 秒的等待期间任何输出）就可能**看起来"被吞"**——
-即问题在**读取方式**而不是 pytest。这与"影响所有『看汇总行』的场景"的描述吻合（人会反复看不到尾行）。
-验证：`cd /d/code/psy-analysis && .venv/Scripts/python.exe -m pytest -q 2>&1 | head -20`（应看不到尾行）
-vs 落盘后再 `tail`（应看得到）。**本单未跑该验证**（全量重跑一次要 4-5 分钟，留给日间或下一班顺手做）。
+`autosave.py:128` 注册的 `flush_background(5.0)` 会在 **pytest 打完汇总行之后**再阻塞最多 5 秒（等后台保存队列排空）；
+但真正让尾行消失的动作在**读取端**——只要看结果的人用了提前关闭管道的读法。三组对照（同一子集，`tests/test_error_messages.py`）：
+
+```
+E1  .venv/Scripts/python.exe -m pytest tests/test_error_messages.py -q 2>&1 | head -1
+    → 只剩进度行「............  [100%]」，**汇总行不见了**（与 9/13 描述的现象一致）
+E2  同命令 > /tmp/e2.txt 2>&1; tail -1 /tmp/e2.txt
+    → 「12 passed in 0.07s」完好
+E3  ... 2>&1 | head -2 | tail -1
+    → 「12 passed in 0.61s」出现（总输出本就 2 行，没截到）
+```
+
+⇒ **机制成立**：管道被提前关闭时，pytest 的剩余输出（含汇总行）静默消失，也没有 BrokenPipe 报错回显。
+⚠️ 结论限定：这只证明"**可以**这样被吞"，**不证明** 9/13 那次就是读法造成的——
+当年那条命令有没有接 `head`/`grep -m`/`tee`，已无从考证。
+本节的可用产出是给后续排查者一条顺序：**先确认读法，再去查 conftest/atexit**。
 
 ## 五、顺带产出的基线数字（供对账引用）
 
