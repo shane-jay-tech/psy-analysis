@@ -115,13 +115,34 @@ def test_assumption_checks_stay_empty_without_a_result_object():
     assert "p=0.01" in ar.assumption_checks[0].detail
 
 
-def test_alpha_injection_is_currently_a_noop_placeholder_missing_from_templates():
-    """`_build_guide` 用 replace("当前α=", ...) 注入实测 α，但**没有任何模板含这个占位**，
-    注入永不生效；α 值不进解读指南。本例钉住该缺陷，补占位后会失败——届时翻正。"""
-    ar = generate_reasoning(_out("cronbach_alpha", "信度", result=SimpleNamespace(alpha=0.82)))
+def test_alpha_placeholder_gets_injected_with_the_computed_value():
+    """s919-03 翻正（原钉「模板缺占位符 ⇒ replace 永不命中、α 不进指南」）：现在注入生效。
 
-    assert ar.interpretation_guide == TEST_TEMPLATES["cronbach_alpha"]["guide"]
-    assert "0.82" not in ar.interpretation_guide
+    第三条断言用模板反算，钉的是"只换了占位符、解读档位文字一字未动"——
+    统计档位（0.90/0.80/0.70/0.60）与 CITC 阈值属数值结论，本单不碰。
+    """
+    ar = generate_reasoning(_out("cronbach_alpha", "信度", result=SimpleNamespace(alpha=0.82)))
+    guide = ar.interpretation_guide
+
+    assert guide.startswith("当前α=0.82，")
+    assert "当前α=α ≥" not in guide                       # 裸占位符已被替换，不会连着读成"当前α=α ≥ 0.90"
+    assert guide == TEST_TEMPLATES["cronbach_alpha"]["guide"].replace("当前α=", "当前α=0.82，")
+
+
+@pytest.mark.parametrize(
+    "result",
+    [None, SimpleNamespace()],
+    ids=["result_is_none", "result_without_alpha"],
+)
+def test_bare_alpha_marker_never_reaches_the_user(result):
+    """拿不到实测 α 的两条出口（result 为 None／结果对象没有 alpha 字段）必须把裸占位符去掉。
+
+    补占位符的副作用就是这个：漏一条出口，用户会读到「当前α=α ≥ 0.90 优秀」这种连着读的句子。
+    """
+    guide = generate_reasoning(_out("cronbach_alpha", "信度", result=result)).interpretation_guide
+
+    assert "当前α=" not in guide
+    assert guide.startswith("α ≥ 0.90 优秀")
 
 
 def test_effect_size_appends_only_when_guide_lacks_the_word():

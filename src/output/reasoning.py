@@ -273,6 +273,7 @@ TEST_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "逐题分析（α-if-item-deleted 和 题总相关）",
         ],
         "guide": (
+            "当前α="
             "α ≥ 0.90 优秀；0.80-0.90 良好；0.70-0.80 可接受；0.60-0.70 探索性边界；< 0.60 不可接受。"
             "查看'删除后α'：若删除某题后α显著上升，说明该题可能质量较差。"
             "题总相关(CITC)应 ≥ 0.30，否则建议删除该题。"
@@ -635,17 +636,28 @@ def _build_assumption_checks(result, assumptions: dict) -> List[StepCheck]:
     return checks
 
 
+def _strip_uninjected_alpha(guide: str, replacement: str = "") -> str:
+    """处理「当前α=」占位符：有实测值就注入，拿不到就整段去掉。
+
+    留裸标记会渲染成「当前α=α ≥ 0.90 优秀」这种连着读的句子，所以三条出口
+    （result 为 None / 结果对象没有 alpha 字段 / 有值）都必须经过这里。
+    """
+    return guide.replace("当前α=", replacement)
+
+
 def _build_guide(tmpl: dict, result, test_type: str) -> str:
     """构建解读指南，可插入结果对象中的实际值"""
     guide = tmpl.get("guide", "请查看上方的统计结果表格和检验指标。")
 
     # 插入诊断信息
     if result is None:
-        return guide
+        return _strip_uninjected_alpha(guide)
 
     # Cronbach's α 插入实际值
-    if test_type == "cronbach_alpha" and hasattr(result, "alpha"):
-        guide = guide.replace("当前α=", f"当前α={result.alpha}，")
+    if test_type == "cronbach_alpha":
+        guide = _strip_uninjected_alpha(
+            guide, f"当前α={result.alpha}，" if hasattr(result, "alpha") else ""
+        )
 
     # 插入效应量信息
     es_info = ""
