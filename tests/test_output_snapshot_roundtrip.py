@@ -3,6 +3,7 @@
 全程 `tmp_path`，不碰真实导出目录；不联网。
 锚点：src/output/snapshot.py:34 create_snapshot、:240 _serialize_dict（254 行）。
 """
+import io
 import json
 import zipfile
 
@@ -50,14 +51,35 @@ def test_zip_members_are_the_documented_four_names(out):
         assert sorted(zf.namelist()) == ["README.txt", "analysis_params.json", "data.csv", "report.md"]
 
 
-def test_returns_bytes_and_writes_the_same_content(out):
-    blob = create_snapshot(DF, PARAMS, report_text="x")
+def test_returned_bytes_equal_the_file_written_in_the_same_call(out):
+    """改写说明（s919-21 收口时修，本仓内我此前埋的用例）：
+
+    前一版调了 **两次** `create_snapshot`（一次取返回 bytes、一次写文件）再比字节，
+    全量跑里间歇性翻红。真因不是 zip 头，而是 `analysis_params.json` 里嵌了
+    `snapshot_created`（微秒精度 ISO 时间，实测两次调用只差这一个键），
+    即"两次调用的内容本来就不同"，拿它当"同一份内容"是错的断言前提。
+
+    于是按语义拆成两条真不变量：
+    ① 同一次调用：返回的 bytes 与落盘文件逐字节相同（实测成立）；
+    ② 跨次调用：唯一差异必然落在 `snapshot_created` 上，其余成员逐字节相同。
+    """
+    blob = create_snapshot(DF, PARAMS, report_text="x", output_path=str(out))
 
     assert isinstance(blob, bytes)
-    create_snapshot(DF, PARAMS, report_text="x", output_path=str(out))
+    assert out.parent.exists()                               # 父目录 nested/ 被自动创建
+    assert out.read_bytes() == blob                          # ① 同一次调用：返回值==落盘字节
 
-    assert out.read_bytes() == blob                      # 父目录 nested/ 被自动创建
-    assert out.parent.exists()
+    def members(src):
+        with zipfile.ZipFile(src) as zf:
+            return {n: zf.read(n) for n in sorted(zf.namelist())}
+
+    other = create_snapshot(DF, PARAMS, report_text="x")
+    m1, m2 = members(io.BytesIO(blob)), members(io.BytesIO(other))
+    assert m1.keys() == m2.keys()
+    assert {k for k in m1 if m1[k] != m2[k]} == {"analysis_params.json"}   # ② 只有 params 变
+    p1, p2 = json.loads(m1["analysis_params.json"]), json.loads(m2["analysis_params.json"])
+    assert {k for k in p1 if p1[k] != p2.get(k)} == {"snapshot_created"}   # 且只因这个时间戳键
+    assert p1["snapshot_created"] != p2["snapshot_created"]
 
 
 def test_serialize_dict_truncates_at_depth_greater_than_three():
