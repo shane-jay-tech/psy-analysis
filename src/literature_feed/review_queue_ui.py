@@ -10,22 +10,30 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence
 
 
-# 状态 → 展示映射
-STATUS_LABELS = {
-    "pending": "待审核",
-    "approved": "已纳入",
-    "rejected": "已排除",
-    "deferred": "待定",
-    "merged": "已合并",
+# 状态 → (图标, 标签)。**单一表**：加一个决策只改这一行。
+# 改前是 label 表与 icon 表两张平行字典靠手工对齐，加一个决策要改两处（`done(s919-02)` 遗留 1）。
+REVIEW_STATUSES: dict[str, tuple[str, str]] = {
+    "pending": ("🔵", "待审核"),
+    "approved": ("✅", "已纳入"),
+    "rejected": ("❌", "已排除"),
+    "deferred": ("⏸️", "待定"),
+    "merged": ("🔗", "已合并"),
 }
 
-STATUS_ICONS = {
-    "pending": "🔵",
-    "approved": "✅",
-    "rejected": "❌",
-    "deferred": "⏸️",
-    "merged": "🔗",
-}
+
+def status_label(status: str) -> str:
+    """未知状态**原样回显**（下拉框里的"全部"这类哨兵值就走这条，改前是 `label 表.get(x, x)`）。"""
+    return REVIEW_STATUSES.get(status, ("", status))[1]
+
+
+def status_icon(status: str) -> str:
+    """未知状态给空串（改前是 `icon 表.get(x, "")`）。"""
+    return REVIEW_STATUSES.get(status, ("", ""))[0]
+
+
+def status_keys() -> list[str]:
+    """状态枚举的展示顺序 = 表定义顺序。"""
+    return list(REVIEW_STATUSES)
 
 REJECTION_REASON_LABELS = {
     "irrelevant_domain": "领域不相关",
@@ -55,11 +63,11 @@ class QueueItem:
 
     @property
     def status_label(self) -> str:
-        return STATUS_LABELS.get(self.status, self.status)
+        return status_label(self.status)
 
     @property
     def status_icon(self) -> str:
-        return STATUS_ICONS.get(self.status, "")
+        return status_icon(self.status)
 
     @property
     def display_title(self) -> str:
@@ -93,9 +101,9 @@ def review_success_message(
     """审核成功后的回显文案（s920-04：四种决策不再共用一句光秃秃的状态词）。
 
     只做展示：决策白名单、落库参数、`ReviewAction.validate` 一概不经过这里。
-    标题拿不到（空/None）就退回 `STATUS_LABELS` 的原短句，**不渲染空的《》**。
+    标题拿不到（空/None）就退回 `status_label` 的原短句，**不渲染空的《》**。
     """
-    label = STATUS_LABELS.get(decision, decision)
+    label = status_label(decision)
     name = (title or "").strip()
     if not name:
         return label
@@ -196,8 +204,8 @@ def format_review_event(event: dict) -> dict[str, str]:
     return {
         "时间": event.get("created_at", ""),
         "审核人": event.get("reviewer", ""),
-        "操作": STATUS_LABELS.get(event.get("new_status", ""), event.get("new_status", "")),
-        "原状态": STATUS_LABELS.get(event.get("old_status", ""), event.get("old_status", "")),
+        "操作": status_label(event.get("new_status", "")),
+        "原状态": status_label(event.get("old_status", "")),
         "原因": REJECTION_REASON_LABELS.get(
             event.get("reason", ""), event.get("reason", "")
         ),

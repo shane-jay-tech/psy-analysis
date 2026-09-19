@@ -15,12 +15,13 @@ from src.literature_feed.review_queue_ui import (
     QueueSummary,
     ReviewAction,
     REJECTION_REASON_LABELS,
-    STATUS_LABELS,
     build_queue_items,
     compute_queue_summary,
     filter_queue,
     format_review_event,
     review_success_message,
+    status_keys,
+    status_label,
 )
 from src.literature_feed.review_service import (
     ReviewDecision,
@@ -94,8 +95,8 @@ def _render_filters(items: list[QueueItem]) -> list[QueueItem]:
     with col1:
         status_filter = st.selectbox(
             "状态筛选",
-            options=["全部"] + list(STATUS_LABELS.keys()),
-            format_func=lambda x: STATUS_LABELS.get(x, "全部"),
+            options=["全部"] + status_keys(),
+            format_func=status_label,
             key="rq_status_filter",
         )
     with col2:

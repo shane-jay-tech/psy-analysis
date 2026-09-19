@@ -158,3 +158,46 @@ class TestFormatReviewEvent:
         assert formatted["操作"] == "已纳入"
         assert formatted["原状态"] == "待审核"
         assert formatted["备注"] == "质量不错"
+
+
+# ─────────── s920-03：状态表合口（一张表派生 icon/label，加状态只改一行） ───────────
+def test_status_table_is_the_only_source_for_both_views():
+    from src.literature_feed.review_queue_ui import (
+        REVIEW_STATUSES,
+        status_icon,
+        status_keys,
+        status_label,
+    )
+
+    assert status_keys() == list(REVIEW_STATUSES) == ["pending", "approved", "rejected", "deferred", "merged"]
+    assert all(len(v) == 2 and v[0] and v[1] for v in REVIEW_STATUSES.values())
+    for key, (icon, label) in REVIEW_STATUSES.items():
+        assert (status_icon(key), status_label(key)) == (icon, label)     # 两个视图同源，不可能再分叉
+
+
+def test_unknown_status_keeps_the_two_legacy_fallbacks_apart():
+    from src.literature_feed.review_queue_ui import status_icon, status_label
+
+    assert status_label("全部") == "全部"       # 标签：原样回显（下拉哨兵值靠这个）
+    assert status_icon("全部") == ""           # 图标：给空串（不硬造一个表情）
+
+
+def test_queue_item_views_and_history_formatting_all_read_the_same_table():
+    from src.literature_feed.review_queue_ui import (
+        QueueItem,
+        format_review_event,
+        status_icon,
+        status_label,
+    )
+
+    item = QueueItem(candidate_id=1, title="T", source="arxiv", status="merged", relevance_score=0.5)
+
+    assert item.status_label == status_label("merged") == "已合并"
+    assert item.status_icon == status_icon("merged") == "🔗"
+    assert item.display_title == "🔗 T"                        # 图标＋标题的组合方式没变
+
+    evt = {"created_at": "2026-09-20T03:00:00Z", "reviewer": "user", "new_status": "approved",
+           "old_status": "pending", "rejection_reason": None, "candidate_id": 1}
+    out = format_review_event(evt)
+
+    assert out["操作"] == "已纳入" and out["原状态"] == "待审核"
