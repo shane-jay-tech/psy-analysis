@@ -78,17 +78,20 @@ def test_is_stale_uses_margin_on_both_sides_of_ttl(tmp_path):
     因此不能拿"mtime 正好等于 ttl"当断言点：`os.utime` 里取的 `time.time()` 与 `is_stale()` 里那次
     之间必然已过去若干微秒，age 恒 > ttl ⇒ 断"不陈旧"会随机/近乎必然地红（本用例前一版正是这个坑，
     全量跑里稳定失败，s919-22 收口时改写成两侧留裕量）。
-    没走"注入时钟"是因为 psy 有后台 autosave 线程，patch 全局 `time.time` 会牵连别人。
+    没走"注入时钟"是因为 psy 有后台 autosave 线程，patch 全局 `time.time` 会牵连别人
+    （`lmk.time` 就是全局 time 模块，monkeypatch 它没有"只限本模块"的效果）。
+    s920-24 复查：裕量从 1 秒提到 50 秒——上一版 `ttl=10 / mtime=now-9` 的"不陈旧"侧只剩 1 秒余量，
+    全量跑里一次 GC 或 CPU 抢占就能翻红；`>` 与 `>=` 的边界语义本用例**测不到**（要测得给 SUT 加时钟接缝）。
     """
     path = _lock_file(tmp_path)
-    mgr = LockManager(path, ttl_seconds=10)
+    mgr = LockManager(path, ttl_seconds=100)
     path.write_text("\n", encoding="utf-8")
 
-    os.utime(path, (time.time() - 9, time.time() - 9))
-    assert mgr.is_stale() is False                     # ttl 内 1 秒：必不陈旧
+    os.utime(path, (time.time() - 50, time.time() - 50))
+    assert mgr.is_stale() is False                     # 距 ttl 还有 50 秒：必不陈旧
 
-    os.utime(path, (time.time() - 15, time.time() - 15))
-    assert mgr.is_stale() is True                      # 超 ttl 5 秒：必陈旧
+    os.utime(path, (time.time() - 150, time.time() - 150))
+    assert mgr.is_stale() is True                      # 超 ttl 50 秒：必陈旧
 
 
 def test_break_stale_deletes_only_when_stale(tmp_path):
