@@ -605,8 +605,9 @@ def _render_ai_item_review_form(df, numeric_cols, cat_cols):
                     st.success(f"✅ KB 命中：{construct_name}")
                 else:
                     st.info("ℹ️ KB 未命中（仅用用户定义）")
-            except Exception:
-                pass
+            except Exception as exc:
+                # s919-13：原先 `except Exception: pass` 把代码异常伪装成"KB 未命中"（s918-27 遗留段）
+                st.warning(f"⚠️ KB 查询失败（{type(exc).__name__}: {str(exc)[:120]}），本轮仅用你的定义")
 
     if kb_def:
         with st.expander("📚 KB 参考定义（仅供对照，不会自动覆盖你的定义）", expanded=False):
@@ -718,8 +719,9 @@ def _run_quick_analysis(df, test_type: str, dv: str = None, iv: str = None,
             }
             archive_analysis(df, output, report_md, params,
                            tag=tag, file_name=st.session_state.get("file_name", ""))
-        except Exception:
-            pass
+        except Exception as exc:
+            # s919-13：原先静默 pass ⇒ 用户看到结果却不知道没存档（s918-27 遗留段 L721）
+            st.warning(f"⚠️ 结果已生成，但归档失败（{type(exc).__name__}: {str(exc)[:120]}）")
 
     # 清除快捷入口，让正常流程渲染结果
     st.session_state.pop("quick_entry", None)

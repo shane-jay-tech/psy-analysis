@@ -35,6 +35,7 @@ class FakeStreamlit:
     def __init__(self):
         self.session_state = FakeState()
         self.reruns = 0
+        self.warnings = []
 
     @contextmanager
     def spinner(self, *args, **kwargs):
@@ -43,6 +44,10 @@ class FakeStreamlit:
     def rerun(self):
         self.reruns += 1
         raise RerunRequested()
+
+    def warning(self, msg):
+        # s919-13：归档/KB 失败现在要出声（quick_entries 的两处 st.warning），故假 st 得收得住
+        self.warnings.append(msg)
 
     def __getattr__(self, name):
         raise AssertionError(f"本单不该触发页面渲染: st.{name}")
@@ -112,8 +117,11 @@ def test_archiving_is_attempted_once_per_analysis(fake_st):
     assert len(fake_st.archive_calls) == 1
 
 
-def test_archiving_failure_is_swallowed_silently(fake_st, monkeypatch):
-    """归档异常被 `except Exception: pass` 吞掉——分析结果照常落盘，用户看不到任何提示。"""
+def test_archiving_failure_lands_results_but_warns(fake_st, monkeypatch):
+    """s919-13 翻正：改前是 `except Exception: pass`，"分析结果照常落盘、用户看不到任何提示"
+    （旧用例名 test_archiving_failure_is_swallowed_silently 钉的就是那个现状）。
+    现在两件事都要成立：① 控制流不变（结果照样进 session_state、照常 rerun）；
+    ② 用户看得见"归档失败"，且带上异常类型便于报障。"""
     def boom(*a, **k):
         raise OSError("disk full")
 
@@ -121,4 +129,6 @@ def test_archiving_failure_is_swallowed_silently(fake_st, monkeypatch):
 
     _rerun(qe._run_quick_analysis, DF, "independent_ttest", dv="分数", iv="组别")
 
-    assert "analysis_output" in fake_st.session_state
+    assert "analysis_output" in fake_st.session_state          # ① 控制流未变
+    assert len(fake_st.warnings) == 1                          # ② 恰好一条提示
+    assert "归档失败" in fake_st.warnings[0] and "OSError" in fake_st.warnings[0]
