@@ -2,7 +2,7 @@
 """20260915-130540-dd4d：基准补评 side-car 落盘单测。
 
 ①原始基准 JSON 字节级不变；②side-car 结构正确（30 条、字段齐全）；③幂等（二次运行一致）。
-脚本经 importlib 从桥侧 tmp 草案加载（路径硬编码在草案内，属既定形态）。
+脚本是桥侧 tmp 草案的逐字副本（s919-09 转正入 `tests/fixtures/`，sha256 与草案一致），经 importlib 加载。
 """
 import hashlib
 import importlib.util
@@ -11,8 +11,9 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(r"D:/code/zcode-bridge/tmp/d913d-11/backfill-draft.py")
-BENCH = Path(r"D:/code/psy-analysis/data/benchmark_history/socratic_benchmark_20260909T192139Z.json")
+_REPO = Path(__file__).resolve().parents[1]
+SCRIPT = _REPO / "tests" / "fixtures" / "benchmark_backfill_draft.py"
+BENCH = _REPO / "data" / "benchmark_history" / "socratic_benchmark_20260909T192139Z.json"
 
 _spec = importlib.util.spec_from_file_location("backfill_draft", SCRIPT)
 mod = importlib.util.module_from_spec(_spec)
@@ -178,3 +179,18 @@ def test_concurrent_same_path_never_yields_a_torn_result(tmp_path):
     assert final["source_file"] in {"bench_a.json", "bench_b.json"}
     assert final["n_entries"] == 30 and len(final["entries"]) == 30
     assert {r["source_file"] for r in results} | {final["source_file"]} <= {"bench_a.json", "bench_b.json"}
+
+
+# ---------- s919-09 追加：解除对桥侧 tmp 的依赖（本单的正题） ----------
+
+def test_fixture_lives_in_repo_and_no_bridge_tmp_path_remains():
+    """草案已入仓：路径解析在 `tests/fixtures/` 下，且本文件与草案都不含桥侧目录字面量。
+
+    钉的是 s918-12 遗留段的危害本身——桥侧 tmp 一旦被清理，这 9 条会一起变 collection error。
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    assert SCRIPT.resolve().is_relative_to(repo_root / "tests" / "fixtures")
+    assert SCRIPT.exists() and BENCH.exists()
+    bridge = "zcode" + "-bridge"          # 拆字面量：否则本断言自己就是命中
+    for p in (Path(__file__), SCRIPT):
+        assert bridge not in p.read_text(encoding="utf-8"), f"{p} 仍指向桥侧路径"
