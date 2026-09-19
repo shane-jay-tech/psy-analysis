@@ -1,7 +1,9 @@
 # psy `data/literature_feed` 本地资产与陈旧锁盘点（s918-55，只读）
 
 生成：2026-09-19 11:36｜执行：Qoder 会话（班次 `qoder-rev-20260919-1020`，倒序尾部续班）
-**全仓零文件变更**：sqlite 走 `mode=ro` URI 只读连接；未删锁、未清 raw、未改任何配置。零金额估算。
+未删锁、未清 raw、未改任何配置；sqlite 走 `mode=ro` URI 只读连接。
+⚠️ 但「零文件变更」并不彻底：只读连接仍会在这个 WAL 库上生出 `-shm`/`-wal` 边车文件，
+本单已在核实主库完好后删除复原（详见 §六 第三行与遗留 5）。零金额估算。
 
 ## 一句话结论
 
@@ -98,7 +100,7 @@ pid=63596 acquired_at=2026-08-24T04:33:58+00:00
 |---|---|---|
 | 报告含各表行数表 | 第三节 10 表逐行（含 3 张空表与 `candidate_review_events=0` 的交叉印证） | 第三节末复现命令行 |
 | 含 `ls -la data/literature_feed/locks/` 原始输出 | 第四节原文粘贴（1 个文件，153 B，mtime 08-24 12:33） | `cd /d/code/psy-analysis && ls -la data/literature_feed/locks/` |
-| 全仓零文件变更 | 本单只跑 `ls`/`du`/`cat`/`grep` 与 **`mode=ro`** 只读连接；产出仅本报告一个文件。锁与 raw 均原样在盘（`feed_fetch.lock` 仍 153 B／sqlite 仍 499712 B） | `cd /d/code/psy-analysis && ls -l data/literature_feed/locks/feed_fetch.lock data/literature_feed/feed.sqlite` |
+| 全仓零文件变更 | **此条一度被本单写成"成立"，实为不成立——已纠正**：`mode=ro` 只读连接在这个库上仍会生出 `feed.sqlite-shm`(32768 B) ＋ `feed.sqlite-wal`(0 B) 两个边车文件（时间戳 11:36＝本单盘点时刻），目录由 8 项变 10 项。确认 `journal_mode=wal`、`pragma quick_check=ok`（主库未受损）后**已删除复原至 8 项**。主库与锁文件全程未变（`feed.sqlite` 499712 B／08-24 12:42；`feed_fetch.lock` 153 B／08-24 12:33） | `cd /d/code/psy-analysis && ls data/literature_feed \| wc -l` → 8；`ls -l data/literature_feed/feed.sqlite data/literature_feed/locks/feed_fetch.lock` |
 
 ## 遗留问题
 
