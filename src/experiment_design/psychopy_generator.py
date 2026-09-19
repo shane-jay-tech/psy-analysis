@@ -186,17 +186,37 @@ def generate_latin_square_psychopy(
 # ============================================================
 
 
+def _segment(block: str, indent: int = 0) -> str:
+    """把一段脚本归一化：先去公共缩进归零，再按 `indent` 列**显式**缩进，首尾空行一律去掉。
+
+    层级与空行不再靠约定（s919-01 遗留 2+3）：片段自带几行尾随空行、基准是 0 列还是 8 列，
+    过去全靠拼接方恰好对齐兜着——一处没对齐就整页拼歪（那个 SyntaxError BLOCKER 的机制）。
+    这里把"归零＋按列缩进"收进一个函数，段间距统一交给 `_assemble`。
+    """
+    stripped = textwrap.dedent(block).strip("\n")
+    if not stripped.strip():
+        return ""
+    while "\n\n\n" in stripped:                  # 段内也只留一个空行（注入空块会留下连串空行）
+        stripped = stripped.replace("\n\n\n", "\n\n")
+    return textwrap.indent(stripped, " " * indent) if indent else stripped
+
+
+def _assemble(segments) -> str:
+    """按 (片段, 缩进列) 列表装配整脚本：段间恰好空一行，结尾恰好一个换行。"""
+    return "\n\n".join(_segment(block, indent) for block, indent in segments) + "\n"
+
+
 def _build_script(exp: PsychoPyExperiment) -> str:
-    """组装完整的 PsychoPy Python 脚本"""
-    parts = []
-    parts.append(_script_header(exp))
-    parts.append(_script_imports())
-    parts.append(_script_window_setup(exp))
-    parts.append(_script_stimuli_setup(exp))
-    parts.append(_script_trial_list(exp))
-    parts.append(_script_routine_defs(exp))
-    parts.append(_script_main_loop(exp))
-    return "\n\n".join(parts)
+    """组装完整的 PsychoPy Python 脚本（七段一律 0 列，段间距由 _assemble 决定）"""
+    return _assemble([
+        (_script_header(exp), 0),
+        (_script_imports(), 0),
+        (_script_window_setup(exp), 0),
+        (_script_stimuli_setup(exp), 0),
+        (_script_trial_list(exp), 0),
+        (_script_routine_defs(exp), 0),
+        (_script_main_loop(exp), 0),
+    ])
 
 
 def _script_header(exp: PsychoPyExperiment) -> str:
@@ -390,20 +410,9 @@ def _script_routine_defs(exp: PsychoPyExperiment) -> str:
     """)
 
     return (
-        routine.replace("@@CORRECT_LOGIC@@", _indent_block(correct_logic, 4))
-             .replace("@@FEEDBACK@@", _indent_block(feedback_lines, 4))
+        routine.replace("@@CORRECT_LOGIC@@", _segment(correct_logic, 4))
+             .replace("@@FEEDBACK@@", _segment(feedback_lines, 4))
     )
-
-
-def _indent_block(block: str, spaces: int) -> str:
-    """把生成好的代码块整体缩进到指定列（先 dedent 再 indent，调用方不必关心块自己的基准缩进）。
-
-    `_correct_response_logic` 的各分支基准并不统一（三个范式的串 dedent 后从 0 列起，
-    else 分支却自带 8 空格），这里一律归零再加缩进，插进模板后才是同一层。
-    """
-    if not block.strip():
-        return ""
-    return textwrap.indent(textwrap.dedent(block), " " * spaces)
 
 
 def _correct_response_logic(exp: PsychoPyExperiment) -> str:

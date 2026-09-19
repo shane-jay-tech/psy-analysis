@@ -156,3 +156,89 @@ def test_injected_blocks_land_inside_run_trial_body():
     assert "    if response:" in lines                                       # 判断块首行在体内（4 空格）
     assert "    if trial.get('is_practice'):" in lines                        # 反馈块同样在体内
     assert "        color_to_key = {'红': 'f', '绿': 'j', '蓝': 'f', '黄': 'j'}" in lines  # 再进一层（8）
+
+
+# ═══════════════ s920-01：装配重构（显式缩进参数＋换行列表）与无 Tab 契约 ═══════════════
+import src.experiment_design.psychopy_generator as ps_gen  # noqa: E402
+
+
+def _gen(paradigm="stroop", **kw):
+    base = dict(title="测试实验", paradigm=paradigm)
+    base.update(kw)
+    return generate_psychopy_script(PsychoPyExperiment(**base))
+
+
+@pytest.mark.parametrize("paradigm", ["stroop", "flanker", "emotion", "memory", "custom", "不存在的范式"])
+@pytest.mark.parametrize("show_feedback", [True, False])
+def test_generated_script_never_contains_a_tab(paradigm, show_feedback):
+    """制表符混进生成码是同类 bug 的温床（Windows 编辑器尤其爱塞）⇒ 12 形态一律钉死。"""
+    src = _gen(paradigm, show_feedback=show_feedback)
+
+    assert "\t" not in src
+    compile(src, f"<gen:{paradigm}>", "exec")           # 顺带保证重构后仍可编译
+
+
+SECTION_MARKERS = [
+    "#!/usr/bin/env python",
+    "from psychopy import visual, core, event, gui, data",
+    "# ========== 窗口与计时器设置 ==========",
+    "# ========== 刺激材料 ==========",
+    "# ========== 试次列表 ==========",
+    "# ========== 试次呈现例程 ==========",
+    "# ========== 主实验流程 ==========",
+]
+
+
+def test_sections_are_separated_by_exactly_one_blank_line():
+    """段间距是装配规则给的，不是片段自己带的：每个段首行前面恰好一个空行、再往前必须是非空行。"""
+    src = _gen()
+
+    assert "\n\n\n" not in src                                         # 最多一个空行
+    assert src.startswith("#!/usr/bin/env python")
+    assert src.endswith("\n") and not src.endswith("\n\n")
+    lines = src.split("\n")
+    for marker in SECTION_MARKERS:
+        idx = next(i for i, l in enumerate(lines) if l.startswith(marker))
+        if idx == 0:
+            continue
+        assert lines[idx - 1] == "", f"{marker} 前少了空行（段间距被改掉）"
+        assert lines[idx - 2].strip(), f"{marker} 前空行超过一行"
+
+
+def test_no_shape_has_double_blank_anywhere():
+    """12 形态一律：注入空块留下的连串空行也要被 _segment 收掉。"""
+    for paradigm in ("stroop", "flanker", "emotion", "memory", "custom", "不存在的范式"):
+        for fb in (True, False):
+            assert "\n\n\n" not in _gen(paradigm, show_feedback=fb), f"{paradigm}/fb={fb}"
+
+def test_all_seven_sections_land_at_column_zero_in_order():
+    markers = [
+        "#!/usr/bin/env python",
+        "from psychopy import visual, core, event, gui, data",
+        "# ========== 窗口与计时器设置 ==========",
+        "def run_trial(",
+    ]
+    lines = _gen().splitlines()
+    positions = []
+    for mk in markers:
+        idx = next(i for i, l in enumerate(lines) if l.startswith(mk) or l.strip() == mk)
+        assert lines[idx].startswith(mk), f"{mk} 带了意外缩进"
+        positions.append(idx)
+
+    assert positions == sorted(positions)                # 装配顺序没被打乱
+
+
+def test_segment_normalizes_mixed_base_indents_to_the_same_level():
+    """`_segment` 存在的理由：输入块自带 0 列或 8 列都要归零再加缩进，插进模板后才是同一层。"""
+    flat = "a = 1\nb = 2\n"
+    deep = "        a = 1\n        b = 2\n"
+
+    assert ps_gen._segment(flat, 4) == ps_gen._segment(deep, 4) == "    a = 1\n    b = 2"
+    # 行内的**公共**缩进会被 dedent 归零（这是它的语义）；尾随空行由 _segment 剥掉
+    assert ps_gen._segment("\n\n  x = 1  \n\n") == "x = 1  "
+    assert ps_gen._segment("if x:\n    y = 1\n", 8) == "        if x:\n            y = 1"
+
+
+def test_segment_on_blank_input_yields_empty_string_not_indent_noise():
+    for blank in ("", "\n\n", "   \n\n", "\t \n"):
+        assert ps_gen._segment(blank, 4) == ""
