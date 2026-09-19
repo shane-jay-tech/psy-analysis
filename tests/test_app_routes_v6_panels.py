@@ -72,6 +72,41 @@ class TestV6PanelStateIntegration:
         assert get_cleaned_result(state) is None
         assert get_cleaning_log_for_deliverable(state) == []
 
+    def test_three_qimport_keys_survive_a_write_then_read(self):
+        """补 s919-21 遗留：三个键名当时只 import 没断言 ⇒ 现在"先写后读"，三键都要在。
+
+        顺带把**键的字面值**钉住：这三串是历史工作区/autosave JSON 里的实际键名，
+        改名等于让旧存档读不到（`get_cleaned_result`／`get_cleaning_log_for_deliverable` 全按字面值取）。
+        """
+        import pandas as pd
+
+        from src.questionnaire.import_cleaning import CleaningLogEntry, CleaningResult
+        from src.ui.questionnaire_import_panel import (
+            _CLEANED_KEY, _DIMENSIONS_KEY, _RAW_DF_KEY,
+            get_cleaned_result, get_cleaning_log_for_deliverable,
+        )
+
+        assert (_CLEANED_KEY, _RAW_DF_KEY, _DIMENSIONS_KEY) == (
+            "questionnaire_cleaned_result", "questionnaire_raw_df", "questionnaire_dimensions")
+
+        state = {}
+        assert not ({_CLEANED_KEY, _RAW_DF_KEY, _DIMENSIONS_KEY} & set(state))
+
+        result = CleaningResult(
+            df_cleaned=pd.DataFrame({"a": [1]}),
+            log=[CleaningLogEntry(step="去空行", action="dropna", affected_rows=1, detail="删 1 行")],
+        )
+        state[_RAW_DF_KEY] = pd.DataFrame({"a": [1, 2]})
+        state[_DIMENSIONS_KEY] = ["维度1"]
+        state[_CLEANED_KEY] = result
+
+        for key in (_RAW_DF_KEY, _DIMENSIONS_KEY, _CLEANED_KEY):
+            assert key in state, f"写入后 {key} 丢失"
+        assert state[_DIMENSIONS_KEY] == ["维度1"]
+        assert get_cleaned_result(state) is result
+        log = get_cleaning_log_for_deliverable(state)
+        assert len(log) == 1 and log[0]["step"] == "去空行" and log[0]["affected_rows"] == 1
+
     def test_deliverable_panel_reads_from_state(self):
         from src.ui.deliverable_center_panel import (
             _get_or_build_bundle, get_deliverable_bundle,
