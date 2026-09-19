@@ -47,7 +47,7 @@ python launcher.pyw
 ```text
 DEEPSEEK_API_KEY=...
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
-DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_MODEL=deepseek-v4-flash
 
 # 持久化路径重定向（实读于 src/utils/app_paths.py，不设则用默认值）
 PSY_ANALYSIS_HOME=~/.psy_analysis          # 用户数据根；派生 projects/ 与 user_prefs.json、autosave.json
