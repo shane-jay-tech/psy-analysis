@@ -171,7 +171,30 @@ def test_approve_writes_with_reviewer_user_then_reruns(fake_st, svc):
         pnl._do_review(FakeStore([]), 14, "approved")
 
     assert svc == [(14, "approved", "user", {"rejection_reason": None, "target_kb_id": None})]
-    assert fake_st.successes == ["已已纳入"]
+    assert fake_st.successes == ["已纳入"]
+
+
+@pytest.mark.parametrize(
+    "decision,expected",
+    [
+        ("approved", "已纳入"),
+        ("rejected", "已排除"),
+        ("merged", "已合并"),
+        ("deferred", "待定"),          # 标签本就不带「已」：旧代码给它加前缀成"已待定"，同一种错
+    ],
+)
+def test_success_text_is_the_label_verbatim(fake_st, svc, decision, expected):
+    """`STATUS_LABELS` 的值自带「已」，f-string 前缀再加一层就成了「已已纳入」（s918-26 遗留段）。
+
+    四个合法决策（`ReviewAction.validate` 的白名单）全过一遍——上游只举了"已纳入"一例。
+    """
+    kwargs = {"rejected": {"rejection_reason": "duplicate"},
+              "merged": {"target_kb_id": "kb-7"}}.get(decision, {})
+    with pytest.raises(RerunRequested):
+        pnl._do_review(FakeStore([]), 21, decision, **kwargs)
+
+    assert fake_st.successes == [expected]
+    assert "已已" not in fake_st.successes[0]
 
 
 def test_reject_passes_reason_through(svc):

@@ -196,7 +196,7 @@ def _do_review(
             rejection_reason=rejection_reason,
             target_kb_id=target_kb_id,
         )
-        st.success(f"已{STATUS_LABELS.get(decision, decision)}")
+        st.success(STATUS_LABELS.get(decision, decision))
         st.rerun()
     except Exception as e:
         st.error(f"审核失败: {e}")
