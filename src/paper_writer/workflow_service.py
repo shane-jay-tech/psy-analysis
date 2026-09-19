@@ -59,10 +59,21 @@ class PaperResult:
 def generate_paper_quick(req: QuickPaperRequest) -> PaperResult:
     """一键生成论文初稿 — 从请求到完整论文的一步调用。
 
-    等价于手动调用 PaperEngine 的 set_topic → set_methods → set_discussion
-    → import_analysis → search_literature → generate_full_paper → assemble
+    等价于手动调用 PaperEngine 的
+    set_topic → set_methods → set_discussion → [set_data] → import_analysis_results
+    → add_user_literature → [search_literature] → generate_full_paper → assemble_manuscript，
     但 UI 层只需填一个 QuickPaperRequest。
+    方括号三步是条件步：`df`/`user_literature`/`search_keywords` 为空时整步跳过
+    （s919-16 订正：原 docstring 漏了 set_data 与 add_user_literature 两步，
+    且把方法名写成 `import_analysis`；见 s918-23 结果「遗留 1」）。
     """
+    if req.df is not None and not isinstance(req.df, pd.DataFrame):
+        # s919-16 类型守卫：原先只判 `is not None`，任何对象都被送进 engine.set_data，
+        # 类型错误推迟到引擎内部才爆（s918-23「遗留 2」）。快速失败在建引擎之前。
+        raise TypeError(
+            f"QuickPaperRequest.df 只接受 DataFrame 或 None，收到 {type(req.df).__name__}"
+        )
+
     engine = PaperEngine()
 
     engine.set_topic(

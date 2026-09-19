@@ -2,8 +2,9 @@
 
 facade 层：注入 fake `PaperEngine` 记录调用序列，**零 LLM、零联网、零真实数据分析**。
 只钉「字段默认值＋组装流顺序＋委托调用」，不评生成内容质量。
-锚点：src/paper_writer/workflow_service.py:59，120 行。
+锚点：src/paper_writer/workflow_service.py:59 `generate_paper_quick`（现 131 行；s919-16 加了 df 类型守卫）。
 """
+import pandas as pd
 import pytest
 
 import src.paper_writer.workflow_service as ws
@@ -105,7 +106,8 @@ def test_full_request_drives_the_documented_call_order(engine):
         materials=["量表"], procedure="三步", ethics="已批", control_vars=["性别"],
         theoretical_contributions=["T"], practical_implications=["P"],
         limitations=["L"], future_directions=["F"],
-        df="DF", analysis_results={"t": 1}, user_literature=[{"t": "文"}],
+        df=pd.DataFrame({"分数": [1.0, 2.0]}), analysis_results={"t": 1},
+        user_literature=[{"t": "文"}],
         search_keywords=["stress"],
     )
 
@@ -131,6 +133,20 @@ def test_bare_request_skips_all_optional_stages(engine):
     kinds = [c[0] for c in engine["instance"].calls]
     assert kinds == ["set_topic", "set_methods", "set_discussion",
                      "generate_full_paper", "assemble_manuscript", "get_logs"]
+
+
+@pytest.mark.parametrize("bad", ["DF", 42, [{"x": 1}], object()])
+def test_non_dataframe_df_is_rejected_before_the_engine_is_built(engine, bad):
+    """s919-16 类型守卫（s918-23「遗留 2」的收口）：改前 `df="DF"` 能一路混到 set_data。
+    现在要求在**建引擎之前**就 TypeError——`engine` fixture 只在 `PaperEngine()` 被调用时才登记实例，
+    所以"没有 instance"就是"没建引擎"的直接证据（守卫若写成"送进 set_data 再由引擎炸"，本断言会红）。"""
+    req = QuickPaperRequest(df=bad)
+
+    with pytest.raises(TypeError) as ei:
+        ws.generate_paper_quick(req)
+
+    assert "DataFrame" in str(ei.value) and type(bad).__name__ in str(ei.value)
+    assert "instance" not in engine
 
 
 @pytest.mark.parametrize("empty", [{}, None])
