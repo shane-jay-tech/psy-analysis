@@ -164,3 +164,74 @@ def test_data_quality_warnings_are_a_noop_branch():
 
     assert with_dq.interpretation_guide == plain.interpretation_guide
     assert with_dq.alternatives == plain.alternatives
+
+
+# ══════════════════ s920-06：信度族主值注入扩到四类（本段配套改了 src） ══════════════════
+from src.analysis.reliability import ReliabilityResult          # noqa: E402
+from src.output.reasoning import _RELIABILITY_MAIN_LABEL, _build_guide   # noqa: E402
+
+ALPHA_JUDGEMENT = ("α ≥ 0.90 优秀；0.80-0.90 良好；0.70-0.80 可接受；"
+                   "0.60-0.70 探索性边界；< 0.60 不可接受。")
+
+
+def _rel(test_type, alpha=0.82):
+    return ReliabilityResult(test_type=test_type, alpha=alpha, ci_lower=alpha - 0.05,
+                             ci_upper=alpha + 0.05, n_items=6, n_cases=60)
+
+
+@pytest.mark.parametrize("test_type,label", [
+    ("cronbach_alpha", "α"),
+    ("split_half", "分半信度"),
+    ("mcdonald_omega", "ω"),
+    ("composite_reliability", "CR"),
+])
+def test_reliability_family_guides_carry_their_own_main_value(test_type, label):
+    """同一个 `alpha` 槽位装的是不同统计量 ⇒ 注入时必须按各自的名字标，四类都要有主值。"""
+    ar = generate_reasoning(_out(test_type, "信度分析", result=_rel(test_type)))
+
+    assert ar.interpretation_guide.startswith(f"当前{label}=0.82，")
+
+
+def test_alpha_wording_is_byte_identical_apart_from_the_injected_value():
+    """判据文本一个字都不许动：把注入句剥掉后必须与模板原文完全一致。"""
+    ar = generate_reasoning(_out("cronbach_alpha", "信度分析", result=_rel("cronbach_alpha")))
+
+    assert ALPHA_JUDGEMENT in ar.interpretation_guide
+    assert ar.interpretation_guide.replace("当前α=0.82，", "", 1) == \
+        TEST_TEMPLATES["cronbach_alpha"]["guide"].replace("当前α=", "", 1)
+
+
+@pytest.mark.parametrize("test_type", ["split_half", "mcdonald_omega", "composite_reliability"])
+def test_non_alpha_reliabilities_are_never_labelled_alpha(test_type):
+    ar = generate_reasoning(_out(test_type, "信度分析", result=_rel(test_type)))
+
+    assert "当前α=" not in ar.interpretation_guide          # 把 ω 说成 α 是错的标签，不是小的措辞问题
+    assert "0.90 优秀" not in ar.interpretation_guide       # 也不许借用 α 的判据段
+
+
+def test_result_without_alpha_field_still_strips_the_bare_placeholder():
+    class NoAlpha:
+        pass
+
+    out = _build_guide(TEST_TEMPLATES["cronbach_alpha"], NoAlpha(), "cronbach_alpha")
+
+    assert "当前α=" not in out and ALPHA_JUDGEMENT in out    # 拿不到值就整段摘掉，不留"当前α=α ≥ …"
+
+
+def test_none_result_path_is_unchanged():
+    assert "当前α=" not in _build_guide(TEST_TEMPLATES["cronbach_alpha"], None, "cronbach_alpha")
+
+
+@pytest.mark.parametrize("test_type", sorted(_RELIABILITY_MAIN_LABEL))
+def test_reliability_family_share_the_two_precondition_checks(test_type):
+    """`:516` 同族分支同步：四类都要拿到"题目数量/样本量"两条前提（原来只有 α 有）。"""
+    ar = generate_reasoning(_out(test_type, "信度分析", result=_rel(test_type)))
+    names = [c.name for c in ar.data_requirements]
+
+    assert "题目数量" in names and "样本量" in names
+
+
+def test_non_reliability_type_is_not_prefixed():
+    ar = generate_reasoning(_out("pearson_corr", "Pearson相关分析"))
+
+    assert not ar.interpretation_guide.startswith("当前")

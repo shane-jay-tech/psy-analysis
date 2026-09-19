@@ -513,7 +513,7 @@ def _build_requirements(tmpl: dict, plan, result, test_type: str) -> List[StepCh
         reqs.append(StepCheck("变量类型", "连续数值型", True, ""))
         reqs.append(StepCheck("线性关系", "变量间应为线性/单调关系", True, "通过散点图验证"))
 
-    elif test_type in ("cronbach_alpha",):
+    elif test_type in _RELIABILITY_MAIN_LABEL:
         reqs.append(StepCheck("题目数量", "≥2道题目", True, ""))
         reqs.append(StepCheck("样本量", "建议N ≥ 100", True, "小样本会导致α估计不稳定"))
 
@@ -636,6 +636,16 @@ def _build_assumption_checks(result, assumptions: dict) -> List[StepCheck]:
     return checks
 
 
+# 信度族四个检验共用 `ReliabilityResult.alpha` 这个"主指标槽位"（reliability.py:12 注释），
+# 但槽位里装的量各不相同 ⇒ 注入时必须按各自的统计量名称写，不许把 ω/CR 也标成 α。
+_RELIABILITY_MAIN_LABEL = {
+    "cronbach_alpha": "α",
+    "split_half": "分半信度",
+    "mcdonald_omega": "ω",
+    "composite_reliability": "CR",
+}
+
+
 def _strip_uninjected_alpha(guide: str, replacement: str = "") -> str:
     """处理「当前α=」占位符：有实测值就注入，拿不到就整段去掉。
 
@@ -653,11 +663,14 @@ def _build_guide(tmpl: dict, result, test_type: str) -> str:
     if result is None:
         return _strip_uninjected_alpha(guide)
 
-    # Cronbach's α 插入实际值
-    if test_type == "cronbach_alpha":
-        guide = _strip_uninjected_alpha(
-            guide, f"当前α={result.alpha}，" if hasattr(result, "alpha") else ""
-        )
+    # 信度族插入各自的实际值（α / 分半 / ω / CR 共用一个主指标槽位，标签按类型给）
+    if test_type in _RELIABILITY_MAIN_LABEL:
+        label = _RELIABILITY_MAIN_LABEL[test_type]
+        injected = f"当前{label}={result.alpha}，" if hasattr(result, "alpha") else ""
+        if "当前α=" in guide:
+            guide = _strip_uninjected_alpha(guide, injected)   # α 模板里自带占位符，原地替换
+        elif injected:
+            guide = injected + guide                          # 其余三类模板没有占位符，前置一句主值
 
     # 插入效应量信息
     es_info = ""
