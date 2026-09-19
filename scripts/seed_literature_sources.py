@@ -9,6 +9,7 @@ upsert 幂等：重复跑只更新不重复插入。
 
 用法：
     python scripts/seed_literature_sources.py            # 写入 + 列出当前源
+    python scripts/seed_literature_sources.py list       # 只列出当前源（不写库）
     python scripts/seed_literature_sources.py --probe     # 写入后逐源实测（只抓不抽取）
 """
 
@@ -94,12 +95,15 @@ def probe(store: FeedStore) -> None:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="注册文献雷达数据源")
+    ap.add_argument("command", nargs="?", default="seed", choices=["seed", "list"],
+                    help="seed=写入后列出（默认，与历史行为一致）；list=只列出不写库")
     ap.add_argument("--probe", action="store_true", help="写入后逐源实测抓取（只抓不抽取）")
     args = ap.parse_args(argv)
 
     store = FeedStore()
     try:
-        seed(store)
+        if args.command == "seed":
+            seed(store)
         list_current(store)
         if args.probe:
             probe(store)

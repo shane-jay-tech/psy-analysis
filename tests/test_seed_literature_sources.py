@@ -141,12 +141,50 @@ def test_main_with_probe_flag_runs_probe_after_seeding(monkeypatch):
     assert calls == ["seed", "list", "probe"]
 
 
-def test_main_rejects_a_list_subcommand_with_exit_code_two(monkeypatch):
-    """任务书写「main(["list"]) 返回 0」，但脚本只有 `--probe` 一个开关、没有位置参数
-    ⇒ argparse 直接以退出码 2 拒绝。锚点与磁盘不符，按现状钉。"""
+def test_main_list_subcommand_lists_without_touching_the_seed_path(monkeypatch):
+    """s919-20 新增的 `list` 子命令：只列不写。
+    改前 `main(["list"])` 被 argparse 以退出码 2 拒绝（脚本当时没有位置参数）。"""
+    class FakeStore:
+        def list_sources(self, *, enabled_only=False):
+            return []
+
+        def close(self):
+            pass
+
+    calls = []
+    monkeypatch.setattr(sls, "FeedStore", lambda: FakeStore())
+    monkeypatch.setattr(sls, "seed", lambda st: calls.append("seed"))
+    monkeypatch.setattr(sls, "list_current", lambda st: calls.append("list"))
+    monkeypatch.setattr(sls, "probe", lambda st: calls.append("probe"))
+
+    assert sls.main(["list"]) == 0
+    assert calls == ["list"]          # seed 没被调用＝不写库；probe 也未触发
+
+
+def test_main_list_combined_with_probe_still_skips_seed(monkeypatch):
+    """`list --probe` 应是合法组合：看现有源并逐个探活，但仍然不写。"""
+    class FakeStore:
+        def list_sources(self, *, enabled_only=False):
+            return []
+
+        def close(self):
+            pass
+
+    calls = []
+    monkeypatch.setattr(sls, "FeedStore", lambda: FakeStore())
+    monkeypatch.setattr(sls, "seed", lambda st: calls.append("seed"))
+    monkeypatch.setattr(sls, "list_current", lambda st: calls.append("list"))
+    monkeypatch.setattr(sls, "probe", lambda st: calls.append("probe"))
+
+    assert sls.main(["list", "--probe"]) == 0
+    assert calls == ["list", "probe"]
+
+
+def test_main_still_rejects_an_unknown_command_with_exit_code_two(monkeypatch):
+    """新增位置参数不能顺手把"任意字符串都收"的口子开大：非 seed/list 仍退 2，且不建库。"""
     monkeypatch.setattr(sls, "FeedStore", lambda: (_ for _ in ()).throw(AssertionError("不该建库")))
 
     with pytest.raises(SystemExit) as exc:
-        sls.main(["list"])
+        sls.main(["droptable"])
 
     assert exc.value.code == 2
