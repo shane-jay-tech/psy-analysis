@@ -5,6 +5,7 @@
 **不 import 真分析注册表、不跑 pytest 收集**。这些数字是发布系统报告的口径来源。
 锚点：:53 count_lines、:60 count_pattern、:68 gather_metrics（331 行）。
 """
+import inspect
 import sys
 import types
 
@@ -15,9 +16,10 @@ import scripts.generate_system_report as g
 
 @pytest.fixture(autouse=True)
 def _no_syspath_pollution(monkeypatch):
-    """s919-17 幂等守卫：`gather_metrics()` 内部有**两处** `sys.path.insert(0, PROJECT_ROOT)`
-    （`scripts/generate_system_report.py:73` 与 `:112`），而本模块每个用例都把 `PROJECT_ROOT`
-    换成自己的 tmp 树 ⇒ 没有这层守卫，那些 tmp 路径会一路留在会话的 `sys.path` 里（无人回收）。
+    """s919-17 幂等守卫：本模块每个用例都把 `PROJECT_ROOT` 换成自己的 tmp 树，
+    而 `gather_metrics()` 仍会把"当前 `PROJECT_ROOT`"挂上 `sys.path`（s920-25 起改为
+    `_ensure_project_on_path()`：只在缺席时挂，不再一次插两条）⇒ 没有这层守卫，tmp 路径
+    仍会一路留在会话的 `sys.path` 里（无人回收）。
     做法是**换掉 sys.path 这个对象本身**（浅拷贝），teardown 由 monkeypatch 还原 ⇒ 用例内随便插都不外溢。
     """
     monkeypatch.setattr(sys, "path", list(sys.path))
@@ -113,23 +115,35 @@ def test_gather_metrics_against_a_tmp_tree_has_every_key(tmp_path, monkeypatch):
     assert m["dependencies"]["pandas"] is True
 
 
-def test_gather_metrics_inserts_project_root_into_sys_path_each_call(tmp_path, monkeypatch):
-    """`gather_metrics()` 内有**两处** `sys.path.insert(0, PROJECT_ROOT)`（版本读取段与注册方法段）
-    ⇒ 单次调用就把同一根目录塞两遍，重复调用持续累积（可观测的小泄漏；本用例顺带清干净）。"""
+def test_gather_metrics_is_idempotent_for_sys_path_and_result(tmp_path, monkeypatch):
+    """s920-25 翻正（原钉「单次调用插两条、重复调用累积到 4 条」）：现在最多一条，且两次结果全等。"""
     monkeypatch.setattr(g, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(g, "TESTS_DIR", tmp_path / "t")
     _stub_heavy_imports(monkeypatch)
     target = str(tmp_path)
-    before = sys.path.count(target)
+    assert target not in sys.path
 
-    g.gather_metrics()
-    g.gather_metrics()
+    first_metrics = g.gather_metrics()
+    after_first = sys.path.count(target)
+    second_metrics = g.gather_metrics()
 
     try:
-        assert sys.path.count(target) == before + 4
+        assert (after_first, sys.path.count(target)) == (1, 1), "仓根被重复累积（泄漏回来了）"
+        assert first_metrics == second_metrics, "重复调用结果不一致 ⇒ 报告数会随调用次数漂"
     finally:
         while target in sys.path:
             sys.path.remove(target)
+
+
+def test_gather_metrics_has_no_inline_sys_path_insert():
+    """幂等性由 `_ensure_project_on_path()` 单点负责：函数体里不该再有裸 insert。
+
+    只断"写法"不测行为的那一面：将来有人再加一句 `sys.path.insert(...)`，
+    行为测要等到有人连调两次才红，这条静态测当场就红。
+    """
+    src = inspect.getsource(g.gather_metrics)
+    assert "sys.path.insert" not in src
+    assert src.count("_ensure_project_on_path()") == 2          # 版本段＋注册方法段，仍是两处需要
 
 
 def test_real_repo_has_no_async_def_tests_yet():

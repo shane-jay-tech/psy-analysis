@@ -65,12 +65,23 @@ def count_pattern(path: Path, pattern: str) -> int:
         return 0
 
 
+def _ensure_project_on_path() -> None:
+    """把仓根挂到 `sys.path`，**只在缺席时挂**。
+
+    原先 `gather_metrics()` 的版本段与注册方法段各写了一次 `sys.path.insert(0, PROJECT_ROOT)`
+    ⇒ 单次调用插两条、重复调用持续累积（s918-53 遗留 3）。
+    """
+    root = str(PROJECT_ROOT)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+
+
 def gather_metrics():
     """Collect all system metrics, return as dict."""
     metrics = {}
 
     # Version — single source of truth
-    sys.path.insert(0, str(PROJECT_ROOT))
+    _ensure_project_on_path()
     try:
         from src.version import APP_VERSION_LABEL
         version = APP_VERSION_LABEL
@@ -109,7 +120,7 @@ def gather_metrics():
     metrics["test_functions"] = test_funcs
 
     # Registered methods (suppress jieba/streamlit noise)
-    sys.path.insert(0, str(PROJECT_ROOT))
+    _ensure_project_on_path()
     try:
         with _suppress_third_party_noise():
             from src.analysis.runner import AnalysisRegistry
