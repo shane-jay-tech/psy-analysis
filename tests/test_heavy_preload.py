@@ -112,12 +112,21 @@ def test_preload_swallows_import_failure(monkeypatch):
     hp.preload_heavy_deps()  # 不抛即通过
 
 
+HEAVY_ROOTS = {"semopy", "statsmodels", "pingouin", "factor_analyzer"}
+
+
+def _loaded_heavy():
+    return {m for m in sys.modules if m.split(".")[0] in HEAVY_ROOTS}
+
+
 def test_the_warmup_body_never_runs_in_this_process(reset):
-    """自证门：线程被桩化，`preload_heavy_deps` 从未被调用 ⇒ 重型模块不该进 sys.modules。"""
+    """自证门：线程被桩化 ⇒ 预热线程体没跑，本次调用不该**新增**任何重型模块。
+    用差分而非「不在 sys.modules」：合跑时前面的测试文件可能已载入这些库。"""
+    before = _loaded_heavy()
+
     hp.start_heavy_preload_once()
 
-    assert "semopy" not in sys.modules
-    assert "statsmodels.api" not in sys.modules
+    assert _loaded_heavy() == before
 
 
 def test_all_nine_warmup_imports_share_one_try_block():
