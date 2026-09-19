@@ -1,0 +1,122 @@
+"""scripts/generate_system_report.py 计数口径测试（s918-53）。
+
+小文件一律 `tmp_path` 合成；`gather_metrics` 把 `PROJECT_ROOT`/`TESTS_DIR` 指向 tmp 树，
+并把两个重依赖模块（`AnalysisRegistry`/`LEARNING_DB`）在 `sys.modules` 里换成桩，
+**不 import 真分析注册表、不跑 pytest 收集**。这些数字是发布系统报告的口径来源。
+锚点：:53 count_lines、:60 count_pattern、:68 gather_metrics（331 行）。
+"""
+import sys
+import types
+
+import pytest
+
+import scripts.generate_system_report as g
+
+
+@pytest.fixture
+def tiny(tmp_path):
+    def write(name, text):
+        p = tmp_path / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+        return p
+    return write
+
+
+def test_count_lines_counts_physical_lines(tiny):
+    assert g.count_lines(tiny("three.py", "a\nb\nc\n")) == 3
+    assert g.count_lines(tiny("noeol.py", "a\nb")) == 2          # 末行无换行仍算一行
+    assert g.count_lines(tiny("empty.py", "")) == 0
+
+
+def test_count_lines_returns_zero_for_missing_and_undecodable(tmp_path, tiny):
+    assert g.count_lines(tmp_path / "nope.py") == 0
+    raw = tmp_path / "binary.py"
+    raw.write_bytes(b"\xff\xfe\x00\x01\n")                        # errors="ignore" 下不抛
+    assert g.count_lines(raw) == 1
+
+
+def test_count_pattern_uses_regex_on_the_whole_file(tiny):
+    src = tiny("pkg.py", "class A:\n    pass\n\n\nclass B:\n    pass\n")
+    assert g.count_pattern(src, r"(?m)^class ") == 2
+    assert g.count_pattern(src, r"(?m)^class Z") == 0
+    assert g.count_pattern(tiny("e.py", ""), r"class") == 0
+    assert g.count_pattern(tiny("miss2.py", "x"), r"[") == 0        # 非法正则也走 except → 0
+
+
+def test_function_counter_only_sees_module_and_one_level_defs(tiny):
+    """发布口径：`^(?:    )?def ` 只认模块级与缩进 4 空格；嵌套更深的 def 不计。"""
+    src = tiny("fn.py", "def top():\n    pass\n\n\nclass C:\n    def m(self):\n        pass\n"
+                        "    def outer():\n        def inner():\n            pass\n")
+
+    assert g.count_pattern(src, r"(?m)^(?:    )?def ") == 3
+
+
+def test_iter_py_files_skips_the_excluded_dirs(tmp_path):
+    for d in ["src", ".venv", "__pycache__", "node_modules", ".git", ".pytest_cache", "src/sub"]:
+        (tmp_path / d).mkdir(parents=True)
+        (tmp_path / d / "f.py").write_text("x", encoding="utf-8")
+    (tmp_path / "src" / "notes.txt").write_text("x", encoding="utf-8")
+
+    found = sorted(p.relative_to(tmp_path).as_posix() for p in g._iter_py_files(tmp_path))
+
+    assert found == ["src/f.py", "src/sub/f.py"]
+
+
+def _stub_heavy_imports(monkeypatch):
+    reg = types.ModuleType("src.analysis.runner")
+    reg.AnalysisRegistry = {"a": 1, "b": 2, "c": 3}
+    card = types.ModuleType("src.output.learning_card")
+    card.LEARNING_DB = {"k1": {}, "k2": {}}
+    monkeypatch.setitem(sys.modules, "src.analysis.runner", reg)
+    monkeypatch.setitem(sys.modules, "src.output.learning_card", card)
+
+
+def test_gather_metrics_against_a_tmp_tree_has_every_key(tmp_path, monkeypatch):
+    code = tmp_path / "repo"
+    (code / "src" / "analysis").mkdir(parents=True)
+    (code / "src" / "analysis" / "a.py").write_text("class A:\n    def m(self):\n        pass\n", encoding="utf-8")
+    (code / "src" / "analysis" / "b.py").write_text("def f():\n    pass\n", encoding="utf-8")
+    (code / "src" / "version.py").write_text("APP_VERSION_LABEL = 'tmp-v'\n", encoding="utf-8")
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_a.py").write_text("def test_one():\n    pass\n\nasync def test_two():\n    pass\n", encoding="utf-8")
+    (tests / "helper.py").write_text("def x():\n    pass\n", encoding="utf-8")
+
+    monkeypatch.setattr(g, "PROJECT_ROOT", code)
+    monkeypatch.setattr(g, "TESTS_DIR", tests)
+    _stub_heavy_imports(monkeypatch)
+
+    m = g.gather_metrics()
+
+    assert set(m) >= {"version", "total_files", "total_lines", "total_classes", "total_functions",
+                      "modules", "test_files", "test_functions", "registered_methods",
+                      "learning_cards", "dependencies"}
+    assert m["total_files"] == 3 and m["total_lines"] == 6      # a.py + b.py + src/version.py
+    assert m["total_classes"] == 1 and m["total_functions"] == 2
+    assert m["test_files"] == 1
+    # 口径漏洞：`(?m)^\s*def test_` 不认 `async def test_two` ⇒ 异步测试一律漏计（本单 tmp 文件里 2 个测试只数到 1）
+    assert m["test_functions"] == 1
+    assert m["modules"]["src/analysis"] == {"files": 2, "lines": 5}
+    assert "src/ui" not in m["modules"]                  # tmp 树里没有的模块不进 breakdown
+    assert m["registered_methods"] == 3 and m["learning_cards"] == 2
+    assert m["dependencies"]["pandas"] is True
+
+
+def test_gather_metrics_inserts_project_root_into_sys_path_each_call(tmp_path, monkeypatch):
+    """`gather_metrics()` 内有**两处** `sys.path.insert(0, PROJECT_ROOT)`（版本读取段与注册方法段）
+    ⇒ 单次调用就把同一根目录塞两遍，重复调用持续累积（可观测的小泄漏；本用例顺带清干净）。"""
+    monkeypatch.setattr(g, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(g, "TESTS_DIR", tmp_path / "t")
+    _stub_heavy_imports(monkeypatch)
+    target = str(tmp_path)
+    before = sys.path.count(target)
+
+    g.gather_metrics()
+    g.gather_metrics()
+
+    try:
+        assert sys.path.count(target) == before + 4
+    finally:
+        while target in sys.path:
+            sys.path.remove(target)
