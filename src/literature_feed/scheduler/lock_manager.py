@@ -11,7 +11,9 @@ Windows 用 ``msvcrt.locking``，POSIX 用 ``fcntl.flock``。锁文件存
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -42,7 +44,7 @@ class LockManager:
 
     Args:
         lock_path: 锁文件路径。``None`` 用 ``paths.FETCH_LOCK_FILE``。
-        ttl_seconds: 锁文件的 TTL，超过这个时间没释放视为 stale 强抢。默认 1 小时。
+        ttl_seconds: 锁文件的 TTL，超过这个时间没释放视为 stale 强抢。默认 6 小时（21600s）。
     """
 
     def __init__(
@@ -54,8 +56,37 @@ class LockManager:
         self.lock_path: Path = Path(lock_path) if lock_path else FETCH_LOCK_FILE
         self.ttl_seconds = int(ttl_seconds)
         self._fh: Optional[Any] = None
+        # d914-19：一次性告警守卫（同一实例同一告警只发一次，防 UI 轮询刷屏）
+        self._alerted: set[str] = set()
         ensure_dirs()
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # ------------------------------------------------------------------ #
+    # 告警（d914-19：可选告警日志，只记不改锁行为）
+    # ------------------------------------------------------------------ #
+
+    def _read_owner_pid(self) -> Optional[int]:
+        """尽力从锁文件读持锁 pid（读不到返回 None，属最小信息口径）。
+
+        必须从 offset 1 起读：Windows 下 byte 0 被 ``msvcrt.locking`` 独占，持锁期内
+        任何整文件读取都会 ``PermissionError``；而 ``_write_owner_info`` 本就把
+        ``pid=…`` 写在 byte 1 之后（以 ``\\n`` 当 sentinel），偏移 1 正好绕开锁字节。
+        """
+        try:
+            with open(self.lock_path, "rb") as fh:
+                fh.seek(1)
+                text = fh.read().decode("utf-8", errors="replace")
+        except OSError:
+            return None
+        m = re.search(r"pid=(\d+)", text)
+        return int(m.group(1)) if m else None
+
+    def _alert_once(self, kind: str, message: str) -> None:
+        """同一实例同一 kind 只告警一次。"""
+        if kind in self._alerted:
+            return
+        self._alerted.add(kind)
+        logging.warning("[lock-alert] %s %s", kind, message)
 
     # ------------------------------------------------------------------ #
     # 主要 API
@@ -79,6 +110,11 @@ class LockManager:
         try:
             self._open_and_lock()
         except LockBusyError:
+            pid = self._read_owner_pid()
+            self._alert_once(
+                "held_by_other",
+                f"lock={self.lock_path} held by pid={pid if pid is not None else 'unknown'}",
+            )
             return True
         else:
             self._unlock_and_close()
@@ -91,7 +127,14 @@ class LockManager:
             mtime = self.lock_path.stat().st_mtime
         except OSError:
             return False
-        return (time.time() - mtime) > self.ttl_seconds
+        stale = (time.time() - mtime) > self.ttl_seconds
+        if stale:
+            age_min = int((time.time() - mtime) / 60)
+            self._alert_once(
+                "stale_lock",
+                f"lock={self.lock_path} stale for {age_min} min (ttl={self.ttl_seconds}s)",
+            )
+        return stale
 
     def break_stale(self) -> bool:
         """删除 stale 锁文件。返回是否真的删了。"""

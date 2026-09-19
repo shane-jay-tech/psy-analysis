@@ -2,7 +2,7 @@
 
 锁文件一律放 `tmp_path`，并 autouse 挡掉 `ensure_dirs()`——**否则构造 LockManager 就会在
 真实 `data/literature_feed/` 下建目录**（见 `_alert_once` 之外的唯一副作用）。零网络、零真实调度器。
-锚点：:54 `ttl_seconds: int = 21600,  # 6h`；判陈旧在 :116 起。
+锚点：:54 `ttl_seconds: int = 21600,  # 6h`；判陈旧在 :123 起（s919-05 修 `_read_owner_pid` 后行号位移）。
 """
 import os
 import time
@@ -135,17 +135,32 @@ def test_alert_fires_once_per_kind(tmp_path, caplog):
     assert sum('stale_lock' in r.message for r in caplog.records) == 1
 
 
-def test_read_owner_pid_never_sees_the_pid_while_the_lock_is_held(tmp_path):
-    """Windows 语义钉桩：byte 0 被独占，期间任何 `read_text()` 都 PermissionError
-    ⇒ `is_held_by_other()` 的告警里 pid **恒为 unknown**，持锁者身份拿不到。"""
+def test_read_owner_pid_sees_the_pid_while_the_lock_is_held(tmp_path):
+    """s919-05 翻正：从 offset 1 起读绕开被独占的 byte 0 ⇒ 持锁期就能拿到持有者 pid。
+
+    旧口径（`read_text()` 整读）在持锁期必 PermissionError ⇒ `is_held_by_other()` 的告警恒为 pid=unknown；
+    持有者信息本就写在 byte 1 之后（`_write_owner_info` 用 `\n` 当 sentinel），偏移 1 即够。
+    """
     path = _lock_file(tmp_path)
     holder = LockManager(path, ttl_seconds=60)
 
     with holder.acquire():
-        waiter = LockManager(path, ttl_seconds=60)
-        assert waiter._read_owner_pid() is None
+        assert LockManager(path, ttl_seconds=60)._read_owner_pid() == os.getpid()
 
     assert LockManager(path, ttl_seconds=60)._read_owner_pid() == os.getpid()
+
+
+def test_held_by_other_alert_carries_the_real_pid(tmp_path, caplog):
+    """告警文案是用户唯一能看到的持锁者身份：`pid=<真值>`，不再是 unknown。"""
+    path = _lock_file(tmp_path)
+    holder = LockManager(path, ttl_seconds=60)
+
+    with holder.acquire(), caplog.at_level("WARNING"):
+        assert LockManager(path, ttl_seconds=60).is_held_by_other() is True
+
+    msgs = [r.message for r in caplog.records if "held_by_other" in r.message]
+    assert len(msgs) == 1
+    assert f"pid={os.getpid()}" in msgs[0] and "pid=unknown" not in msgs[0]
 
 
 def test_read_owner_pid_tolerates_missing_or_pidless_file(tmp_path):
