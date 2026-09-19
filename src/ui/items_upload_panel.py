@@ -363,11 +363,32 @@ def render_items_upload_panel():
             st.error(f"PDF 生成失败：{exc}")
 
 
+# s919-11：文件名四道加固（缺陷由 s918-45 钉桩记录，见 outbox 同单遗留段）
+_SAFE_NAME_MAX = 80          # 防撞 MAX_PATH：base 截到 80，加 "."＋扩展名仍在安全区
+_WINDOWS_RESERVED = {
+    "con", "prn", "aux", "nul",
+    *(f"com{i}" for i in range(1, 10)),
+    *(f"lpt{i}" for i in range(1, 10)),
+}
+
+
 def _safe_filename(title: str, ext: str) -> str:
-    base = (title or "questionnaire").strip()
+    """清洗导出文件名：非法字符→`_`、剔除其余控制字符、空名兜底、保留名加后缀、超长截断。
+
+    `ext` 不清洗（两个调用点只传字面量 "docx"/"pdf"，见 :337/:356）——留作接口约束，未在此兜底。
+    """
+    base = (title or "").strip()
     # 去掉常见非法字符
     for ch in '\\/:*?"<>|\n\r\t':
         base = base.replace(ch, "_")
+    # NUL 等其余控制字符**剔除**而非替换：留着会让下游 open() 直接 ValueError
+    base = "".join(ch for ch in base if ch == " " or ch >= "!").strip()
+    if not base:
+        base = "questionnaire"                     # 全空白/空串走兜底（改前 "   " 会产出 ".docx"）
+    if base.split(".")[0].lower() in _WINDOWS_RESERVED:
+        base = f"{base}_"                          # Windows 连 con.txt 这种带扩展名的也拒收
+    if len(base) > _SAFE_NAME_MAX:
+        base = base[:_SAFE_NAME_MAX].rstrip(". ")  # 截断后不留尾点/尾空格（Windows 会静默去掉它们）
     return f"{base}.{ext}"
 
 
