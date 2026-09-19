@@ -33,4 +33,5 @@
 
 - app.py 剩余可拆块：重依赖预热线程块（_preload_heavy_deps，约 350-371 行）、_autosave_current_workspace 等，留第三批。
 - pytest 终端汇总行被吞（疑浏览器 e2e conftest 的 atexit 硬退出）——影响所有「看汇总行」的流程，建议日间定位（junitxml 可绕过）。
+  > 结案标注（s918-51 诊断 → s919-19 落注，2026-09-19）：当天全量日常跑汇总行正常输出（`2859 passed, 1 skipped, 89 deselected, 43 warnings in 277.72s`，退出码 0），本条猜想的两处代码依据均被否证——`tests/conftest.py` 内无 `atexit`/`os._exit`/`sys.exit`/`pytest_sessionfinish` 之类钩子，仓内也没有顶层 `conftest.py`；全仓唯一 `atexit.register` 是 `src/utils/autosave.py:128` 的 `flush_background(5.0)`，它吞异常、不打印、不硬退出。故本条按「未复现·已否证猜想」结案，证据与复现命令见 `docs/insights/psy-pytest-swallow-diagnosis-20260918.md`；日后若再见"汇总行缺失"，先查读取方式（例如 `pytest -q | head -N` 提前关管道）而不是这条。
 - 23 个浏览器 e2e 非绿需日间在带浏览器/server 的环境复跑定绿，非本班能闭环。
