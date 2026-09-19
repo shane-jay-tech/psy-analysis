@@ -24,6 +24,32 @@
 .\.venv\Scripts\python.exe -m pytest -m "ui" -v
 ```
 
+## 解释器口径（两口径数字不可混比）
+
+一切测试 / collect 一律用**仓内虚拟环境解释器**：`.venv/Scripts/python.exe -m pytest …`（Windows）。
+系统 python 与 .venv 的依赖集不同，口径混用会把**环境差异误报成代码回归**。
+
+| 口径 | 节点数字（2026-09-15/16 复跑） | 出处 |
+|---|---|---|
+| `.venv` 全量 | **2606 passed / 60 skipped / 0 failed**（4m22s）；同口径 9/14 夜为 2600/60 | `docs/insights/psy-interpreter-caliber-20260915.md`（引 915-40 result） |
+| 系统 python 全量 | 2600 passed / 60 skipped；`collect-only` 口径下 collect=2665 | 同上（p914-19-bridge-collect-relocation） |
+| `.venv` collect | **2665 collected / 0 error** | 同上 |
+| 系统 python 跑 d914 批 | 曾出 **25 failed / 13 error 假失败** | `psy-interpreter-caliber-20260915.md` 前言 |
+
+差异原因：系统解释器缺 Playwright 等依赖 ⇒ 收集与跳过判定与 `.venv` 不一致
+（同一批用例在系统口径下报 ERROR、在 venv 口径下是 SKIP）；`.venv` 是 `requirements-lock.txt` 的权威镜像。
+
+```powershell
+# 权威口径（引用测试数字时必须用这两条，并附复跑时刻）
+cd D:/code/psy-analysis
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m pytest tests --collect-only -q | Select-Object -Last 1
+```
+
+> ⚠️ 表内 2606 / 2665 是 **9/15–9/16 的节点值**，不是现值。例如 2026-09-19 夜补测后 collect 已到 **2766**；
+> 引用前请按上面的命令现跑一次。桥侧任务书若只写 `python -m pytest`，执行班按本口径替换解释器并在 result 披露
+> （既有先例：915-19 / 915-40）。
+
 ## 发版前命令
 
 ```powershell
@@ -100,7 +126,7 @@
 
 | 失败情况 | 解法 |
 |---------|------|
-| `import error` 类测试失败 | 运行 `.venv/Scripts/pip install -e .` 或检查依赖 |
+| `import error` 类测试失败 | 本项目非安装包（根目录无 pyproject.toml/setup.py），可编辑安装不适用；请从项目根用 `.venv\Scripts\python.exe -m pytest` 运行，确实缺依赖再 `.venv\Scripts\pip.exe install -r requirements.txt` |
 | `online` 标记测试超时 | 检查网络连接，Crossref 可能限流 |
 | `perf_smoke` 显示 WARN | 非错误，只是超阈值提醒；FAIL 才需要排查 |
 | pytest 收集报错 | 运行 `pytest --collect-only` 查看哪个文件语法错 |

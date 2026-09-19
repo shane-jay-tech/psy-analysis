@@ -48,6 +48,11 @@ python launcher.pyw
 DEEPSEEK_API_KEY=...
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 DEEPSEEK_MODEL=deepseek-chat
+
+# 持久化路径重定向（实读于 src/utils/app_paths.py，不设则用默认值）
+PSY_ANALYSIS_HOME=~/.psy_analysis          # 用户数据根；派生 projects/ 与 user_prefs.json、autosave.json
+PSY_ANALYSIS_ARCHIVE_DIR=<仓库>/archive    # 归档根；默认落在仓库内 archive/，便携部署时可指到仓外
+PSY_ANALYSIS_LOG_DIR=logs                  # 运行日志目录；默认是「相对当前工作目录」的 logs/，换 cwd 就会换位置
 ```
 
 ## 分析方法

@@ -26,6 +26,7 @@ desktop.ini
 .idea/
 
 # ---- 临时 / 输出 ----
+tmp/
 *.tmp
 ~$*
 test_artifacts/
