@@ -123,18 +123,27 @@ def test_logger_swallows_only_the_write_failure(monkeypatch, tmp_path):
     ul.log_event("page_visit", page_id="x")  # 不抛
 
 
-def test_dir_creation_failure_escapes_the_try_block(monkeypatch):
-    """`_ensure_log_dir()` 在 try 之外被调用 ⇒ 目录建不出来时异常会**抛进 UI 主路径**，
-    而不是像写盘那样静默。钉住这个可用性缺口。"""
+@pytest.mark.parametrize(
+    "logger_fn,event",
+    [(ul.log_event, "page_visit"), (ul.log_error, "export_failed")],
+    ids=["log_event", "log_error"],
+)
+def test_dir_creation_failure_is_swallowed_like_write_failures(monkeypatch, tmp_path, logger_fn, event):
+    """s919-04 翻正（原钉「目录创建失败逃逸 try 块」）：`_ensure_log_dir()` 已在 try 内 ⇒ 不抛进 UI 主路径。
+
+    刻意 monkeypatch `_ensure_log_dir` 本身成 raise，而不是 patch `Path.mkdir`：
+    只有异常发生在调用方 try 之内才算数，patch 真 mkdir 会把 try 外的调用一起吞掉，测不出位置。
+    """
     monkeypatch.setattr(ul, "_ENABLED", True)
+    monkeypatch.setattr(ul, "_LOG_DIR", tmp_path / "gone")
 
     def boom():
         raise OSError("cannot create log dir")
 
     monkeypatch.setattr(ul, "_ensure_log_dir", boom)
 
-    with pytest.raises(OSError, match="cannot create log dir"):
-        ul.log_event("page_visit", page_id="x")
+    logger_fn(event, page_id="x")                      # 不抛 ＝ 本单的全部契约
+    assert not (tmp_path / "gone").exists()            # 建目录失败即中止，不会带着缺失目录继续写盘
 
 
 def test_kill_switch_makes_logging_a_noop(monkeypatch, tmp_path):

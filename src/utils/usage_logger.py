@@ -47,8 +47,6 @@ def log_event(event_type: str, **kwargs):
     """
     if not _ENABLED:
         return
-    _ensure_log_dir()
-
     entry = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "event": event_type,
@@ -57,6 +55,7 @@ def log_event(event_type: str, **kwargs):
 
     log_file = _LOG_DIR / f"usage_events_{date.today().strftime('%Y%m%d')}.jsonl"
     try:
+        _ensure_log_dir()
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except OSError:
@@ -72,8 +71,6 @@ def log_error(error_type: str, **kwargs):
     """
     if not _ENABLED:
         return
-    _ensure_log_dir()
-
     entry = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "error": error_type,
@@ -82,6 +79,7 @@ def log_error(error_type: str, **kwargs):
 
     log_file = _LOG_DIR / f"error_events_{date.today().strftime('%Y%m%d')}.jsonl"
     try:
+        _ensure_log_dir()
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except OSError:
