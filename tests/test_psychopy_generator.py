@@ -1,7 +1,7 @@
 """src/experiment_design/psychopy_generator.py 特征化测试（s918-32）。
 
 三范式脚本生成：纯字符串断言，**零执行生成脚本**（生成期也不 import psychopy）。
-只锁现状不改算法；已知缺陷以「钉住现状」的方式入测，见最后一例。
+只锁现状不改算法；s918-32 钉的那条"产物过不了 compile()"缺陷已由 s919-01 修好并翻正为编译断言（见文末两例）。
 """
 import random
 import sys
@@ -123,13 +123,36 @@ def test_output_path_writes_the_same_string_it_returns(tmp_path):
     assert target.read_text(encoding="utf-8") == returned
 
 
-def test_known_defect_generated_script_does_not_parse():
-    """`_script_routine_defs` 返回整块缩进 4 空格的串，被 `_build_script` 顶层拼接后
-    产生 SyntaxError: unexpected indent——生成的脚本当前无法独立运行。
-    本例钉住缺陷；修好后它会失败，届时翻成 compile() 通过。"""
-    script = generate_psychopy_script(_exp())
+@pytest.mark.parametrize(
+    "exp",
+    [
+        _exp(),
+        _exp(show_feedback=False),
+        _exp(paradigm="custom_x"),
+        generate_standard_paradigm("stroop", n_trials_per_condition=2),
+        generate_standard_paradigm("flanker", n_trials_per_condition=2),
+        generate_standard_paradigm("memory", n_trials_per_condition=2),
+    ],
+    ids=["feedback_on", "feedback_off", "unknown_paradigm", "stroop", "flanker", "memory"],
+)
+def test_generated_script_compiles(exp):
+    """s919-01 翻正（原钉「产物过不了 compile()，SyntaxError: unexpected indent」）。
 
-    with pytest.raises(SyntaxError) as exc:
-        compile(script, "<generated>", "exec")
+    改后六种形态全部可编译。只 compile 不 exec——psychopy 不在依赖里，执行也不是本模块的契约
+    （文件头那条"零执行生成脚本"仍然成立）。
+    """
+    compile(generate_psychopy_script(exp), "<generated>", "exec")
 
-    assert "unexpected indent" in str(exc.value)
+
+def test_injected_blocks_land_inside_run_trial_body():
+    """钉本次修复的**形态**：函数顶格、插值块在函数体内再进一层（4 空格），块内再深一层（8）。
+
+    注入列数弄错时 `compile()` 也会红（0 列会让后续函数体变成"意外缩进"），但报出来的是
+    "unexpected indent at line N"，看不出是谁的锅；这条直接点名"哪一层该在第几列"。
+    """
+    lines = generate_psychopy_script(_exp(paradigm="stroop")).splitlines()
+
+    assert "def run_trial(trial, trial_num):" in lines                       # 顶格
+    assert "    if response:" in lines                                       # 判断块首行在体内（4 空格）
+    assert "    if trial.get('is_practice'):" in lines                        # 反馈块同样在体内
+    assert "        color_to_key = {'红': 'f', '绿': 'j', '蓝': 'f', '黄': 'j'}" in lines  # 再进一层（8）

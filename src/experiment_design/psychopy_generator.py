@@ -333,7 +333,10 @@ def _script_routine_defs(exp: PsychoPyExperiment) -> str:
     # Determine correct response mapping per paradigm
     correct_logic = _correct_response_logic(exp)
 
-    return textwrap.dedent(f"""\
+    # 插值块必须在 dedent **之后**注入：模板里直接嵌多行串会让 f-string 先展开，
+    # 块的首行跟着模板的缩进、其余行带着自己的缩进，外层 dedent 的公共前缀就被打成 0，
+    # 整块因此保持源文件里的 +4 缩进 ⇒ `def run_trial` 变成"意外缩进"（s918-32 BLOCKER）。
+    routine = textwrap.dedent(f"""\
     # ========== 试次呈现例程 ==========
     def run_trial(trial, trial_num):
         \"\"\"运行单个试次\"\"\"
@@ -364,9 +367,9 @@ def _script_routine_defs(exp: PsychoPyExperiment) -> str:
             core.wait(0.001)
 
         # 判断正确性
-        {correct_logic}
+    @@CORRECT_LOGIC@@
 
-        {feedback_lines}
+    @@FEEDBACK@@
 
         # 试次间间隔
         fixation.draw()
@@ -385,6 +388,22 @@ def _script_routine_defs(exp: PsychoPyExperiment) -> str:
             'timestamp': datetime.now().isoformat(),
         }}
     """)
+
+    return (
+        routine.replace("@@CORRECT_LOGIC@@", _indent_block(correct_logic, 4))
+             .replace("@@FEEDBACK@@", _indent_block(feedback_lines, 4))
+    )
+
+
+def _indent_block(block: str, spaces: int) -> str:
+    """把生成好的代码块整体缩进到指定列（先 dedent 再 indent，调用方不必关心块自己的基准缩进）。
+
+    `_correct_response_logic` 的各分支基准并不统一（三个范式的串 dedent 后从 0 列起，
+    else 分支却自带 8 空格），这里一律归零再加缩进，插进模板后才是同一层。
+    """
+    if not block.strip():
+        return ""
+    return textwrap.indent(textwrap.dedent(block), " " * spaces)
 
 
 def _correct_response_logic(exp: PsychoPyExperiment) -> str:
