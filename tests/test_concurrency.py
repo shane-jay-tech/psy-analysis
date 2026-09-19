@@ -134,6 +134,33 @@ class TestSessionLockUIIntegration:
         result = _check_lock_or_warn(_LR_NOTES_LOCK)
         assert result is True
 
+    def test_acquire_failure_also_warns(self, monkeypatch):
+        """`acquire()` 返回 False 必须出声（s919-06：静默 bool ＝ 用户点"保存笔记"以为没反应）。
+
+        正常路径由 is_locked 先拦住，这条分支要 is_locked 与 acquire 之间锁被接管才会走到——
+        单轮 Streamlit 内近乎不可达，故用 monkeypatch 造时序，钉的是"只要走到，就有 warning"。
+        """
+        from src.ui import literature_review_panel as panel
+        from src.utils.concurrency import SessionLock
+
+        st.session_state.clear()
+        SessionLock(st.session_state).acquire(panel._LR_NOTES_LOCK, holder_id="other_tab", ttl=30)
+
+        warnings = []
+
+        class FakeSt:
+            session_state = st.session_state
+
+            def warning(self, msg):
+                warnings.append(msg)
+
+        monkeypatch.setattr(panel, "st", FakeSt())
+        monkeypatch.setattr(SessionLock, "is_locked", lambda self, resource, by_others=False: False)
+
+        assert panel._check_lock_or_warn(panel._LR_NOTES_LOCK) is False
+        assert len(warnings) == 1, "False 分支必须且只能给一条提示"
+        assert panel._LR_NOTES_LOCK in warnings[0] and "other_tab" in warnings[0]
+
     def test_lock_resources_distinct(self):
         """笔记锁与矩阵锁是独立资源，互不干扰。"""
         from src.ui.literature_review_panel import _LR_NOTES_LOCK, _LR_MATRIX_LOCK

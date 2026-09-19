@@ -85,7 +85,13 @@ def _check_lock_or_warn(resource: str) -> bool:
         return False
     # 尝试获取锁（即便没人锁也获取，TTL 30s 自动过期）
     my_id = ensure_tab_id(st.session_state)
-    return lock.acquire(resource, holder_id=my_id, ttl=30)
+    if not lock.acquire(resource, holder_id=my_id, ttl=30):
+        # 走到这里说明 is_locked 与 acquire 之间锁被别人接管（同一轮里近乎不可达，
+        # 见 s919-06：会话锁存于 per-session 的 session_state，跨 tab 本来就不感知）。
+        # 但契约是"False 必有提示"——静默 bool 会让用户以为按钮没反应。
+        st.warning(locked_user_prompt(resource, lock.get_holder(resource)))
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
