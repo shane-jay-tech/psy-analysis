@@ -412,11 +412,16 @@ def _parse_crossref_item(item: Dict) -> Optional[Dict]:
     ).get("date-parts", [[None]])[0]
     year = str(date_parts[0]) if date_parts and date_parts[0] else ""
 
-    # 构建APA7引用
+    # 构建APA7引用（委托 literature_manager.LiteratureEntry，916p-a4-005 §四已审定）
+    from src.paper_writer.literature_manager import LiteratureEntry
+
     first_author = author_names[0] if author_names else ""
-    ref_apa7 = f"{first_author} ({year}). {title}. {container}."
-    if doi:
-        ref_apa7 += f" https://doi.org/{doi}"
+    entry = LiteratureEntry(
+        key=f"{first_author.split(',')[0]}{year}", authors=author_names, year=year,
+        title=title, journal=container, doi=doi,
+        is_chinese=any("一" <= c <= "鿿" for c in title),
+    )
+    ref_apa7 = entry.format_reference()
 
     # 尝试从标题/摘要中提取n_items和alpha
     abstract = item.get("abstract", "")

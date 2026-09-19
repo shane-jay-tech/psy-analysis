@@ -146,6 +146,7 @@ def _search_crossref(construct_name: str, domain: str = "") -> List[Dict]:
     )
 
     results = []
+    from src.paper_writer.literature_manager import LiteratureEntry
 
     try:
         with urllib.request.urlopen(req, timeout=API_TIMEOUT) as resp:
@@ -186,10 +187,12 @@ def _search_crossref(construct_name: str, domain: str = "") -> List[Dict]:
                 if not title:
                     continue
 
-                # 提取相关信息
-                reference_str = f"{first_author} ({year}). {title}. {container}."
-                if doi:
-                    reference_str += f" doi:{doi}"
+                # 提取相关信息（APA7 串收敛到 LiteratureEntry.format_reference，916p-a4-005 §四）
+                reference_str = LiteratureEntry(
+                    key=f"{first_author.split(',')[0]}{year}", authors=author_names, year=year,
+                    title=title, journal=container, doi=doi,
+                    is_chinese=any("一" <= c <= "鿿" for c in title),
+                ).format_reference()
 
                 results.append({
                     "source": "academic_api",
