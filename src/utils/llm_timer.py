@@ -4,7 +4,7 @@
 - 0s: "正在思考..."
 - 10s: 显示已等待秒数
 - 30s: 提示可能较慢
-- 60s: 提供取消建议
+- timeout_hint（默认 60s）: 提供取消建议
 - 失败: 显示模型名、耗时、可操作建议
 """
 import time
@@ -66,10 +66,11 @@ def llm_status(label: str = "AI 思考中", timeout_hint: int = 60, model_name: 
                 msg = f"⏳ {label}... ({elapsed:.0f}s)"
             elif elapsed < 30:
                 msg = f"⏳ {label}... 已等待 {elapsed:.0f}s"
-            elif elapsed < 60:
+            elif elapsed < timeout_hint:
                 msg = f"⏳ {label}... 已等待 {elapsed:.0f}s（较慢，可能是网络或模型排队）"
             else:
-                msg = f"⏳ {label}... 已等待 {elapsed:.0f}s（超过1分钟，如无响应可取消重试）"
+                # s919-14：阈值与文案都接到 timeout_hint（原先写死 60，参数无人读＝死参数，见 s918-21 遗留 1）
+                msg = f"⏳ {label}... 已等待 {elapsed:.0f}s（超过{timeout_hint}s，如无响应可取消重试）"
             try:
                 container.info(msg)
             except Exception:

@@ -2,7 +2,7 @@
 
 纯状态函数＋上下文管理器：假 `st`、假时钟、`cancel_request` 打桩，**零 LLM、零网络、零等待**。
 只钉状态机与文案，不评价提示语措辞。
-锚点：src/utils/llm_timer.py:33，104 行。
+锚点：src/utils/llm_timer.py:33 `set_active_cancel_id` 与 :48 `llm_status`，现 105 行（s919-14 接线后）。
 """
 import pytest
 
@@ -158,12 +158,18 @@ def test_entering_llm_status_clears_a_pending_cancel(ui, clock):
         assert lt.is_cancel_requested() is False
 
 
-def test_timeout_hint_is_a_dead_parameter(ui):
-    """`timeout_hint` 只出现在函数签名里，函数体从不读它——60s 阈值是写死的文案。
-    调用方（如 quick_entries 的 `llm_status(..., timeout_hint=60)`）改这个值不会有任何效果。"""
+def test_timeout_hint_now_drives_the_threshold(ui):
+    """s919-14 接线（原钉桩 `test_timeout_hint_is_a_dead_parameter` 记录的是"死参数"现状）：
+    改前函数体从不读 `timeout_hint`，60s 阈值与「超过1分钟」文案都是写死的 ⇒
+    调用方 `llm_status(..., timeout_hint=60)`（`src/ui/quick_entries.py:657`）改值无任何效果。
+    现在阈值与文案都取该参数；本用例仍走 `inspect.getsource` 的静态口径——
+    提示文案由后台 ticker 线程每 1s 推一次，拿运行时时序断言会 flaky，不值得为这条引入假时钟线程驱动。
+    """
     import inspect
 
     src = inspect.getsource(lt.llm_status.__wrapped__)
 
-    assert src.count("timeout_hint") == 1
-    assert "超过1分钟" in src
+    assert src.count("timeout_hint") >= 2          # 签名之外至少还有消费点
+    assert "elapsed < timeout_hint" in src         # 分支阈值接上了
+    assert "elapsed < 60" not in src               # 旧写死值已消失
+    assert "超过{timeout_hint}s" in src            # 文案随参数插值，不再钉死"1分钟"
