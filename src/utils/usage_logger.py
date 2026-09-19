@@ -11,6 +11,8 @@
     log_error("export_failed", error_id="pdf_unavailable", severity="warning")
 """
 import json
+import logging
+import os
 import time
 from datetime import datetime, date
 from pathlib import Path
@@ -18,13 +20,45 @@ from typing import Optional, Any
 
 from src.utils.app_paths import LOG_DIR
 
-_LOG_DIR = LOG_DIR
+# 显式覆盖点（测试/嵌入部署用）；为 None 时**调用期**解析，不再吃 import 期的旧绑定。
+_LOG_DIR: Optional[Path] = None
 _ENABLED = True
+_ALERTED: set[str] = set()
+
+
+def _log_dir() -> Path:
+    """解析日志目录：显式打桩 > 环境变量 `PSY_ANALYSIS_LOG_DIR` > `app_paths.LOG_DIR`。
+
+    早先是模块顶部 `_LOG_DIR = LOG_DIR` 一次性绑定——`.env`/测试在 import 之后才设环境变量就不认了，
+    而 `LOG_DIR` 的**默认值本身没动**（仍是 `app_paths` 里那个 `Path("logs")`）。
+    """
+    if _LOG_DIR is not None:
+        return Path(_LOG_DIR)
+    value = os.environ.get("PSY_ANALYSIS_LOG_DIR", "").strip()
+    return Path(value).expanduser() if value else LOG_DIR
+
+
+def _alert_once(kind: str, message: str) -> None:
+    """同一 kind 只报一次：日志目录坏了会被每次埋点撞上，全报会把控制台刷死。"""
+    if kind in _ALERTED:
+        return
+    _ALERTED.add(kind)
+    logging.warning("[usage-log-alert] %s %s", kind, message)
 
 
 def _ensure_log_dir():
-    """确保日志目录存在。"""
-    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    """确保日志目录存在。建不出来照旧抛 `OSError`，但先吱一声。
+
+    告警文案里**不再二次调用** `_log_dir()`：解析本身也可能失败，在 except 里再抛一个异常
+    会让告警一条都发不出去（写这版时正是被自己的用例抓到）。
+    """
+    target = None
+    try:
+        target = _log_dir()
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        _alert_once("mkdir_failed", f"日志目录不可用 dir={target if target is not None else '未解析'}：{exc!r}")
+        raise
 
 
 def set_enabled(enabled: bool):
@@ -53,7 +87,7 @@ def log_event(event_type: str, **kwargs):
         **kwargs,
     }
 
-    log_file = _LOG_DIR / f"usage_events_{date.today().strftime('%Y%m%d')}.jsonl"
+    log_file = _log_dir() / f"usage_events_{date.today().strftime('%Y%m%d')}.jsonl"
     try:
         _ensure_log_dir()
         with open(log_file, "a", encoding="utf-8") as f:
@@ -77,7 +111,7 @@ def log_error(error_type: str, **kwargs):
         **kwargs,
     }
 
-    log_file = _LOG_DIR / f"error_events_{date.today().strftime('%Y%m%d')}.jsonl"
+    log_file = _log_dir() / f"error_events_{date.today().strftime('%Y%m%d')}.jsonl"
     try:
         _ensure_log_dir()
         with open(log_file, "a", encoding="utf-8") as f:
@@ -87,12 +121,17 @@ def log_error(error_type: str, **kwargs):
 
 
 def get_usage_summary(days: int = 7) -> dict:
-    """获取最近 N 天的使用摘要。"""
-    _ensure_log_dir()
+    """获取最近 N 天的使用摘要。目录建不出来只给空摘要——读侧不许把界面带崩。"""
     events_by_type: dict[str, int] = {}
     total_events = 0
 
-    for log_file in sorted(_LOG_DIR.glob("usage_events_*.jsonl"))[-days:]:
+    try:
+        _ensure_log_dir()
+        files = sorted(_log_dir().glob("usage_events_*.jsonl"))[-days:]
+    except OSError:
+        files = []
+
+    for log_file in files:
         try:
             for line in log_file.read_text(encoding="utf-8").splitlines():
                 if line.strip():
@@ -111,12 +150,17 @@ def get_usage_summary(days: int = 7) -> dict:
 
 
 def get_error_summary(days: int = 7) -> dict:
-    """获取最近 N 天的错误摘要。"""
-    _ensure_log_dir()
+    """获取最近 N 天的错误摘要。同 `get_usage_summary`：读侧不抛。"""
     errors_by_type: dict[str, int] = {}
     total_errors = 0
 
-    for log_file in sorted(_LOG_DIR.glob("error_events_*.jsonl"))[-days:]:
+    try:
+        _ensure_log_dir()
+        files = sorted(_log_dir().glob("error_events_*.jsonl"))[-days:]
+    except OSError:
+        files = []
+
+    for log_file in files:
         try:
             for line in log_file.read_text(encoding="utf-8").splitlines():
                 if line.strip():
@@ -183,9 +227,14 @@ def export_feedback_package(output_dir: Optional[Path] = None) -> Path:
 
 
 def clear_logs():
-    """清除所有本地日志文件。"""
-    _ensure_log_dir()
-    for f in _LOG_DIR.glob("*.jsonl"):
+    """清除所有本地日志文件。目录不可用时视为"没有可清的"，不抛。"""
+    try:
+        _ensure_log_dir()
+        files = list(_log_dir().glob("*.jsonl"))
+    except OSError:
+        return
+
+    for f in files:
         try:
             f.unlink()
         except OSError:

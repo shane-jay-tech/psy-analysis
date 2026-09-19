@@ -168,3 +168,96 @@ def test_logger_writes_one_json_line_per_event_with_epoch_seconds(monkeypatch, t
     entry = json.loads(files[0].read_text(encoding="utf-8").strip())
     assert entry["event"] == "export" and entry["format"] == "docx"
     assert len(entry["timestamp"]) == 19  # 秒级 ISO，无毫秒
+
+
+# ────────────── s920-07：目录调用期解析＋建不出来要吱一声＋读侧不许崩 ──────────────
+def test_log_dir_is_resolved_at_call_time_not_import_time(monkeypatch, tmp_path):
+    """`_LOG_DIR=None` 时认环境变量，且是**每次调用**都认（改前先 import 定死了，后来设 env 无效）。"""
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    monkeypatch.setattr(ul, "_LOG_DIR", None)
+    monkeypatch.setenv("PSY_ANALYSIS_LOG_DIR", str(a))
+    assert ul._log_dir() == a
+    monkeypatch.setenv("PSY_ANALYSIS_LOG_DIR", str(b))
+    assert ul._log_dir() == b                      # 换了立刻生效，不需要重导入
+
+
+def test_explicit_override_beats_the_environment(monkeypatch, tmp_path):
+    """tests/conftest.py 与多处既有用例是直接打桩 `_LOG_DIR` 的——这条优先级不许变。"""
+    monkeypatch.setattr(ul, "_LOG_DIR", tmp_path / "pinned")
+    monkeypatch.setenv("PSY_ANALYSIS_LOG_DIR", str(tmp_path / "env"))
+    assert ul._log_dir() == tmp_path / "pinned"
+
+
+def test_default_log_dir_is_still_the_configured_one(monkeypatch, tmp_path):
+    """默认值不许被本次改动带跑：无覆盖、无环境变量 ⇒ 回到 `app_paths.LOG_DIR`。"""
+    from src.utils.app_paths import LOG_DIR
+
+    monkeypatch.setattr(ul, "_LOG_DIR", None)
+    monkeypatch.delenv("PSY_ANALYSIS_LOG_DIR", raising=False)
+    assert ul._log_dir() == LOG_DIR
+
+
+def test_mkdir_failure_alerts_once_and_still_raises(monkeypatch, caplog, tmp_path):
+    import logging
+
+    class ReadOnlyDir:
+        """模拟"目录解析得出来、但建不出来"（只读盘/权限不足）。"""
+
+        def mkdir(self, *a, **k):
+            raise OSError("只读盘")
+
+        def __str__(self):
+            return "logs"
+
+    monkeypatch.setattr(ul, "_ALERTED", set())
+    monkeypatch.setattr(ul, "_log_dir", lambda: ReadOnlyDir())
+
+    with caplog.at_level(logging.WARNING, logger=""):
+        for _ in range(5):
+            with pytest.raises(OSError):
+                ul._ensure_log_dir()               # 语义不变：建不出来照样抛
+
+    alerts = [r.getMessage() for r in caplog.records if "[usage-log-alert]" in r.getMessage()]
+    assert len(alerts) == 1                        # 但一次比静默强：报一次，不报五次
+    assert "mkdir_failed" in alerts[0] and "只读盘" in alerts[0]
+
+
+def test_alert_message_does_not_re_resolve_the_dir(monkeypatch, caplog):
+    """回归自捉：告警文案里再调一次 `_log_dir()` 会在 except 里二次抛异常，结果一条告警都发不出去。"""
+    import logging
+
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        raise OSError("环境变量坏了")
+
+    monkeypatch.setattr(ul, "_ALERTED", set())
+    monkeypatch.setattr(ul, "_log_dir", flaky)
+
+    with caplog.at_level(logging.WARNING, logger=""):
+        with pytest.raises(OSError):
+            ul._ensure_log_dir()
+
+    assert calls["n"] == 1                         # 只解析一次，不在异常处理里重试
+    alerts = [r.getMessage() for r in caplog.records if "[usage-log-alert]" in r.getMessage()]
+    assert len(alerts) == 1 and "未解析" in alerts[0]
+
+
+@pytest.mark.parametrize("reader", ["get_usage_summary", "get_error_summary"])
+def test_readers_degrade_to_empty_summary_instead_of_crashing(monkeypatch, reader):
+    """改前三处 `_ensure_log_dir()` 在 try 外面 ⇒ 目录坏了读摘要直接把界面带崩。"""
+    monkeypatch.setattr(ul, "_ensure_log_dir", lambda: (_ for _ in ()).throw(OSError("建不出来")))
+
+    out = getattr(ul, reader)()
+
+    assert out[f"total_{'events' if reader.endswith('usage_summary') else 'errors'}"] == 0
+    assert out[f"{'events' if reader.endswith('usage_summary') else 'errors'}_by_type"] == {}
+    assert out["period_days"] == 7                 # 摘要结构照旧，只是空
+
+
+def test_clear_logs_is_quiet_when_the_dir_is_unavailable(monkeypatch):
+    monkeypatch.setattr(ul, "_ensure_log_dir", lambda: (_ for _ in ()).throw(OSError("建不出来")))
+
+    ul.clear_logs()                                # 不抛就是全部要求
