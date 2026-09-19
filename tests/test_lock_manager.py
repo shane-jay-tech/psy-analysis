@@ -72,16 +72,23 @@ def test_nested_acquire_on_same_instance_raises_runtime_error(tmp_path):
                 pass
 
 
-def test_is_stale_boundary_is_strictly_greater_than_ttl(tmp_path):
+def test_is_stale_uses_margin_on_both_sides_of_ttl(tmp_path):
+    """陈旧判据是 `lock_manager.py:123` 的 `(time.time() - mtime) > ttl`——**现算 wall clock**。
+
+    因此不能拿"mtime 正好等于 ttl"当断言点：`os.utime` 里取的 `time.time()` 与 `is_stale()` 里那次
+    之间必然已过去若干微秒，age 恒 > ttl ⇒ 断"不陈旧"会随机/近乎必然地红（本用例前一版正是这个坑，
+    全量跑里稳定失败，s919-22 收口时改写成两侧留裕量）。
+    没走"注入时钟"是因为 psy 有后台 autosave 线程，patch 全局 `time.time` 会牵连别人。
+    """
     path = _lock_file(tmp_path)
     mgr = LockManager(path, ttl_seconds=10)
     path.write_text("\n", encoding="utf-8")
 
-    os.utime(path, (time.time() - 10, time.time() - 10))
-    assert mgr.is_stale() is False                     # 正好等于 ttl 不算陈旧
+    os.utime(path, (time.time() - 9, time.time() - 9))
+    assert mgr.is_stale() is False                     # ttl 内 1 秒：必不陈旧
 
-    os.utime(path, (time.time() - 11, time.time() - 11))
-    assert mgr.is_stale() is True
+    os.utime(path, (time.time() - 15, time.time() - 15))
+    assert mgr.is_stale() is True                      # 超 ttl 5 秒：必陈旧
 
 
 def test_break_stale_deletes_only_when_stale(tmp_path):
