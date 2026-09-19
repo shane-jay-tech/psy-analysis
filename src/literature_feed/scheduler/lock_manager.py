@@ -81,6 +81,11 @@ class LockManager:
         m = re.search(r"pid=(\d+)", text)
         return int(m.group(1)) if m else None
 
+    def _owner_suffix(self) -> str:
+        """给"抢锁失败"补一句是谁占着——读不到就当 unknown，绝不因为取信息而改变结论。"""
+        pid = self._read_owner_pid()
+        return f"（持有者 pid={pid if pid is not None else 'unknown'}）"
+
     def _alert_once(self, kind: str, message: str) -> None:
         """同一实例同一 kind 只告警一次。"""
         if kind in self._alerted:
@@ -165,14 +170,14 @@ class LockManager:
 
         try:
             self._do_lock(fh)
-        except LockBusyError:
+        except LockBusyError as exc:
             with contextlib.suppress(OSError):
                 fh.close()
-            raise
+            raise LockBusyError(f"{exc}{self._owner_suffix()}") from exc
         except OSError as exc:
             with contextlib.suppress(OSError):
                 fh.close()
-            raise LockBusyError(f"获取锁失败: {exc}") from exc
+            raise LockBusyError(f"获取锁失败: {exc}{self._owner_suffix()}") from exc
 
         self._fh = fh
 
@@ -228,7 +233,10 @@ class LockManager:
             self._fh.write(payload)
             self._fh.flush()
             os.fsync(self._fh.fileno())
-        except (OSError, ValueError):
-            # 写不进去不算致命，锁还是有效的
-            pass
+        except (OSError, ValueError) as exc:
+            # 写不进去不算致命，锁还是有效的——但"谁在干活"这条可观测性没了，必须吱一声
+            self._alert_once(
+                "owner_write_failed",
+                f"lock={self.lock_path} 持有者信息写入失败（锁仍有效）：{exc!r}",
+            )
 

@@ -175,3 +175,80 @@ def test_read_owner_pid_tolerates_missing_or_pidless_file(tmp_path):
     assert mgr._read_owner_pid() is None
     path.write_text("\npid=4242 acquired_at=x\n", encoding="utf-8")
     assert mgr._read_owner_pid() == 4242
+
+
+# ────────────────── s920-08：抢锁失败要说得出"谁占着"，写不进持有者要吱一声 ──────────────────
+def test_busy_message_carries_the_real_owner_pid(tmp_path):
+    """真实两个实例抢同一把锁（Windows 下同一进程的第二个句柄也会被拒），消息里要带持有者 pid。"""
+    path = _lock_file(tmp_path)
+    holder, waiter = LockManager(path, ttl_seconds=60), LockManager(path, ttl_seconds=60)
+
+    with holder.acquire():
+        with pytest.raises(LockBusyError) as ei:
+            waiter._open_and_lock()
+
+    msg = str(ei.value)
+    assert msg.startswith("锁已被其他进程持有")            # 原文案一字不动，只在后面追加
+    assert f"持有者 pid={os.getpid()}" in msg             # 真从锁文件读到了，不是猜的
+    assert isinstance(ei.value, RuntimeError)             # 类型没变，既有 `except LockBusyError` 照常接住
+
+
+def test_busy_message_falls_back_to_unknown(tmp_path, monkeypatch):
+    path = _lock_file(tmp_path)
+    holder = LockManager(path, ttl_seconds=60)
+    waiter = LockManager(path, ttl_seconds=60)
+    monkeypatch.setattr(waiter, "_read_owner_pid", lambda: None)
+
+    with holder.acquire():
+        with pytest.raises(LockBusyError) as ei:
+            waiter._open_and_lock()
+
+    assert "持有者 pid=unknown" in str(ei.value)           # 读不到≠没信息，得明说"不知道"
+
+
+def test_platform_lock_error_also_gets_the_owner_suffix(tmp_path, monkeypatch):
+    """`_do_lock` 抛 OSError（不是 LockBusyError）那条分支同样要带持有者，且不漏 fd。"""
+    mgr = LockManager(_lock_file(tmp_path), ttl_seconds=60)
+    monkeypatch.setattr(mgr, "_do_lock",
+                        lambda fh: (_ for _ in ()).throw(OSError("EACCES")))
+    monkeypatch.setattr(mgr, "_read_owner_pid", lambda: 4321)
+
+    with pytest.raises(LockBusyError) as ei:
+        mgr._open_and_lock()
+
+    assert "获取锁失败" in str(ei.value) and "pid=4321" in str(ei.value)
+    assert mgr._fh is None                                 # 抛出前关掉了自己刚开的句柄
+
+
+def test_owner_write_failure_alerts_once_while_lock_stays_held(tmp_path, monkeypatch, caplog):
+    import logging
+
+    mgr = LockManager(_lock_file(tmp_path), ttl_seconds=60)
+    with caplog.at_level(logging.WARNING, logger=""):
+        with mgr.acquire():
+            good = mgr._fh
+
+            class BadFh:
+                def seek(self, *a):
+                    raise OSError("disk full")
+
+            monkeypatch.setattr(mgr, "_fh", BadFh())
+            mgr._write_owner_info()                        # 不许抛出去
+            assert mgr._fh is not None                     # 写失败不算致命，锁还在手上
+            assert "owner_write_failed" in mgr._alerted
+            mgr._write_owner_info()                        # 第二次不该再刷
+            monkeypatch.setattr(mgr, "_fh", good)
+
+    alerts = [r.getMessage() for r in caplog.records if "[lock-alert]" in r.getMessage()]
+    assert len(alerts) == 1                                # 同一 kind 每实例只报一次
+    assert "disk full" in alerts[0] and "锁仍有效" in alerts[0]
+
+
+def test_acquire_succeeds_even_if_fsync_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(lmk.os, "fsync", lambda fd: (_ for _ in ()).throw(OSError("flush 失败")))
+    mgr = LockManager(_lock_file(tmp_path), ttl_seconds=60)
+
+    with mgr.acquire() as got:
+        assert got is mgr                                  # 互斥照常成立
+        assert "owner_write_failed" in mgr._alerted        # 但这次是静默失败改成了有声失败
+    assert mgr._fh is None                                 # 退出仍正常释放
