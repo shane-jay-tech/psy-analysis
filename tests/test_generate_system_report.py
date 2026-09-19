@@ -13,6 +13,16 @@ import pytest
 import scripts.generate_system_report as g
 
 
+@pytest.fixture(autouse=True)
+def _no_syspath_pollution(monkeypatch):
+    """s919-17 幂等守卫：`gather_metrics()` 内部有**两处** `sys.path.insert(0, PROJECT_ROOT)`
+    （`scripts/generate_system_report.py:73` 与 `:112`），而本模块每个用例都把 `PROJECT_ROOT`
+    换成自己的 tmp 树 ⇒ 没有这层守卫，那些 tmp 路径会一路留在会话的 `sys.path` 里（无人回收）。
+    做法是**换掉 sys.path 这个对象本身**（浅拷贝），teardown 由 monkeypatch 还原 ⇒ 用例内随便插都不外溢。
+    """
+    monkeypatch.setattr(sys, "path", list(sys.path))
+
+
 @pytest.fixture
 def tiny(tmp_path):
     def write(name, text):
@@ -120,3 +130,26 @@ def test_gather_metrics_inserts_project_root_into_sys_path_each_call(tmp_path, m
     finally:
         while target in sys.path:
             sys.path.remove(target)
+
+
+def test_real_repo_has_no_async_def_tests_yet():
+    """口径哨兵（s918-53 遗留 1 的订正）：发布报告数测试函数用的是 `(?m)^\\s*def test_`，
+    **不认 `async def test_`** ⇒ 今天全仓 0 条异步测试所以不咬人，
+    一旦有人加 pytest-asyncio 用例，`test_functions` 就会**静默偏小**（报告的数比真的好少）。
+    本用例把这份"静默"换成显式红：真出现异步测试时，必须同步改
+    `scripts/generate_system_report.py` 的 count 口径（或本注释说明为何可以偏小）。
+    只读文件文本，不收集测试、不 import 任何被测模块。
+    """
+    import re
+    from pathlib import Path
+
+    tests_dir = Path(g.__file__).resolve().parents[1] / "tests"
+    pat = re.compile(r"(?m)^[ \t]*async[ \t]+def[ \t]+test_")
+    hits = [p.name for p in sorted(tests_dir.glob("test_*.py"))
+            if pat.search(p.read_text(encoding="utf-8", errors="ignore"))]
+
+    assert hits == [], (
+        f"仓库首次出现 async 测试：{hits}；"
+        "generate_system_report 的 test_functions 口径会漏计它们 ⇒ 发布报告数字偏小。"
+        "请把 count 模式改成同时认 async def，或在本用例里说明为何允许少计。"
+    )
