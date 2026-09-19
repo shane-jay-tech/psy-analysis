@@ -23,7 +23,13 @@ $ ?? 行数                        → 20
 
 **报告类（docs/insights，12）**：psy-app-split-2-20260913、psy-app-split-batch2-20260913、psy-app-split-batch3-20260914、psy-autosave-timer-semantics-20260913、psy-benchmark-score-backfill-20260913、psy-e2e-skip-inventory-20260914、psy-e2e-subset-order-20260913、psy-interpreter-caliber-20260915、psy-known-issues-101-rewrite-20260913、psy-perf-smoke-contract-test-20260915、psy-test-blindspot-audit-20260915.md＋.json —— 建议：随下次签核批直接提交。
 **脚本/源码类（4）**：src/ui/heavy_preload.py、src/ui/startup_checks.py（app-split 配套新源码，需单独复核）；tests/test_analysis_contracts.py、tests/test_perf_smoke_report.py、tests/test_startup_checks.py、tests/test_lock_alert_log.py（测试类，建议与对应实现同批提交）。
-**其他（2）**：tmp/（噪声域，建议 .gitignore 补 tmp/）；**zcode-bridge/（psy 仓内嵌套目录，含 tmp/focus/20260912-0415 的 E01/E02 run.json——疑似 9/12 夜间任务 cwd 误指产生，建议日间确认后删除或迁移）**。
+**其他（2）**：tmp/（噪声域，建议 .gitignore 补 tmp/）；**zcode-bridge/（psy 仓内嵌套目录，含 tmp/focus/20260912-0415 的 E01/E02 run.json）**
+——「疑似 9/12 夜间任务 cwd 误指」**已由 s918-17 升级为实证**（2026-09-19 更新，原措辞见本节 git 历史）：
+两文件内容全文是 `can't open file 'D:\code\psy-analysis\zcode-bridge\scripts\focus_scan.py'`，即**扫描单压根没跑起来**，
+机制是**脚本路径与 `--out` 都是相对路径而当时 cwd 是被分析仓 psy**（stderr 被顺手建出的目录接住）。
+复发条件仍在（`zcode-bridge/scripts/focus_scan.py:91-97` 无条件 `mkdir` ＋ `:646` 的 `--out` 无校验）。
+⇒ 处置从"确认后删除或迁移"改为**案 A 直接删除（附限定路径 `git clean -nnd` 预检）**，
+详见 `docs/insights/psy-nested-zcodebridge-triage-20260918.md`；本清单不再重复论证。
 
 ## 四、5 处已知归属一致性核对（来源单 ↔ 盘上 diff）
 
@@ -38,7 +44,7 @@ $ ?? 行数                        → 20
 ## 五、结论
 
 - **建议随下次日间签核批直接提交**：pytest.ini、docs/TESTING.md、requirements-lock.txt、lock_manager.py＋tests/test_lock_alert_log.py（实现与测试同批）、tests/test_analysis_contracts.py、tests/test_perf_smoke_report.py、tests/test_startup_checks.py＋src/ui 两新源码、docs/insights 报告类 12 份。
-- **建议单独复核**：app.py（入口装配改动面大）、tmp/（建议 .gitignore 补 tmp/）、zcode-bridge/ 嵌套目录（疑似误建）。
+- **建议单独复核**：app.py（入口装配改动面大）、tmp/（建议 .gitignore 补 tmp/）、zcode-bridge/ 嵌套目录（**已实证为 cwd 误指产生的空报错文件**，处置见本节上文与 `psy-nested-zcodebridge-triage-20260918.md`）。
 
 ## 六、零改动自证
 
