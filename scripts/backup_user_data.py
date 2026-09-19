@@ -40,6 +40,9 @@ def create_backup() -> Path:
 
 
 def prune(keep: int = KEEP) -> int:
+    if keep < 1:
+        # s919-22：keep=0 会让下面的切片变成"删掉全部备份"，且本函数是唯一有破坏性的入口。
+        raise ValueError(f"prune(keep={keep}) 被拒绝：keep 必须 >= 1，否则将清空 {BACKUP_ROOT} 下全部备份")
     zips = sorted(BACKUP_ROOT.glob("psy-*.zip"), reverse=True)
     removed = 0
     for old in zips[keep:]:

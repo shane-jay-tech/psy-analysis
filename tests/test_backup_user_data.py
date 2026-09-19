@@ -75,12 +75,25 @@ def test_prune_with_fewer_archives_than_keep_deletes_nothing(sandbox):
     assert sorted(sandbox.root.glob("psy-*.zip")) == seeded
 
 
-def test_prune_keep_zero_clears_the_whole_root(sandbox):
-    """keep=0 会清空备份根——无下限保护，防线在调用方（默认 KEEP=10）。"""
-    _seed_archives(sandbox.root, STAMPS[:3])
+def test_prune_rejects_keep_below_one(sandbox):
+    """s919-22 下限守卫：keep=0/负数一律 ValueError，且**一个文件都不许少**。
+    改前现状是 `prune(keep=0)` 把备份根清空（本用例前一版钉的就是它，守卫落地后按新契约改写）。"""
+    seeded = _seed_archives(sandbox.root, STAMPS[:3])
 
-    assert bud.prune(keep=0) == 3
-    assert list(sandbox.root.glob("psy-*.zip")) == []
+    for bad in (0, -1):
+        with pytest.raises(ValueError) as ei:
+            bud.prune(keep=bad)
+        assert "keep" in str(ei.value) and str(bad) in str(ei.value)
+
+    assert sorted(sandbox.root.glob("psy-*.zip")) == seeded
+
+
+def test_prune_keep_one_is_allowed_boundary(sandbox):
+    """守卫不能顺手把合法边界也拦掉：keep=1 保留最新 1 份、删掉其余。"""
+    seeded = _seed_archives(sandbox.root, STAMPS[:3])
+
+    assert bud.prune(keep=1) == 2
+    assert list(sandbox.root.glob("psy-*.zip")) == [seeded[-1]]
 
 
 def test_verify_rejects_crc_corrupted_member(sandbox, tmp_path):
