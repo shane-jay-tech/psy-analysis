@@ -59,11 +59,16 @@ def verify(archive: Path) -> None:
         bad = zf.testzip()
         assert bad is None, f"corrupt member: {bad}"
         names = zf.namelist()
+        # s919-12：只数"文件条目"。改前拿 extracted（rglob 只会数到文件）去等 namelist 全长，
+        # 任何带目录条目（"dir/"）的 zip 都被判成损坏——create_backup 自己不打目录条目所以
+        # 自家备份相安无事，但 `--verify-only <外部 zip>` 一验一个准（s918-35 遗留段）。
+        file_entries = [n for n in names if not zf.getinfo(n).is_dir()]
         with tempfile.TemporaryDirectory(prefix="psy_bak_") as tmp:
             zf.extractall(tmp)
             extracted = sum(1 for p in Path(tmp).rglob("*") if p.is_file())
-    assert extracted == len(names), f"extracted {extracted} != entries {len(names)}"
-    print(f"[backup] verify ok: {len(names)} entries, {archive.stat().st_size} bytes")
+    assert extracted == len(file_entries), f"extracted {extracted} != file entries {len(file_entries)}"
+    print(f"[backup] verify ok: {len(file_entries)} files / {len(names)} entries, "
+          f"{archive.stat().st_size} bytes")
 
 
 def main():

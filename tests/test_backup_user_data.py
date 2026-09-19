@@ -108,15 +108,33 @@ def test_verify_rejects_crc_corrupted_member(sandbox, tmp_path):
         bud.verify(bogus)
 
 
-def test_verify_rejects_archive_carrying_directory_entries(sandbox, tmp_path):
-    """含目录项的 zip 过不了 verify：extractall 不落文件，计数必然小于 namelist。"""
+def test_verify_accepts_archive_carrying_directory_entries(tmp_path, capsys):
+    """s919-12 翻正（旧用例 `test_verify_rejects_archive_carrying_directory_entries`
+    钉的是那句误判 `extracted 1 != entries 2`）：目录条目不该计入"应被解出的文件数"。
+    这是 `--verify-only <外部 zip>` 的常见形态（多数打包工具会写目录条目），改前一律误判损坏。"""
     with_dirs = tmp_path / "psy-dirs.zip"
     with zipfile.ZipFile(with_dirs, "w") as zf:
         zf.writestr("payload.txt", "hello")
-        zf.writestr("empty_dir/", "")
+        zf.writestr("empty_dir/", "")                 # 目录条目（名以 / 结尾）
+        zf.writestr("d/a.txt", "a")
+        zf.writestr("d/b.txt", "b")
 
-    with pytest.raises(AssertionError, match=r"extracted 1 != entries 2"):
-        bud.verify(with_dirs)
+    bud.verify(with_dirs)                             # 不再抛
+
+    assert "3 files / 4 entries" in capsys.readouterr().out
+
+
+def test_verify_counts_only_file_entries_when_archive_is_all_directories(tmp_path, capsys):
+    """上一条的边界：全是目录条目的空壳包应当判"0 个文件、完好"，
+    守卫若写成"跳过名字以 / 结尾的项但计数仍用 namelist"，这条会红。"""
+    only_dirs = tmp_path / "psy-onlydirs.zip"
+    with zipfile.ZipFile(only_dirs, "w") as zf:
+        zf.writestr("a/", "")
+        zf.writestr("b/", "")
+
+    bud.verify(only_dirs)
+
+    assert "0 files / 2 entries" in capsys.readouterr().out
 
 
 def test_create_backup_degrades_loudly_when_sources_missing(sandbox, capsys):
