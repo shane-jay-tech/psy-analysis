@@ -53,7 +53,7 @@ def render_paper_writing_ui():
 
         # 信息缺口检查
         gaps = engine.get_gaps_summary()
-        st.markdown(engine.get_gaps_summary())
+        st.markdown(gaps)
 
         st.divider()
         st.header("💡 使用指南")
@@ -588,7 +588,7 @@ ref {{ font-size: 0.9em; }}
         _render_paper_mode_defense_qa()
 
     # 如果没有分析结果但有分析输出，提示导入
-    if st.session_state.analysis_output is not None and not engine.state.analysis_results:
+    if st.session_state.get("analysis_output") is not None and not engine.state.analysis_results:
         with tab1:
             with st.expander("📥 从数据分析导入结果", expanded=False):
                 st.info("检测到数据分析输出，可以导入到论文写作中。")

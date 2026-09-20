@@ -172,7 +172,7 @@ def test_entry_builds_engine_once_then_reuses_the_same_object(engines, monkeypat
     assert first.gaps_calls > 0
 
 
-@pytest.mark.parametrize("missing", ["paper_engine", "analysis_output"])
+@pytest.mark.parametrize("missing", ["paper_engine"])   # s921-01 翻正：analysis_output 已改 .get()，另例锁它不再崩
 def test_three_keys_are_assumed_present_by_the_page(engines, monkeypatch, missing):
     """现状耦合：本页用**属性式**读 `paper_engine / analysis_output / plan`，键不存在就 AttributeError。
     预置这两个键是 app.py 的责任（值是 None 才走到懒建/判空分支）。
@@ -198,7 +198,7 @@ def test_missing_engine_is_the_only_bootstrap_path_and_reset_rebuilds_it(engines
     assert len(engines) == 2                    # 懒建一个 + 重置再建一个
     assert st.session_state.paper_engine is engines[1]
     assert engines[1].gaps_calls == 0           # 关键现状：新引擎本轮**还没渲染过**
-    assert engines[0].gaps_calls == 2           # 旧实例只走到第 2 次取缺口就被 rerun 打断；
+    assert engines[0].gaps_calls == 1           # s921-01 翻正：侧栏复用 gaps 后只剩 1 次取缺口就被 rerun 打断；
     # 第 3 次调用在 tab4 深处（整页渲染完才有 3）⇒ 少这次 rerun 的话，界面停在半个新状态上
 
     st2 = RecordingSt()
@@ -222,7 +222,7 @@ def test_five_tabs_are_the_skeleton_and_the_page_runs_start_to_finish(engines, m
     assert tab_calls[0][1][0] == ["1️⃣ 研究信息", "2️⃣ 文献管理", "3️⃣ 确认问题", "4️⃣ 生成论文", "5️⃣ 答辩模拟"]
     assert any("论文写作" in m for m in st.msgs("title"))
     assert any("填写研究信息" in c for c in st.msgs("caption"))
-    assert st.session_state.paper_engine.gaps_calls == 3   # 现状：一次渲染里 get_gaps_summary 被调 3 遍，只钉不改
+    assert st.session_state.paper_engine.gaps_calls == 2   # s921-01 翻正：侧栏白算两遍已复用，一次渲染＝侧栏 1 + tab4 1
 
 
 def test_methods_file_import_failure_is_a_visible_error_not_a_crash(engines, monkeypatch):
@@ -341,3 +341,22 @@ def test_write_surface_is_exactly_six_session_keys():
                     "_paper_defense_qa_items", "paper_defense_qa_mastered"}
     assert text.count("st.session_state.pop(") == 2          # _lit_search_pending 用后即摘
     assert "on_click" not in text and "on_change" not in text  # 与 questionnaire_panel 同构：全靠 rerun 重入
+
+
+def test_analysis_output_missing_key_no_longer_crashes_the_page(engines, monkeypatch):
+    """s921-01 翻正：analysis_output 改 .get() 读取后，缺键不再抛 AttributeError。
+
+    原桩 test_three_keys_are_assumed_present_by_the_page 把这条锁成「现状耦合」；
+    预置键仍是 app.py 的责任，但页面不该因一个可选键缺失而整页崩。
+    """
+    st = RecordingSt()
+    monkeypatch.setattr(pwu, "st", st)
+    for key in ("paper_engine", "plan"):
+        setattr(st.session_state, key, None)
+
+    try:
+        pwu.render_paper_writing_ui()
+    except AttributeError as exc:
+        pytest.fail(f"翻正后缺 analysis_output 不应再抛 AttributeError：{exc}")
+    except RerunRequested:
+        pass
