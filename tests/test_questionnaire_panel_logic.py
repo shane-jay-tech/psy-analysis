@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-"""classify_questionnaire_sub_mode 纯函数单测（s921-06，设计稿 §4.1「测点」清单）。
-
-零 st、零 session_state、秒级：只钉判别函数本体。
+"""纯函数单测（零 st、秒级）：classify_questionnaire_sub_mode（s921-06，设计稿 §4.1「测点」）
++ compute_pending_elapsed 边界例（s921-07，设计稿 §4.2）。
 页面侧行为等价性由 test_questionnaire_panel_charac.py 的分支头五例继续把关。
 """
 import pytest
@@ -11,6 +10,25 @@ from src.ui.questionnaire_panel import classify_questionnaire_sub_mode
 UPLOAD_LABEL = "📤 上传现有题目（预审 + 排版导出）"
 IMPORT_LABEL = "📊 问卷数据导入与清洗"
 AI_LABEL = "🆕 AI 设计新问卷"
+
+
+# ── compute_pending_elapsed（s921-07 计时面实装，边界例：缺失/正常/跨日）──
+def test_pending_elapsed_missing_started_at_returns_none():
+    """started_at 缺失（None 或 0）→ None，页面显示「—」——不再恒 0。"""
+    from src.ui.questionnaire_panel import compute_pending_elapsed
+    assert compute_pending_elapsed(None, 1000.0) is None
+    assert compute_pending_elapsed(0, 1000.0) is None
+
+
+def test_pending_elapsed_normal_diff_is_int_seconds():
+    from src.ui.questionnaire_panel import compute_pending_elapsed
+    assert compute_pending_elapsed(1000.0, 1042.7) == 42
+    assert compute_pending_elapsed(1000.0, 1000.4) == 0      # 刚起步仍是真 0，不是兜底假 0
+
+
+def test_pending_elapsed_cross_day_counts_full_seconds():
+    from src.ui.questionnaire_panel import compute_pending_elapsed
+    assert compute_pending_elapsed(1_000_000.0, 1_000_000.0 + 90_000) == 90_000  # 跨日 25h
 
 
 def test_three_real_labels_map_to_their_branches():

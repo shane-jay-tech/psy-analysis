@@ -39,6 +39,15 @@ def classify_questionnaire_sub_mode(choice: str) -> str:
     return "ai_design"
 
 
+def compute_pending_elapsed(started_at, now: float):
+    """pending 计时面（设计稿 §4.2 根因、s921-07 实装）：started_at 缺失/为 0 返回 None，
+    页面显示「—」——不再以当前时刻兜底造成耗时恒 0。正常返回整数秒。
+    """
+    if not started_at:
+        return None
+    return int(now - started_at)
+
+
 def render_questionnaire_page():
     """渲染问卷设计页面的完整流程。"""
     st.title("📋 问卷设计工具")
@@ -173,10 +182,11 @@ def render_questionnaire_page():
     # ── 取消进行中设计（v3.7 加进度反馈） ──
     pending = st.session_state.get("_q_design_pending")
     if pending is not None:
-        # v3.7 计算已等待时间
+        # v3.7 计算已等待时间（s921-07：缺失→None→显示「—」，不再恒 0）
         import time as _t
-        started_at = pending.get("started_at") or _t.time()
-        elapsed = int(_t.time() - started_at)
+        started_at = pending.get("started_at")
+        elapsed = compute_pending_elapsed(started_at, _t.time())
+        elapsed_txt = "—" if elapsed is None else f"{elapsed}s"
         from_cache = pending.get("from_cache", False)
         is_premium = pending.get("premium", False)
 
@@ -188,11 +198,13 @@ def render_questionnaire_page():
             with progress.get("lock", threading.Lock()) if progress else _DummyContext():
                 p_msg = progress.get("msg", "排队中...") if progress else "..."
                 p_pct = float(progress.get("pct", 0.0)) if progress else 0.0
-            st.markdown(f"### ⭐ 高质量模式生成中（已 {elapsed}s）")
+            st.markdown(f"### ⭐ 高质量模式生成中（已 {elapsed_txt}）")
             st.progress(min(1.0, p_pct), text=p_msg)
             st.caption("流程：①骨架 → ②并行生成各维度题目 → ③元数据 → ④质检 → ⑤弱题重写")
-            if elapsed > 90:
+            if elapsed is not None and elapsed > 90:
                 st.warning(f"⏳ 已超过 {elapsed}s。Premium 模式正常 30-40s，超 90s 可能模型偏慢，建议取消换更快模型。")
+        elif elapsed is None:
+            st.info("⏳ LLM 正在生成问卷（缺少 started_at，耗时未知）...")
         elif elapsed < 30:
             st.info(f"⏳ LLM 正在生成问卷（已 {elapsed}s，通常 30-90s 完成）...")
         elif elapsed < 90:
@@ -227,7 +239,7 @@ def render_questionnaire_page():
                 design = future.result()
                 design["llm_used"] = True
                 st.session_state.questionnaire_design = design
-                cache_label = "（命中缓存）" if from_cache else f"（耗时 {elapsed}s）"
+                cache_label = "（命中缓存）" if from_cache else f"（耗时 {elapsed_txt}）"
                 st.success(f"问卷设计完成！{cache_label}")
             except CancelledLLMError:
                 st.warning("问卷生成已被取消。")
