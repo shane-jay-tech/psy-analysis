@@ -31,6 +31,65 @@ def test_pending_elapsed_cross_day_counts_full_seconds():
     assert compute_pending_elapsed(1_000_000.0, 1_000_000.0 + 90_000) == 90_000  # 跨日 25h
 
 
+def test_pending_elapsed_future_started_at_clamps_to_zero_not_negative():
+    """s922-02（s921-07 遗留 1）：started_at 在未来（时钟回拨/跨机时差）⇒ 钳 0，负秒不外泄。"""
+    from src.ui.questionnaire_panel import compute_pending_elapsed
+    assert compute_pending_elapsed(2000.0, 1000.0) == 0     # 回拨 1000s：旧实现给 -1000
+    assert compute_pending_elapsed(1000.5, 1000.4) == 0     # 亚秒级未来
+    assert compute_pending_elapsed(None, 1000.0) is None    # 缺失仍是 None（不被钳成 0，两态可分）
+    assert compute_pending_elapsed(1000.0, 1000.4) == 0     # 真 0 与钳 0 同值 ⇒ 需 anomaly 判据区分
+
+
+def test_pending_elapsed_clock_anomaly_is_the_only_negative_source():
+    """判据域：True ⇔ started_at 严格晚于 now；缺失/为 0 归「耗时未知」而非「时钟异常」。"""
+    from src.ui.questionnaire_panel import pending_clock_anomaly
+    assert pending_clock_anomaly(2000.0, 1000.0) is True
+    assert pending_clock_anomaly(1000.0, 2000.0) is False
+    assert pending_clock_anomaly(1000.0, 1000.0) is False   # 恰等不算异常（< 而非 <=）
+    assert pending_clock_anomaly(None, 1000.0) is False
+    assert pending_clock_anomaly(0, 1000.0) is False
+
+
+@pytest.mark.parametrize("started_at,now", [
+    (2000.0, 1000.0), (1e9, 0.0), (1000.5, 1000.4),        # 异常族
+    (1000.0, 1000.4), (1000.0, 1000.0), (900.0, 1000.0),   # 正常族（含真 0）
+])
+def test_pending_elapsed_anomaly_true_always_pairs_with_clamped_zero(started_at, now):
+    """两函数同源于同一 now 的不变式：判异常 ⇒ 秒必为钳后的 0；不判异常 ⇒ 秒就是真差值。"""
+    from src.ui.questionnaire_panel import compute_pending_elapsed, pending_clock_anomaly
+    e = compute_pending_elapsed(started_at, now)
+    assert e is not None and e >= 0                         # 钳 0 后全谱非负
+    if pending_clock_anomaly(started_at, now):
+        assert e == 0
+    else:
+        assert e == int(now - started_at)                   # 未回拨时钳位不改值（真 0 仍是真 0）
+
+
+def test_pending_elapsed_page_puts_the_clock_anomaly_branch_before_the_under_30_branch():
+    """s921-07 遗留原文的病就是「负秒落进 <30 正常文案」——分支次序与单一 now 就是病灶，源码次序钉住。
+
+    只钉次序不钉渲染：页面级 pending 渲染目前无假 st 覆盖（charac 的 StrictSt 只够跑分支头），
+    次序一被调换（把 clock_anomaly 挪到 <30 之后）或 now 被拆成两次 time.time() 本例立刻红。
+    """
+    import inspect
+    import src.ui.questionnaire_panel as qp
+    src = inspect.getsource(qp.render_questionnaire_page)
+    body = src.split(chr(10))
+
+    def first(snip):
+        hits = [i for i, ln in enumerate(body) if snip in ln]
+        assert hits, snip
+        return hits[0]
+
+    assert first("elapsed_txt =") > first("clock_anomaly =") > first("_now = _t.time()")
+    chain = ["elif elapsed is None:", "elif clock_anomaly:", '"🕐 时钟异常', "elif elapsed < 30:"]
+    assert [first(c) for c in chain] == sorted([first(c) for c in chain])
+    assert first("elif clock_anomaly:") < first("elif elapsed < 30:")
+    assert src.count("_now = _t.time()") == 1                       # 单一时钟读数，两判据同源
+    assert "compute_pending_elapsed(started_at, _t.time())" not in src   # 旧的一次性读数写法已消失
+
+
+
 def test_three_real_labels_map_to_their_branches():
     assert classify_questionnaire_sub_mode(AI_LABEL) == "ai_design"
     assert classify_questionnaire_sub_mode(UPLOAD_LABEL) == "upload_items"
@@ -91,3 +150,5 @@ def test_parity_with_old_inline_predicate(choice):
     else:
         expected = "ai_design"
     assert classify_questionnaire_sub_mode(choice) == expected
+
+

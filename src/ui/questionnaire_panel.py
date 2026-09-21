@@ -41,11 +41,24 @@ def classify_questionnaire_sub_mode(choice: str) -> str:
 
 def compute_pending_elapsed(started_at, now: float):
     """pending 计时面（设计稿 §4.2 根因、s921-07 实装）：started_at 缺失/为 0 返回 None，
-    页面显示「—」——不再以当前时刻兜底造成耗时恒 0。正常返回整数秒。
+    页面显示「—」——不再以当前时刻兜底造成耗时恒 0。正常返回整数秒；
+    started_at 在未来（时钟回拨/跨机时差）时钳 0（s922-02），负秒不外泄，
+    异常本身交给 pending_clock_anomaly 判别，页面据此走「时钟异常」文案而非「<30 正常」。
     """
     if not started_at:
         return None
-    return int(now - started_at)
+    return max(0, int(now - started_at))
+
+
+def pending_clock_anomaly(started_at, now: float) -> bool:
+    """时钟接缝判据（s922-02）：True ⇔ started_at 晚于 now（时钟回拨或跨机时差）。
+
+    必须与 compute_pending_elapsed 共用同一个 now：分两次 time.time() 会给出互相矛盾的
+    结论（s921-13「告警 age 与判据同源」的同一教训）。
+    """
+    if not started_at:
+        return False
+    return (now - started_at) < 0
 
 
 def render_questionnaire_page():
@@ -185,7 +198,9 @@ def render_questionnaire_page():
         # v3.7 计算已等待时间（s921-07：缺失→None→显示「—」，不再恒 0）
         import time as _t
         started_at = pending.get("started_at")
-        elapsed = compute_pending_elapsed(started_at, _t.time())
+        _now = _t.time()                      # 单一 now 同时喂计时与异常判据（s922-02）
+        elapsed = compute_pending_elapsed(started_at, _now)
+        clock_anomaly = pending_clock_anomaly(started_at, _now)
         elapsed_txt = "—" if elapsed is None else f"{elapsed}s"
         from_cache = pending.get("from_cache", False)
         is_premium = pending.get("premium", False)
@@ -205,6 +220,11 @@ def render_questionnaire_page():
                 st.warning(f"⏳ 已超过 {elapsed}s。Premium 模式正常 30-40s，超 90s 可能模型偏慢，建议取消换更快模型。")
         elif elapsed is None:
             st.info("⏳ LLM 正在生成问卷（缺少 started_at，耗时未知）...")
+        elif clock_anomaly:
+            st.warning(
+                "🕐 时钟异常：任务起始时刻晚于当前时刻（系统时钟回拨或跨机时差），耗时按 0s 显示、"
+                "超时判断本轮不生效。若反复出现，请校准系统时间后重新提交。"
+            )
         elif elapsed < 30:
             st.info(f"⏳ LLM 正在生成问卷（已 {elapsed}s，通常 30-90s 完成）...")
         elif elapsed < 90:
