@@ -46,7 +46,7 @@ class FakeSt:
         self.errors, self.warnings, self.successes, self.infos, self.toasts = [], [], [], [], []
         self.tabs_arg, self.columns_args, self.dataframes = None, [], []
         self.buttons, self.dividers, self.reruns = [], 0, 0
-        self.containers = 0
+        self.containers, self.texts = 0, []
         self.column_config = _ColConfig()
 
     def title(self, msg, **k):
@@ -89,7 +89,8 @@ class FakeSt:
 
     def columns(self, widths=None, **k):
         self.columns_args.append(widths)
-        return [_Ctx(self, f"col{i}", kind="col") for i in range(len(widths or [1]))]
+        n = widths if isinstance(widths, int) else len(widths or [1])  # 真 st.columns 收 int（确认拒绝帧的 st.columns(2)）
+        return [_Ctx(self, f"col{i}", kind="col") for i in range(n)]
 
     def dataframe(self, data, **k):
         self.dataframes.append((list(data), k))
@@ -97,6 +98,9 @@ class FakeSt:
     def button(self, label, **k):
         self.buttons.append((label, k))
         return label in self.clicked
+
+    def text(self, msg, **k):
+        self.texts.append(msg)
 
     def rerun(self, **k):
         self.reruns += 1
@@ -350,3 +354,68 @@ def test_daily_manual_trigger_failure_stays_on_page(monkeypatch):
 
     assert any("触发失败：锁被别的进程占着" in e for e in st.errors)
     assert st.toasts == [] and st.reruns == 0  # 失败不许 toast 成功、不许重跑盖掉错误
+
+# ─────────────── 批量拒绝「确认拒绝」两段式钉桩（s921-11，feed_panel :198-218） ───────────────
+_CANDS = [
+    {"candidate_id": "c1", "kind": "construct", "name": "心理安全感", "confidence": 0.6,
+     "priority_score": 0.2, "definition": "团队人际风险感知", "evidence_quote": "ev-1", "iohr_hits_json": "[]"},
+    {"candidate_id": "c2", "kind": "method", "name": "SEM", "confidence": 0.6,
+     "priority_score": 0.1, "definition": "", "evidence_quote": "", "iohr_hits_json": "[]"},
+]
+
+
+def _daily_state(store, state, clicked=(), monkeypatch=None):
+    """跨帧驱动：state 注入 session_state，模拟「上一帧点了按钮 → 这一帧重渲染」。"""
+    st = FakeSt(clicked=clicked)
+    st.session_state.update(state)
+    monkeypatch.setattr(fp, "st", st)
+    monkeypatch.setattr(fp, "bootstrap_is_running", lambda: False)
+    monkeypatch.setattr(fp, "bootstrap_evaluate", lambda: SimpleNamespace(last_success_hours=1.0))
+    monkeypatch.setattr(fp, "bootstrap_last_result", lambda: None)
+    fp._render_daily_tab(store)
+    return st
+
+
+def test_daily_reject_first_click_arms_confirmation_without_writes(monkeypatch):
+    """一次点击「🗑️ 全部拒绝」：只置确认态 + rerun，零拒绝写；确认按钮要等下一帧。"""
+    store = FakeStore(candidates=_CANDS)
+    st = _daily_state(store, {}, clicked={"🗑️ 全部拒绝"}, monkeypatch=monkeypatch)
+
+    assert st.session_state["_confirm_batch_reject"] is True
+    assert store.status_writes == []
+    labels = [b[0] for b in st.buttons]
+    assert "🗑️ 全部拒绝" in labels and "确认拒绝" not in labels
+    assert st.reruns == 1
+
+
+def test_daily_reject_armed_frame_offers_confirm_and_cancel_but_writes_nothing(monkeypatch):
+    """确认态帧：warning 问一次、给「确认拒绝/取消」两键，本帧不点就零写零 rerun。"""
+    store = FakeStore(candidates=_CANDS)
+    st = _daily_state(store, {"_confirm_batch_reject": True}, monkeypatch=monkeypatch)
+
+    assert len(st.warnings) == 1 and "确定拒绝全部 2 条候选？" in st.warnings[0]
+    labels = [b[0] for b in st.buttons]
+    assert "确认拒绝" in labels and "取消" in labels and "🗑️ 全部拒绝" not in labels
+    assert store.status_writes == [] and st.reruns == 0
+
+
+def test_daily_reject_confirm_second_click_writes_all_then_disarms(monkeypatch):
+    """二次点击「确认拒绝」：按 pending 顺序批量拒（reviewer=batch_reject）、清确认态、toast+rerun。"""
+    store = FakeStore(candidates=_CANDS)
+    st = _daily_state(store, {"_confirm_batch_reject": True}, clicked={"确认拒绝"}, monkeypatch=monkeypatch)
+
+    assert store.status_writes == [("c1", "rejected", "batch_reject"),
+                                   ("c2", "rejected", "batch_reject")]
+    assert st.session_state["_confirm_batch_reject"] is False
+    assert any("已拒绝全部 2 条候选" in t for t in st.toasts)
+    assert st.reruns == 1
+
+
+def test_daily_reject_cancel_only_disarms(monkeypatch):
+    """「取消」只解除确认态：零写、无 toast，但 rerun 一次让界面回到未武装帧。"""
+    store = FakeStore(candidates=_CANDS)
+    st = _daily_state(store, {"_confirm_batch_reject": True}, clicked={"取消"}, monkeypatch=monkeypatch)
+
+    assert store.status_writes == []
+    assert st.session_state["_confirm_batch_reject"] is False
+    assert st.toasts == [] and st.reruns == 1
