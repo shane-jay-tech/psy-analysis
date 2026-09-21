@@ -29,12 +29,16 @@ class FakeSt:
     def __init__(self):
         self.successes, self.errors, self.captions, self.markdowns = [], [], [], []
         self.expanders, self.columns_args = [], []
+        self.warnings = []
 
     def success(self, msg, **k):
         self.successes.append(msg)
 
     def error(self, msg, **k):
         self.errors.append(msg)
+
+    def warning(self, msg, **k):
+        self.warnings.append(msg)
 
     def caption(self, msg, **k):
         self.captions.append(msg)
@@ -181,14 +185,17 @@ def test_badge_grade_maps_to_a_known_css_tone(monkeypatch, st, grade, tone):
     assert f"<span>{grade}</span>" in html
 
 
-def test_badge_swallows_scorer_failure_without_touching_ui(monkeypatch, st):
+def test_badge_failure_warns_once_and_still_skips_the_badge(monkeypatch, st):
+    """s921-09 翻正（s920-13 遗留①预告的改法）：评分器抛异常 ⇒ 恰好一条 st.warning（带 exc 摘要），
+    徽标依旧不渲染（原「静默隐身」红在此处按注释翻正）。errors 仍留空：只降级提示，不升级为报错。"""
     def boom(s):
         raise ValueError("评分器读不懂这份 state")
 
     monkeypatch.setattr(lrp, "calculate_completeness", boom)
     lrp._render_completeness_badge({})
 
-    assert st.markdowns == [] and st.expanders == [] and st.errors == []  # 现状：静默，用户不知道评分挂了
+    assert len(st.warnings) == 1 and "评分器读不懂这份 state" in st.warnings[0]
+    assert st.markdowns == [] and st.expanders == [] and st.errors == []
 
 
 def test_badge_detail_marks_are_scored_against_eighty_percent_of_weight(monkeypatch, st):

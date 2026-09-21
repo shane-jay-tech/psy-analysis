@@ -9,8 +9,8 @@
   ① KB 命中 ⇒ 把 kb_definition 透传给评审；结果写进 session_state；成功提示一条。
   ② KB 未命中 ⇒ kb_definition 传 None（不是空串——下游据此区分"没查到"与"查到但定义为空"）。
   ③ 评审抛异常 ⇒ st.error，并且**把上一次的结果从 session_state 摘掉**（不然是拿旧结果冒充本轮）。
-  ④ 现状：CONSTRUCTS 查表自身抛异常被 `except Exception: pass` 静默 ⇒ 与"未命中"长得一样
-     （与 s918-27/s919-13 在 quick_entries 里修掉的是同一族病灶；本单只钉不改）。
+  ④ ~~现状：CONSTRUCTS 查表自身抛异常被 `except Exception: pass` 静默 ⇒ 与"未命中"长得一样~~
+     （s921-09 已按注释翻正：except 补 st.warning(exc 摘要)，本例更名为 warns_once）。
   ⑤ spinner 文案随 dimensions 有/无切换 ⇒ 用户等的时长提示与实际跑的 mode 一致。
 """
 import pytest
@@ -29,12 +29,16 @@ class FakeSt:
     def __init__(self):
         self.session_state = FakeState()
         self.errors, self.successes, self.spinners = [], [], []
+        self.warnings = []
 
     def error(self, msg, **k):
         self.errors.append(msg)
 
     def success(self, msg, **k):
         self.successes.append(msg)
+
+    def warning(self, msg, **k):
+        self.warnings.append(msg)
 
     def __getattr__(self, name):
         if name == "spinner":
@@ -126,11 +130,10 @@ def test_review_failure_reports_and_clears_stale_result(env):
     assert st.successes == []
 
 
-def test_lookup_blowup_is_currently_indistinguishable_from_miss(env):
-    """④现状：查表本身抛异常 ⇒ 被 `except Exception: pass` 吞掉，结果与"未命中"完全一样。
-
-    钉住它，是为了让"要不要像 quick_entries 那样补一行提示"（s918-27→s919-13 那条路）
-    有个可核对的现场；真要改时这条会红，按注释翻正即可。
+def test_lookup_blowup_warns_once_and_still_degrades_like_miss(env):
+    """④（s921-09 翻正）：查表抛异常 ⇒ 恰好一条 st.warning（带 exc 摘要），不再与"未命中"隐身同形；
+    降级口径不变——kb_definition 仍按 None 送审，成功提示保留，errors 仍空。
+    原文「钉住现状、真要改时这条会红，按注释翻正」已由 s921-09 兑现。
     """
     st, monkeypatch = env
 
@@ -142,7 +145,8 @@ def test_lookup_blowup_is_currently_indistinguishable_from_miss(env):
     spy = _run(st, monkeypatch, Spy(result={}))
 
     assert spy.calls[0]["kb_definition"] is None
-    assert st.errors == [] and st.successes == ["✅ AI 预审完成"], "现状：异常被吞，用户无从得知"
+    assert len(st.warnings) == 1 and "注册表读不动" in st.warnings[0]
+    assert st.errors == [] and st.successes == ["✅ AI 预审完成"]
 
 
 def test_spinner_text_follows_dimensions_mode(env):

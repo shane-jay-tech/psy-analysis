@@ -586,8 +586,8 @@ def _run_ai_review(doc: ItemsDoc, construct_name: str, construct_def: str,
         rec = CONSTRUCTS.get(construct_name.strip())
         if rec:
             kb_def = rec.get("definition")
-    except Exception:
-        pass
+    except Exception as exc:  # s921-09：查表失败不再隐身（s918-27→s919-13 同族修法）
+        st.warning(f"KB 注册表读取失败，按未定义口径送审：{exc}")
 
     spinner_msg = (
         "4 位 AI 专家分维度评分（约 30-60 秒）..." if dimensions

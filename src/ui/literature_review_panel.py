@@ -223,7 +223,8 @@ def _render_completeness_badge(lr_state: Dict[str, Any]) -> None:
     """v3.5 完成度评分显示。"""
     try:
         result = calculate_completeness(lr_state)
-    except Exception:
+    except Exception as exc:  # s921-09：降级不再对用户隐身，补一条带 exc 摘要的提示
+        st.warning(f"完成度评分不可用：{exc}")
         return
     tone_map = {
         "优秀": "success",
