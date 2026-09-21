@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(r"D:/code")
 ENV_PATH = ROOT / ".env.local"
-LOG_PATH = Path(__file__).resolve().parent / "data" / "benchmark_history" / "_relay_calls.jsonl"
+LOG_PATH = Path(__file__).resolve().parents[1] / "data" / "benchmark_history" / "_relay_calls.jsonl"  # s922-09/A5: 落仓根 data/，原 .parent 指向 scripts/data/（不存在）
 UPSTREAM = "https://ai.711ev.com/v1/chat/completions"
 RELAY_HEADERS = {
     "Origin": "http://127.0.0.1:55758",
