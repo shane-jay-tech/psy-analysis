@@ -13,7 +13,12 @@ grep 这两键零命中）⇒ 按磁盘实况测前者。
 
 红线自约：只测「文件字节 → 内存 DataFrame → 键」与「维度表单 → 键」两步。
 「执行清洗与计分」按钮（`run_questionnaire_cleaning`，会产出无效样本判定与维度得分）属统计结论域，
-本单一律不点、不 import、不断言其输出。
+s921-15 本单一律不点、不 import、不断言其输出。
+
+s922-10 追加（同文件加例，不改上面那句话的历史口径）：清洗按钮**改为点一次**，但断言面**仍锁在
+「键在不在 / 对象类型 / summary 的键集合」三件事上**——`summary` 里任何数值（valid_n、invalid_n、
+题项列数、维度数）与维度得分一律不进断言，喂进去的数据是 1..6 的递增斜坡这种一眼假的人造值。
+口径出处：`outbox/s921-15-psy-qimport-apptest.result.md` 遗留原文。数值口径归 owner 与统计域。
 """
 import pathlib
 
@@ -143,3 +148,101 @@ def test_saved_dimensions_read_back_into_widgets_on_next_render():
     name_widget = at.text_input(key="dim_name_0")
     assert name_widget.value == "外显攻击"
     assert at.text_input(key="dim_items_0").value == "Q3"
+
+
+# ─────────────── _CLEANED_KEY：点「执行清洗与计分」才落键（s922-10） ───────────────
+# 写入点只有一个：`src/ui/questionnaire_import_panel.py:163`（`if st.button("执行清洗与计分")` 分支内）。
+# 断言面锁死在**键 / 类型 / summary 键集合**，不碰任何统计数值（见文件顶 s922-10 追加说明）。
+_CLEANED = "questionnaire_cleaned_result"
+
+# 纯人造问卷：题项是 1..6 的递增斜坡（不含任何真实被试反应形态），时长全部 > 60s
+_CSV_SYNTH = b"Q1,Q2,Q3,Q4,gender,duration_sec\n1,2,3,4,a,300\n2,3,4,5,b,400\n3,4,5,6,c,500\n"
+_SUMMARY_KEYS = {"original_n", "valid_n", "invalid_n", "item_columns", "dimensions_scored"}
+
+
+def _uploaded_with_one_dimension() -> AppTest:
+    """停在「维度已存、清洗还没点」那一帧——清洗键的写入点只在该帧之后才可达。"""
+    at = _upload(_panel(), "synth.csv", _CSV_SYNTH)
+    at.text_input(key="dim_name_0").set_value("维度A").run()
+    at.text_input(key="dim_items_0").set_value("Q1,Q2,Q3,Q4").run()
+    [b for b in at.button if b.label == "保存维度配置"][0].click().run()
+    return at
+
+
+def test_cleaned_result_key_absent_until_the_cleaning_button_is_clicked():
+    """上传 + 存维度都不构成写入：`_CLEANED_KEY` 只接在那个按钮分支上。"""
+    at = _uploaded_with_one_dimension()
+
+    assert not at.exception
+    assert _DIMS in at.session_state                           # 前置条件真成立，不是空跑
+    assert _CLEANED not in at.session_state                    # 没点清洗 ⇒ 没写
+
+
+def test_clicking_cleaning_writes_a_cleaningresult_object_shape_only_claims():
+    """点「执行清洗与计分」⇒ `_CLEANED_KEY` 收到 `CleaningResult` 实例，且 summary 键集合是契约面。
+
+    这里刻意**不**断 valid_n / invalid_n / 维度得分任何一个数：那些是统计结论，属红线域。
+    键名写错、写成了 dict、summary 少了一族键、日志条目类型漂移——这四种破法本例都会红。
+    """
+    from src.questionnaire.import_cleaning import CleaningLogEntry, CleaningResult
+
+    at = _uploaded_with_one_dimension()
+    clean = [b for b in at.button if b.label == "执行清洗与计分"]
+    assert len(clean) == 1
+    clean[0].click().run()
+
+    assert not at.exception
+    result = at.session_state[_CLEANED]                        # ① 键真在
+    assert isinstance(result, CleaningResult)                  # ② 是 dataclass 实例，不是 dict
+    assert set(result.summary) == _SUMMARY_KEYS                # ③ summary 键集合（契约面，非数值）
+    assert all(isinstance(v, int) for v in result.summary.values())      # 值的**类型**，仍不碰值
+    assert isinstance(result.df_cleaned, pd.DataFrame)
+    assert isinstance(result.invalid_mask, pd.Series)
+    assert isinstance(result.log, list) and result.log
+    assert all(isinstance(e, CleaningLogEntry) for e in result.log)
+    assert any(s.value.startswith("清洗完成: ") for s in at.success)      # 只断前缀，不比对回显里的数
+
+
+# ─────────────── .xlsx 分支（s922-10） ───────────────
+_XLSX_HEADER = ["Q1", "Q2", "Q3", "gender", "duration_sec"]
+_XLSX_ROWS = [[1, 2, 3, "a", 120], [4, 5, 1, "b", 300], [2, 3, 4, "c", 45]]
+
+
+def _xlsx_bytes(header: list[str], rows: list[list]) -> bytes:
+    """内存里造真 xlsx 字节（openpyxl 已在环境内），不落任何临时文件、不读仓内样例。"""
+    import io
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active.append(header)
+    for r in rows:
+        wb.active.append(r)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_upload_xlsx_goes_through_read_excel_and_lands_the_same_raw_df_key():
+    """`:51-54` 的分支判据是文件名后缀：`.csv` → `read_csv`，其余（xlsx/xls）→ `read_excel`。
+
+    投的是真 xlsx 字节 ⇒ 若 `else` 分支被改回 `read_csv`，CSV 解析器读不动 zip 容器，
+    面板会落进 `except` 出 st.error，本例当场红（判别力实测见 result）。
+    """
+    at = _panel()
+    at.file_uploader[0].set_value(
+        (
+            "synth.xlsx",
+            _xlsx_bytes(_XLSX_HEADER, _XLSX_ROWS),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    ).run()
+
+    assert not at.exception
+    assert not at.error, f"read_excel 分支没跑通：{[e.value for e in at.error]}"
+    df = at.session_state[_RAW]                                # ① 与 CSV 同一把键
+    assert isinstance(df, pd.DataFrame)                        # ② 类型一致
+    assert df.shape == (3, 5)
+    assert list(df.columns) == _XLSX_HEADER
+    assert df["Q1"].tolist() == [1, 4, 2]                       # ④ 逐格，排除「读到了壳、值是空的」
+    assert len(at.success) == 1 and at.success[0].value == "已加载 3 行 x 5 列"

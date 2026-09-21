@@ -2,7 +2,11 @@
 
 锁文件一律放 `tmp_path`，并 autouse 挡掉 `ensure_dirs()`——**否则构造 LockManager 就会在
 真实 `data/literature_feed/` 下建目录**（见 `_alert_once` 之外的唯一副作用）。零网络、零真实调度器。
-锚点：:54 `ttl_seconds: int = 21600,  # 6h`；判陈旧在 :123 起（s919-05 修 `_read_owner_pid` 后行号位移）。
+锚点：:54 `ttl_seconds: int = 21600,  # 6h`；判陈旧在 :128 起（`def is_stale`）。
+s922-10 订正：此处原写 `:123`，那是 s919-05（5a9e46f）时的实况；`def is_stale` 被
+s920-08（5fe7754，LockBusyError 带持有者 pid）位移 +5 → :128，此后 s921-13（e02df5a）加 `now`
+接缝只改签名不改行号，:128 至今未再漂（`git show <sha>:…/lock_manager.py | grep -n "def is_stale"`
+逐个复测）。:54 那一条自始至终没漂。
 """
 import os
 import time
