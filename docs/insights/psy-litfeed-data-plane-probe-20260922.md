@@ -67,7 +67,7 @@ extracted_articles 0 | extracted_constructs 0 | error null | status completed
    ⇒ 启动侧的 abandoned 对账（08-14 那 5 条被标 `abandoned` 就是它干的）在 08-24 这一批上没生效，
    原因未坐实（进程被强杀？对账只在别处跑？）。**登记，不顺手改。**
 2. **A4（logs/ 死目录）要补一句**：`data/literature_feed/logs/` 实测仍为空，但**并非「无任何代码引用」**——
-   `scripts/run_daily_feed.bat` 明确 `mkdir` 该目录并把 `daily_runner.log` 追加进去（.bat 第 8/22-24 行）。
+   `scripts/run_daily_feed.bat` 明确 `mkdir` 该目录并把 `daily_runner.log` 追加进去（.bat 第 8 行注释、:23 mkdir、:25-27 写日志头、:37 才调 python）。
    ⇒ 目录为空这件事本身就是**「.bat 从未成功跑过」**的证据（它会先写日志头再执行 python），
    与 `schtasks` 查无此任务互相印证。这也解释了为什么 28 次 `trigger='scheduler'` 却没有 .bat 日志——
    **那 28 次不是走 .bat 来的**（人或脚本直接 `python -m src.literature_feed.scheduler`，或一个已被删掉的任务）。
