@@ -125,16 +125,29 @@ class LockManager:
             self._unlock_and_close()
             return False
 
-    def is_stale(self) -> bool:
+    def is_stale(self, now: Optional[float] = None) -> bool:
+        """锁文件是否陈旧（mtime 距今 > ttl_seconds）。
+
+        Args:
+            now: s921-13 加的**时钟接缝**。``None``（缺省）= 现算 ``time.time()``，
+                行为与旧版逐字一致；传入 epoch 秒 = 用这个"现在"做判据。
+                有了它，``>`` 与 ``>=`` 的边界可以用 ``now = mtime + ttl`` 精确断言，
+                测试不必再两侧留裕量（见 s920-24 遗留 1）。
+                同一次调用的 age 与告警里的 age_min 共用这一个读数；旧版调了两次
+                ``time.time()``，两个值之间夹着 stat 与字符串格式化，会差出调度抖动。
+        """
         if not self.lock_path.exists():
             return False
         try:
             mtime = self.lock_path.stat().st_mtime
         except OSError:
             return False
-        stale = (time.time() - mtime) > self.ttl_seconds
+        if now is None:
+            now = time.time()
+        age = now - mtime
+        stale = age > self.ttl_seconds
         if stale:
-            age_min = int((time.time() - mtime) / 60)
+            age_min = int(age / 60)
             self._alert_once(
                 "stale_lock",
                 f"lock={self.lock_path} stale for {age_min} min (ttl={self.ttl_seconds}s)",

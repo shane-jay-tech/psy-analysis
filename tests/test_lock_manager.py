@@ -72,26 +72,58 @@ def test_nested_acquire_on_same_instance_raises_runtime_error(tmp_path):
                 pass
 
 
-def test_is_stale_uses_margin_on_both_sides_of_ttl(tmp_path):
-    """陈旧判据是 `lock_manager.py:123` 的 `(time.time() - mtime) > ttl`——**现算 wall clock**。
+# s921-13：`is_stale(now=…)` 时钟接缝落地后，边界从"两侧留裕量"改成"精确压线"。
+_FIXED_MTIME = 1_000.0          # 1970-01-01 附近的固定基准，避免文件系统时间戳量化
 
-    因此不能拿"mtime 正好等于 ttl"当断言点：`os.utime` 里取的 `time.time()` 与 `is_stale()` 里那次
-    之间必然已过去若干微秒，age 恒 > ttl ⇒ 断"不陈旧"会随机/近乎必然地红（本用例前一版正是这个坑，
-    全量跑里稳定失败，s919-22 收口时改写成两侧留裕量）。
-    没走"注入时钟"是因为 psy 有后台 autosave 线程，patch 全局 `time.time` 会牵连别人
-    （`lmk.time` 就是全局 time 模块，monkeypatch 它没有"只限本模块"的效果）。
-    s920-24 复查：裕量从 1 秒提到 50 秒——上一版 `ttl=10 / mtime=now-9` 的"不陈旧"侧只剩 1 秒余量，
-    全量跑里一次 GC 或 CPU 抢占就能翻红；`>` 与 `>=` 的边界语义本用例**测不到**（要测得给 SUT 加时钟接缝）。
+
+def test_is_stale_boundary_is_strictly_greater_than_ttl(tmp_path):
+    """恰 ttl ⇒ 不陈旧；超 ttl（这里取 0.5 秒，任务书口径的"超 1 秒"同侧）⇒ 陈旧。钉住 `lock_manager.py:148` 的 `>` 而非 `>=`。
+
+    旧用例（`ttl=100 / mtime=now±50`）证不了这件事：`os.utime` 里那次 `time.time()`
+    与 SUT 里那次之间必然已过去若干微秒 ⇒ age 恒偏大，压着 ttl 断"不陈旧"会随机翻红。
+    s919-22 因此改写成立即断两侧、s920-24 又把裕量从 1 秒抬到 50 秒，并在遗留 1 里点名
+    "根治是给 is_stale 加时钟接缝"。接缝给了 `now` 之后：mtime 用固定基准常量
+    （`st_mtime` 回读校验文件系统没量化掉它），`now` 由调用方给，两个都是精确可表示的
+    小数 ⇒ age 恰等于 ttl，边界的开闭才谈得上"断言"。
     """
     path = _lock_file(tmp_path)
     mgr = LockManager(path, ttl_seconds=100)
     path.write_text("\n", encoding="utf-8")
+    os.utime(path, (_FIXED_MTIME, _FIXED_MTIME))
+    assert path.stat().st_mtime == _FIXED_MTIME          # 前提：文件系统老实存了固定基准
 
-    os.utime(path, (time.time() - 50, time.time() - 50))
-    assert mgr.is_stale() is False                     # 距 ttl 还有 50 秒：必不陈旧
+    assert mgr.is_stale(now=_FIXED_MTIME + 100) is False  # age == ttl：`>` 判不陈旧
+    assert mgr.is_stale(now=_FIXED_MTIME + 100.5) is True  # 超半秒也算陈旧（不是"约等"）
+    assert mgr.is_stale(now=_FIXED_MTIME - 1) is False     # NTP 回拨导致 age<0：不炸，仍不陈旧
 
-    os.utime(path, (time.time() - 150, time.time() - 150))
-    assert mgr.is_stale() is True                      # 超 ttl 50 秒：必陈旧
+
+def test_is_stale_now_defaults_to_wall_clock(tmp_path):
+    """缺省不改变语义：不传 now 走真实时钟；传 now 的结论可以与真实时钟相反。"""
+    path = _lock_file(tmp_path)
+    mgr = LockManager(path, ttl_seconds=100)
+    path.write_text("\n", encoding="utf-8")               # mtime = 真实"现在"
+    assert mgr.is_stale() is False                        # 缺省：age≈0 ⇒ 不陈旧
+    assert mgr.is_stale(now=time.time() + 200) is True     # 注入"未来"⇒ 陈旧：缺省值确实被让位
+    assert mgr.is_stale(now=_FIXED_MTIME) is False         # 注入 1970 年 ⇒ age 负 ⇒ 不陈旧
+
+    os.utime(path, (_FIXED_MTIME, _FIXED_MTIME))           # 把锁文件拨回 1970
+    assert mgr.is_stale() is True                          # 缺省仍读真实时钟 ⇒ 陈旧
+    assert mgr.is_stale(now=_FIXED_MTIME + 50) is False     # 注入的时钟里它才"不陈旧"
+
+
+def test_stale_alert_age_uses_the_injected_clock(tmp_path, caplog):
+    """告警年龄与判据共用同一个 now：注入的时钟决定 age_min，不再二次取时间。"""
+    path = _lock_file(tmp_path)
+    mgr = LockManager(path, ttl_seconds=100)
+    path.write_text("\n", encoding="utf-8")
+    os.utime(path, (_FIXED_MTIME, _FIXED_MTIME))
+
+    with caplog.at_level("WARNING"):
+        assert mgr.is_stale(now=_FIXED_MTIME + 600) is True
+    msgs = [r.getMessage() for r in caplog.records if "stale_lock" in r.getMessage()]
+    assert len(msgs) == 1
+    assert "stale for 10 min" in msgs[0]                    # age=600s ⇒ 10 min，取的是注入的 now
+    assert "ttl=100s" in msgs[0]
 
 
 def test_break_stale_deletes_only_when_stale(tmp_path):
