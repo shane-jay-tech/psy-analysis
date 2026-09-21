@@ -25,6 +25,20 @@ class _DummyContext:
         return False
 
 
+def classify_questionnaire_sub_mode(choice: str) -> str:
+    """问卷子工作流文案判别（设计稿 §4.1 第 1 条，s921-06 抽取）：纯函数、零行为变化。
+
+    判据仍是 emoji 前缀串比较（📤→upload_items / 📊→import_clean / 其余→ai_design）。
+    文案改动（丢 emoji/换 emoji）会让分支静默落回 AI 设计页——该风险由
+    test_questionnaire_panel_charac.py 与 test_questionnaire_panel_logic.py 钉住。
+    """
+    if choice.startswith("📤"):
+        return "upload_items"
+    elif choice.startswith("📊"):
+        return "import_clean"
+    return "ai_design"
+
+
 def render_questionnaire_page():
     """渲染问卷设计页面的完整流程。"""
     st.title("📋 问卷设计工具")
@@ -37,11 +51,12 @@ def render_questionnaire_page():
         horizontal=True,
         key="_q_sub_mode_radio",
     )
-    if _q_sub_mode.startswith("📤"):
+    _q_sub_class = classify_questionnaire_sub_mode(_q_sub_mode)
+    if _q_sub_class == "upload_items":
         from src.ui.items_upload_panel import render_items_upload_panel
         render_items_upload_panel()
         st.stop()
-    elif _q_sub_mode.startswith("📊"):
+    elif _q_sub_class == "import_clean":
         from src.ui.questionnaire_import_panel import render_questionnaire_import_panel
         render_questionnaire_import_panel(st.session_state)
         st.stop()
