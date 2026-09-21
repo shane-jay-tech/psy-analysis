@@ -287,3 +287,15 @@ def _translate_method(method: str) -> str:
         "paired_ttest": "配对样本 t 检验",
     }
     return mapping.get(method, method)
+
+
+def render_template_center_page():
+    """模板中心页主路由（s922-101 自 app.py 片 10 逐字节迁入）。
+
+    原 app.py:2477-2485 分支体中的 title/caption/面板调用三句搬到这里；
+    `except` 兜底**留在 app.py 调用侧**——本函数无法兜住自己的导入失败，
+    故迁移前后「加载失败」路径的可观察行为完全一致。
+    """
+    st.title("🗂️ 研究模板中心")
+    st.caption("从研究模板快速开始新项目——选择模板、预览数据、一键创建。")
+    render_template_center_panel()

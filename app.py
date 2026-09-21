@@ -2423,36 +2423,8 @@ elif mode == "📝 论文写作":
 # 📚 文献与选题（合并：选题漏斗 + 文献雷达 + 文献审核）
 # ============================================================
 elif mode == "📚 文献与选题":
-    st.title("📚 文献与选题")
-    _tab_funnel, _tab_feed, _tab_review = st.tabs(["选题与综述", "文献雷达", "文献审核"])
-    with _tab_funnel:
-        from src.utils.workspace import get_upstream_state as _get_upstream_v37
-        _upstream_v37 = _get_upstream_v37(st.session_state)
-        _tier_v37 = _upstream_v37.get("tier", "beginner")
-        _sub_tab_f, _sub_tab_l = st.tabs(["选题漏斗", "文献综述工作台"])
-        with _sub_tab_f:
-            from src.ui.upstream_panel import render_advanced_skip_form, render_funnel
-            if _tier_v37 == "advanced":
-                render_advanced_skip_form()
-            else:
-                render_funnel()
-        with _sub_tab_l:
-            from src.ui.literature_review_panel import render_literature_review
-            render_literature_review(tier=_tier_v37)
-    with _tab_feed:
-        try:
-            from src.literature_feed.ui import render_literature_feed
-            render_literature_feed()
-        except Exception as _feed_err:
-            st.error(f"文献雷达加载失败：{_feed_err}")
-    with _tab_review:
-        try:
-            from src.literature_feed.storage.feed_store import FeedStore as _ReviewFS
-            from src.ui.literature_review_queue_panel import render_review_queue
-            _review_store = _ReviewFS()
-            render_review_queue(_review_store)
-        except Exception as _review_err:
-            st.error(f"文献审核加载失败：{_review_err}")
+    from src.ui.literature_entry_panel import render_literature_entry_panel
+    render_literature_entry_panel()
 
 
 # ============================================================
@@ -2503,11 +2475,9 @@ elif mode == "📦 交付包导出":
 # v5.1: 🗂️ 模板中心
 # ============================================================
 elif mode == "🗂️ 模板中心":
-    st.title("🗂️ 研究模板中心")
-    st.caption("从研究模板快速开始新项目——选择模板、预览数据、一键创建。")
     try:
-        from src.ui.template_center_panel import render_template_center_panel
-        render_template_center_panel()
+        from src.ui.template_center_panel import render_template_center_page
+        render_template_center_page()
     except Exception as _tpl_err:
         st.error(f"模板中心加载失败：{_tpl_err}")
         on_error_display("template_center_load_failed", "error")
