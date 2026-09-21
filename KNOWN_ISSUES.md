@@ -35,11 +35,11 @@
 | **v4.6.a** | LLM 单轨化（删底部配置面板 + 备用模型 fallback；侧栏 9→4 块） | `docs/decisions/2026-05-25-merge-llm-config-quickonly.md` + `2026-05-26-llm-single-track-review.md` |
 | **v4.6.b** | 冗余清理：A 类 ~1500 行 src 死代码 + B 类 legacy 函数 + F2/F3 用户视角冗余 | `docs/decisions/2026-05-26-redundancy-audit.md` |
 
-**测试基线**：v3.9 (1140) → v4.0 (1166) → v4.1+4.2 (1208) → v4.3 (1222) → v4.4 (1253) → v4.5 (1260) → v4.6.a (1260) → v4.6.b (1235) → v5.11 当前 2644 个离线收集项（复现：.venv/Scripts/python.exe -m pytest --collect-only -q -m "not online"，2026-09-17）。
+**测试基线**：v3.9 (1140) → v4.0 (1166) → v4.1+4.2 (1208) → v4.3 (1222) → v4.4 (1253) → v4.5 (1260) → v4.6.a (1260) → v4.6.b (1235) → v5.11 当前 3306 个离线收集项（复现：.venv/Scripts/python.exe -m pytest --collect-only -q -m "not online"，2026-09-21 复测；轨迹 2644@09-17→3297@09-21 傍晚→3306@09-21 深夜，增量来自 s920/s921/s922 批纯测试单）。
 
 ---
 
-## 仍未修复（v4.7+ 路线）
+## 路线与状态（v4.7+）
 
 ### 🔴 #L1 自学习模块（4 顶刊每日抓摘要 → 知识库扩充 + 趋势提示）
 
@@ -53,14 +53,14 @@
 
 ### 🟡 #L2 F1 论文写作两入口合并
 
-- **影响**：`paper_writing_ui.py` (594 行独立 mode) 和 `undergrad_wizard.py` 第 7 步「写方法+结果」**功能重叠**：两条最终都调 `PaperEngine` 生成论文，差别只是独立入口要重填一遍信息，wizard 入口已有数据。
+- **影响**：`paper_writing_ui.py` (678 行独立 mode，2026-09-21 复测) 和 `undergrad_wizard.py` 第 7 步「写方法+结果」**功能重叠**：两条最终都调 `PaperEngine` 生成论文，差别只是独立入口要重填一遍信息，wizard 入口已有数据。
 - **决策**：v4.6 redundancy 时跳过（用户表态可能保留独立模式作为高级用户入口）。v4.7 重启评估，决定是否真合并、降级、或保留双入口加埋点观测使用率。
 - **预期产出**：合并 → 省 ~600 行 UI；保留 → 至少加埋点。
 
 ### 🟡 #L3 N10 苏格拉底基准 LLM-as-judge 漂移连续观测
 
 - **影响**：v3.7 加了 8 边界案例的金标，但单次对照；judge 漂移检测需要多次跑 + 历史曲线。
-- **计划**：CI 跑 `scripts/evaluate_socratic_benchmark.py` + 历史趋势记录到 `D:\code\psy-analysis\data\benchmark_history\`，与 #L1 共用 D 盘数据目录约定。
+- **现状＋缺口**（2026-09-21 订正，原「计划」已陈旧）：脚本归档与对比基建已建（`evaluate_socratic_benchmark.py` 的 `HISTORY_DIR`/`_last_history_entry`/`_archive_to_history`）但观测未连续——末次归档为 `socratic_benchmark_20260909T192139Z.json`（9/16 backfill 草稿未入库）；无 CI（`.github/workflows` 不存在）。缺口＝人工放行后带网跑一次批补样入库（统计结论域，执行班不代跑）；落盘约定与 #L1 共用 `D:\code\psy-analysis\data\benchmark_history\`。
 
 ### ✅ #L4 SELF_ASSESSMENT_REPORT.md 严重过期（2026-09-08 关闭：已归档）
 
@@ -89,8 +89,8 @@
 | 严重度 | 局限 | 目标版本 | 状态 |
 |---|---|---|---|
 | 🔴 高 | #L1 自学习模块 | v4.7 主线 | 已落地 |
-| 🟡 中 | #L2 F1 论文写作合并 | v4.7 | 待评估 |
-| 🟡 中 | #L3 N10 评分趋势观测 | v4.7 | 待开 |
+| 🟡 中 | #L2 F1 论文写作合并 | v4.7 | 已出对照材料（`docs/insights/psy-dualentry-overlap-20260918.md`，s918-01），**待用户拍板** |
+| 🟡 中 | #L3 N10 评分趋势观测 | v4.7 | 基建已建、观测未连续（见 #L3 正文） |
 | 🟢 低 | #L4 自评报告刷新 | — | 已关闭（过期件已归档 docs/history/，commit 4add02e，不再刷新） |
 | 🟢 低 | #L5 socratic_engine 类型 lie | v5.8 | 已完成 |
 
@@ -98,13 +98,13 @@
 
 | 优先级 | 项目 | 当前边界 |
 |---|---|---|
-| P1 | 多实例项目写入 | 已落地两级互斥（线程 RLock＋OS 文件锁，instance_lock.project_lock）；余留＝可选告警日志与锁粒度/回退策略 |
+| P1 | 多实例项目写入 | 已落地两级互斥（线程 RLock＋OS 文件锁，instance_lock.project_lock）；余留＝可选告警日志与锁粒度/回退策略。限定（2026-09-21）：`instance_lock.py` grep alert 零命中＝本行未推进；feed 侧 `lock_manager._alert_once`（d914-19）与 untracked `tests/test_lock_alert_log.py` 是**另一把锁**，勿混为抵账 |
 | P1 | 大工作区快照 | 已按方案 B 后台化（a02626c）＋「返回＝受理」语义与换案阈值已入码（h912-06，实测阈值=序列化 CSV 10MB≈worker 2s/内存峰值≈52MB）；残留：超阈值需评估方案 A 增量资产化 |
-| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，26 项明确跳过（e2e∪playwright 标记项实测，2026-09-17；复现：.venv/Scripts/python.exe -m pytest -q -rs -m "playwright or e2e"）；发布认证环境补装后重跑（安装后本行及 :138 行作废） |
+| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，26 项明确跳过（e2e∪playwright 标记项实测，2026-09-17，2026-09-21 复核仍 26 skipped；口径注：同标记 `--collect-only` 收集仅 25 项，第 26 项来自模块级 skip，两数不可互换；复现：.venv/Scripts/python.exe -m pytest -q -rs -m "playwright or e2e"）；发布认证环境补装后重跑（安装后本行及 :138 行作废） |
 | P2 | 交付入口收敛 | 正式交付已统一硬门禁；草稿、作业包与正式交付仍需统一入口语义 |
 | P2 | 编排层拆分 | `app.py` 保持兼容但体量较大；按页面控制器渐进拆分 |
 
-> 📌 2026-09-13 状态（p912-30 设计稿结论落地，d913b-46/a-42）——针对上表「P1 多实例项目写入」：该行已陈旧，`project_manager._locked` 现为「线程 RLock＋OS 文件锁（instance_lock.project_lock，v5.10 P1/1003 落地）」两级互斥，7 个写路径全在锁内；已按「方案 A（现状自研零依赖）」出具设计稿（docs/insights/psy-multiprocess-lock-design-20260912.md），待实施＝仅可选告警日志；余留＝锁粒度与回退策略的落地。
+> 📌 2026-09-13 状态（p912-30 设计稿结论落地，d913b-46/a-42）——上表「P1 多实例项目写入」与本注同源，s922-08 合并后**以表为唯一事实源**（余留口径见表行含防混淆限定，本注不再复述状态）；设计稿出处（方案 A＝现状自研零依赖）：`docs/insights/psy-multiprocess-lock-design-20260912.md`。
 
 ---
 
