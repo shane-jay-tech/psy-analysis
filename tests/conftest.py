@@ -23,6 +23,7 @@ _APP_TEST_FILES = {
     "test_e2e_v52_paths.py",
     "test_e2e_resultcard_paperpreview.py",
     "test_e2e_qimport_upload.py",
+    "test_project_panel_ui.py",
     "test_playwright_e2e.py",
     "test_playwright_golden_research_flow.py",
 }
