@@ -21,15 +21,21 @@ class TestI18n:
 
     def test_session_state_language(self):
         st.session_state.clear()
-        st.session_state.language = "en"
-        assert t("mean") == "Mean"
+        try:
+            st.session_state.language = "en"
+            assert t("mean") == "Mean"
+        finally:
+            st.session_state.clear()
 
     def test_get_test_name(self):
         st.session_state.clear()
-        st.session_state.language = "zh"
-        assert get_test_name("descriptive") == "描述性统计"
-        st.session_state.language = "en"
-        assert get_test_name("descriptive") == "Descriptive Statistics"
+        try:
+            st.session_state.language = "zh"
+            assert get_test_name("descriptive") == "描述性统计"
+            st.session_state.language = "en"
+            assert get_test_name("descriptive") == "Descriptive Statistics"
+        finally:
+            st.session_state.clear()
 
     def test_welch_anova_translation(self):
         assert t("welch_anova", "zh") == "Welch方差分析"
