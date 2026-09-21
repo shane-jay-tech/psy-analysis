@@ -27,6 +27,7 @@ WHITELIST_EXPORTS = {
     "src/output/docx_exporter.py": "docx 导出器（注释中提及，非实际按钮）",
     "src/ui/evidence_table_panel.py": "文献证据表导出（Markdown/CSV/BibTeX/RIS，中间产物供整理用）",
     "src/ui/questionnaire_import_panel.py": "问卷清洗日志导出（中间产物，供数据处理追溯）",
+    "src/ui/app_pages_text.py": "课程作业包导出（自 app.py 片 2 迁出；调用侧已有效应量检查，非正式论文交付）",
 }
 
 GATED_EXPORTS = {

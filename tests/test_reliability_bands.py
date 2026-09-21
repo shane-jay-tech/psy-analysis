@@ -82,7 +82,12 @@ def test_no_bare_alpha_threshold_left_in_the_two_sources(module_file):
 
 def test_the_two_tasked_sites_are_clean_but_six_more_still_hardcode_bands():
     """本单只收口任务点名的两处。全仓扫下来**还有六处**裸写 α 档位（数量按现状钉死，
-    谁再新增一处、或悄悄收口掉一处，本用例都会红——这是台账，不是终点）。"""
+    谁再新增一处、或悄悄收口掉一处，本用例都会红——这是台账，不是终点）。
+
+    2026-09-22 s922-18 追加第 7 个持有者 app_pages_text.py：那 2 处是 app.py 片 3
+    （_generate_method_description 的中英文方法说明文案）**原样迁入**，不是新增债；
+    app.py 从来不在本扫描的 src/ 范围内，迁入 src/ui 后才被登记到。
+    """
     root = pathlib.Path("src")
     holders = {}
     for path in root.rglob("*.py"):
@@ -93,6 +98,7 @@ def test_the_two_tasked_sites_are_clean_but_six_more_still_hardcode_bands():
             holders[path.name] = n
 
     assert holders == {
+        "app_pages_text.py": 2,                                 # 自 app.py 迁入的说明文案，见 docstring
         "learning_card.py": 1,
         "literature_manager.py": 1,
         "llm_engine.py": 1,
