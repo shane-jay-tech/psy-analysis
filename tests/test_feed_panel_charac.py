@@ -239,7 +239,9 @@ def test_entry_weights_failure_degrades_to_empty_vocab_and_keeps_rendering(entry
     assert store.closed == 1
 
 
-def test_entry_trending_failure_is_logger_only(entry):
+def test_entry_trending_failure_warns_like_weights(entry):
+    """s921-10 翻正（s920-14 遗留「⑥/⑦ 两种口径」点名处）：trending 失败不再 logger-only——
+    与「加载域权重失败」同口径补 st.warning；空权重降级与 errors 留空不变。"""
     st, store, calls, monkeypatch = entry
     _set_weights(entry, lambda: fp.DomainWeights.empty())
     monkeypatch.setattr(fp, "load_default_trending",
@@ -249,7 +251,8 @@ def test_entry_trending_failure_is_logger_only(entry):
 
     assert isinstance(calls["trending_arg"], fp.TrendingWeights)
     assert len(calls["trending_arg"].promoted) == 0 and len(calls["trending_arg"].ignored) == 0  # 落到 empty()
-    assert st.errors == []  # 与权重失败不同：这条对用户完全静默（现状，只钉不改）
+    assert st.errors == []
+    assert len(st.warnings) == 1 and "trending 坏了" in st.warnings[0]
 
 
 # ─────────────────────────── Tab 1 _render_daily_tab ───────────────────────────

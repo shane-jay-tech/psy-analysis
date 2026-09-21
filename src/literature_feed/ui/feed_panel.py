@@ -99,7 +99,8 @@ def render_literature_feed() -> None:
         with tab_trend:
             try:
                 trending_weights = load_default_trending()
-            except Exception as _exc:
+            except Exception as _exc:  # noqa: BLE001 — s921-10：与域权重同口径，降级对用户可见
+                st.warning(f"加载 trending 权重失败（使用空权重继续）：{_exc}")
                 logger.warning("load_default_trending failed: %s", _exc)
                 trending_weights = TrendingWeights.empty()
             _render_trend_tab(store, weights, trending_weights)
