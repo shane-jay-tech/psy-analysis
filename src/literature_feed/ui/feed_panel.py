@@ -69,7 +69,8 @@ def render_literature_feed() -> None:
     if not st.session_state.get(_BOOTSTRAP_SESSION_KEY):
         try:
             maybe_trigger_async()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — s922-06：与域权重/trending 同口径，降级对用户可见
+            st.warning(f"自动触发后台抓取失败（可到「来源管理」手动抓取）：{exc}")
             logger.warning("bootstrap_check 触发失败：%s", exc)
         st.session_state[_BOOTSTRAP_SESSION_KEY] = True
 

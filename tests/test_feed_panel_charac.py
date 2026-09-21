@@ -205,7 +205,10 @@ def test_entry_bootstrap_fires_once_per_session(entry):
     assert st.session_state[fp._BOOTSTRAP_SESSION_KEY] is True
 
 
-def test_entry_bootstrap_failure_is_swallowed_yet_key_still_set(entry):
+def test_entry_bootstrap_failure_warns_like_weights_yet_key_still_set(entry):
+    """s922-06 翻正（s921-10 遗留「bootstrap 分支仍 logger-only」点名处）：
+    触发失败不再用户零知情——与「加载域权重失败」同口径补 st.warning；
+    吞异常继续渲染、session key 仍置位（不 rerun 风暴）的语义不动。"""
     st, store, calls, monkeypatch = entry
 
     def boom():
@@ -214,7 +217,8 @@ def test_entry_bootstrap_failure_is_swallowed_yet_key_still_set(entry):
     monkeypatch.setattr(fp, "maybe_trigger_async", boom)
     fp.render_literature_feed()
 
-    assert st.errors == [] and st.warnings == []  # 现状：只 logger.warning，用户零知情
+    assert st.errors == []
+    assert len(st.warnings) == 1 and "没有网络" in st.warnings[0]  # s922-06：降级对用户可见
     assert st.session_state[fp._BOOTSTRAP_SESSION_KEY] is True  # 失败也算"本 session 试过了"
     assert [k for k, _ in calls["rendered"]] == ["daily", "trend", "sources", "settings"]
 
