@@ -90,7 +90,9 @@ class FakeSessionState:
 def _capture_refs(session_state: Any) -> Optional[Dict[str, Any]]:
     """主线程引用级捕获全部键值（零序列化、零深拷贝）。
 
-    大对象（df 等）按 Streamlit 惯例「整体替换、不就地改」；捕获失败返回 None，
+    捕获的是每个键的引用；凡被 build_workspace_snapshot() 读取的 session_state 键
+    （清单以 workspace.py 为准，不在此抄列）均按 Streamlit 惯例「整体替换、不就地改」。
+    就地写违规的当前基线由 tests/audit_inplace_scan.py 报告。捕获失败返回 None，
     调用方落回同步路径。
     """
     try:

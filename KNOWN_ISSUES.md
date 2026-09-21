@@ -153,5 +153,5 @@
 
 ## 跟进条目（2026-09-13 追加）
 
-- **UI 线程禁止就地变更 df**（来源：0912-02-08 线程审计；2026-09-13 登记）：方案 B 后台保存按「整体替换、不就地改」的 Streamlit 惯例做引用级捕获——若未来引入 `df inplace` 式就地修改，在途后台任务会序列化到改写后的对象，破坏引用快照语义。触发条件=任何对 session_state['df'] 的就地变更代码；处置=改写为整体替换，或把捕获升级为浅拷贝（见 autosave_bg 模块注释）。
+- **UI 线程禁止就地变更任何被 `build_workspace_snapshot()` 读取的 session_state 键**（来源：0912-02-08 线程审计；2026-09-13 登记；2026-09-22 s922-111 按 psy-dfinplace-blindspot §六.1 扩面）：方案 B 后台保存按「整体替换、不就地改」的 Streamlit 惯例做引用级捕获——`_capture_refs` 捕获的是**每一个键**的引用，df 只是最大最显眼的一个；若对快照读取的键做 `df inplace` 式就地修改，在途后台任务会序列化到改写后的对象，破坏引用快照语义。**快照键清单以 `src/utils/workspace.py` 的 `build_workspace_snapshot()` 为准，不在本文抄列（抄了必漂）**；就地写违规的当前基线由 `tests/audit_inplace_scan.py` 报告。触发条件=任何对上述快照键的就地变更代码；处置=改写为整体替换，或把捕获升级为浅拷贝（见 autosave_bg 模块注释）。
 - **psy 测试一律走 .venv**（来源：0912-03-06 jieba 双环境核验；2026-09-13 登记；2026-09-19 s918-16/s919-15 归口）：完整口径表见 [`docs/TESTING.md`](docs/TESTING.md) 的「解释器口径（两口径数字不可混比）」一节，本条只留结论——`D:\code\psy-analysis\.venv\Scripts\python.exe -m pytest -q`；系统 python 缺 jieba/pingouin 等依赖，跑测会出现收集错误或假差异（两环境 jieba dict.txt 已于 0912-03-06 确认同版 0.42.1，勿用系统 python 补装）。**两处不要各自维护数字，改口径只改 TESTING.md。**
