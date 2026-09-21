@@ -288,3 +288,52 @@ def test_acquire_succeeds_even_if_fsync_fails(tmp_path, monkeypatch):
         assert got is mgr                                  # 互斥照常成立
         assert "owner_write_failed" in mgr._alerted        # 但这次是静默失败改成了有声失败
     assert mgr._fh is None                                 # 退出仍正常释放
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# s922-109 追加：边界真值已挪到 `tests/test_lock_stale_boundary.py`（19 例、零 sleep、
+# 零裕量），本文件 :83 那条压线例与它**同一口径**（固定基准 mtime + 注入 now ⇒ age 精确）。
+# 下面两例钉的是"为什么本文件 :133/:147 仍要留真实时钟裕量"——那两处**不能**改走接缝写法，
+# 因为入口根本没接 now 参数。任务书「同批修，不留双口径」的实测结论见这两条例子的 docstring。
+# ─────────────────────────────────────────────────────────────────────────────
+def test_break_stale_and_acquire_expose_no_clock_seam(tmp_path):
+    """结构面钉桩：`break_stale()` / `acquire()` 的签名里**没有** `now`，只有 `is_stale` 有。
+
+    ⇒ 本文件 `test_break_stale_deletes_only_when_stale`（:133）与
+    `test_acquire_steals_a_stale_lock`（:147）用的真实时钟裕量不是"没改干净的双口径"，
+    而是**接缝缺失下的唯一写法**（`break_stale:159` 内部硬调 `self.is_stale()` 不带参）。
+    出口（属行为改动、本班不做）：给这两个入口加同样的可选 `now` 接缝，
+    那两条用例即可改成压线写法、裕量随之取消。若哪天实现补了 `now` 参数，本用例会红——那是设计内翻正。
+    """
+    import inspect
+
+    stale_params = list(inspect.signature(LockManager.is_stale).parameters)
+    assert stale_params == ["self", "now"], stale_params
+    assert list(inspect.signature(LockManager.break_stale).parameters) == ["self"]
+    assert list(inspect.signature(LockManager.acquire).parameters) == ["self"]
+
+
+def test_break_stale_verdict_agrees_with_the_seam_readout(tmp_path):
+    """单口径自证：真实时钟下 `break_stale()` 的结论，与同一状态下注入 `now` 的 `is_stale()` 一致。
+
+    现状钉桩（裕量在这里只用来**免疫调度抖动**，不用来区分判据方向）：
+    把锁文件拨到 `now - ttl - 5`，两侧都判陈旧；拨到 `now - ttl + 5`（即 age 还差 5 秒），两侧都判不陈旧。
+    若边界判据被改成 `>=`，本用例仍绿——它钉的是"两个入口同判据"，
+    压线方向由 `tests/test_lock_stale_boundary.py` 锁死，两档不重复计账。
+    """
+    path = _lock_file(tmp_path, "break.lock")
+    mgr = LockManager(path, ttl_seconds=100)
+    path.write_text("\n", encoding="utf-8")
+
+    aged = time.time() - 105                                 # age ≈ 105 > 100
+    os.utime(path, (aged, aged))
+    assert mgr.is_stale(now=aged + 105) is True              # 接缝口径
+    assert mgr.break_stale() is True                         # 真实时钟口径 ⇒ 删档
+    assert not path.exists()
+
+    path.write_text("\n", encoding="utf-8")
+    fresh = time.time() - 95                                 # age ≈ 95 < 100
+    os.utime(path, (fresh, fresh))
+    assert mgr.is_stale(now=fresh + 95) is False
+    assert mgr.break_stale() is False                        # 同一判据，不删
+    assert path.exists()
