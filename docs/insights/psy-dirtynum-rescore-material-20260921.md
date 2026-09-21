@@ -97,7 +97,7 @@ PY
 | 维度 | 实测 |
 |---|---|
 | 裸强转点 | **6 处**（`models.py:69/73/78` `LiteratureItem.from_dict`；`:89/93` `from_crawled`；`:201` `GapAnalysis.from_dict`） |
-| 「一条坏数据拖垮整表」的同构点 | **2 处**：`literature_review_panel.py:757`（本单目标）与 `src/literature_review/notes.py:157`（`[ReadingNote.from_dict(d) for d in data if isinstance(d, dict)]`，同列表推导、同样无 try；它还多一层宽容但只过滤非 dict） |
+| 「一条坏数据拖垮整表」的同构点 | **3 处**：`literature_review_panel.py:757`（本单目标）、`src/literature_review/notes.py:157`（`[ReadingNote.from_dict(d) for d in data if isinstance(d, dict)]`，同列表推导、同样无 try，它多的一层宽容只过滤非 dict）、`src/literature_review/search.py:230`（`[LiteratureItem.from_dict(d) for d in items_dict]`，爬虫/检索结果的直转面） |
 | 脏值入口面（谁会喂进非数字串） | ①`src/literature_review/search.py:230` 爬虫/检索结果直转；②工作区恢复 `src/utils/workspace.py:373`（快照读回，历史版本或用户手改 JSON 均可带脏）；③批注导入 `src/literature_review/review_import.py:138-145` 写回 `literature_items`；④向导读取 `src/ui/undergrad_wizard.py:3595` 走同一列表 |
 | **本仓现存数据里的脏值观测** | **0 条**。`data/` 与 `demo_projects/` 下全部 JSON 递归扫描，`literature_items` 出现 0 次（字段类型分布为空）⇒ 触发面是**外部输入面与恢复面**，不是存量数据；即「用户项目 JSON / 爬虫返回值」是唯一喂入口 |
 | 影响面（一次命中后果） | 整个「文献综述」面板不可用（`:126` 在渲染主干上，非分支）；同一次会话内只要该条数据仍在 `lr_state`，**每次 rerun 都红**（无自愈路径） |
@@ -158,4 +158,4 @@ def _coerce_int(v, default: int = 0) -> int:
 
 - 不给任何文献打分/相关度/完成度数值下结论，也不修任何数值（红线）；两处复现都在内存里跑，**未写任何项目文件、未触发任何 LLM/网络**。
 - 不动 `tests/test_literature_review_panel_helpers.py` 里 s920-10 系的 ④/⑥/⑦ 钉桩（现 18 例按 `tests/test_literature_review_panel_helpers.py` 原口径绿）；A/B 一旦施工，④ 那枚「只钉不改」的注释需按惯例翻正。
-- `notes.py:157` 的同构列表推导本单**只登记不修**（同病灶第二例，建议与 A 同批，否则「文献列表能容错、笔记列表仍整表弃」是新的不一致）。
+- `notes.py:157` 的同构列表推导本单**只登记不修**（同病灶，另有 search.py:230 共 3 处，见触发表；建议与 A 同批，否则「文献列表能容错、笔记/检索列表仍整表弃」是新的不一致）。
