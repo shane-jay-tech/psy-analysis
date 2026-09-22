@@ -5,7 +5,7 @@
 **不做设计稿第 4 节的结构性抽取**（那是日间拍板的事）。
 
 锚点复核（相对设计稿有一处漂移，按磁盘实况钉）：
-- 设计稿 `st.rerun()` 记 **9 处**，磁盘实况 **8 处**（见 test_rerun_*）；`st.stop()` 仍 3 处（s920-10 时为 :43/:47/:517；s921-06/07 抽取后 :67/:71/:544；s922-02 加 anomaly 判据后 :80/:84/:564）。
+- 设计稿 `st.rerun()` 记 **9 处**，磁盘实况 **8 处**（见 test_rerun_*）；`st.stop()` 仍 3 处（s920-10 时为 :43/:47/:517；s921-06/07 抽取后 :67/:71/:544；s922-02 加 anomaly 判据后 :80/:84/:564；s922-138 反向刷齐后 :81/:85/:576；s922-139 premium 补 anomaly 警示后 :81/:85/:583）。
 - 本页确实零测试：`tests/test_app_routes_v6_panels.py:62` 那个同名用例 import 的是
   `src.ui.questionnaire_import_panel`（别的模块），不是本页。
 
@@ -165,23 +165,34 @@ def test_page_is_still_one_monster_function():
     assert [f.name for f in funcs] == ["classify_questionnaire_sub_mode", "compute_pending_elapsed", "pending_clock_anomaly", "render_questionnaire_page"]
     assert [c.name for c in classes] == ["_DummyContext"]
     fn = funcs[-1]
-    assert fn.lineno == 64 and (fn.end_lineno - fn.lineno + 1) == 774   # s921-07 后 51/767；s922-02 加 pending_clock_anomaly 后 64/774
+    # s921-07 后 51/767；s922-02 加 pending_clock_anomaly 后 64/774；
+    # s922-138 反向刷齐（顶部 import html 占 1 行＋三处渲染/下载面按 app.py 加长）后 65/807；
+    # s922-139 premium 分支补 anomaly 警示（+7 行）后 65/814
+    assert fn.lineno == 65 and (fn.end_lineno - fn.lineno + 1) == 814
 
 
 def test_reentry_is_all_via_rerun_with_zero_callbacks():
-    """本页没有 on_click/on_change，全部交互靠 `st.rerun()` 重入 ⇒ 加回调属于骨架换范式，须先过这条。"""
+    """本页没有交互回调，全部交互靠 `st.rerun()` 重入 ⇒ 加回调属于骨架换范式，须先过这条。
+
+    s922-138 刷齐后**收紧**（非放宽）：app.py 生产版的三枚 `st.download_button` 带
+    `on_click="ignore"`——它不是回调，恰是「点下载不重入」的声明。原断言按字面
+    （`"on_click" not in BODY`）会把这条生产事实判成违规，故改为逐字钉「只允许
+    `on_click="ignore"` 且恰好 3 枚」：任何 `on_change=` 或第四种 on_click 写法仍当场红。
+    """
     reruns = BODY.count("st.rerun()")
     stops = BODY.count("st.stop()")
 
     assert reruns == 8                                   # 设计稿记 9，磁盘实况 8（已留痕）
     assert stops == 3
-    assert "on_click" not in BODY and "on_change" not in BODY
+    assert BODY.count('on_click="ignore"') == 3           # app.py 生产版同数：只此三枚下载按钮
+    assert BODY.count("on_click") == 3                    # 无第四种 on_click 写法混入
+    assert "on_change" not in BODY
 
 
 def test_stop_sites_are_the_two_branch_heads_plus_one_deep_in_report():
     lines = [(i, ln.strip()) for i, ln in enumerate(BODY.splitlines(), 1) if "st.stop()" in ln]
 
-    assert [i for i, _ in lines] == [80, 84, 564]        # s921-06 后 58/62/532；s921-07 后 67/71/544；s922-02 加 anomaly 后 80/84/564
+    assert [i for i, _ in lines] == [81, 85, 583]         # s921-06 后 58/62/532；s921-07 后 67/71/544；s922-02 加 anomaly 后 80/84/564；s922-138 刷齐后 81/85/576；s922-139 premium 警示（+7 行，在第 3 个 stop 之前）后 81/85/583
     assert lines[0][1].startswith("st.stop()") and lines[1][1].startswith("st.stop()")
 
 
@@ -189,7 +200,7 @@ def test_session_state_touches_are_20_and_three_keys_dominate():
     """20 处 `st.session_state.` 引用（设计稿口径），其中 language/questionnaire_design/_q_design_pending 是主写键。"""
     n = sum(1 for _ in BODY.splitlines() if "st.session_state" in _)
 
-    assert len(BODY.splitlines()) == 837                 # s921-06 后 805；s921-07 后 817；s922-02 加 anomaly 与负秒钉后 837
+    assert len(BODY.splitlines()) == 878                 # s921-06 后 805；s921-07 后 817；s922-02 加 anomaly 与负秒钉后 837；s922-138 反向刷齐后 871；s922-139 premium 分支补 anomaly 警示后 878
     assert BODY.count("st.session_state.") >= 20
     for key in ("language", "questionnaire_design", "_q_design_pending", "_q_premium_mode"):
         assert key in BODY
@@ -200,8 +211,8 @@ def test_branch_head_prefixes_live_on_the_expected_lines():
     emoji 前缀串比较原文整体搬进 classify 体内（钉函数体原文）——两处判据仍逐字在钉。"""
     lines = BODY.splitlines()
 
-    assert "    _q_sub_class = classify_questionnaire_sub_mode(_q_sub_mode)" == lines[75]
-    assert 'if _q_sub_class == "upload_items":' == lines[76].strip()
-    assert 'elif _q_sub_class == "import_clean":' == lines[80].strip()
-    assert 'if choice.startswith("📤"):' == lines[34].strip()
-    assert 'elif choice.startswith("📊"):' == lines[36].strip()
+    assert "    _q_sub_class = classify_questionnaire_sub_mode(_q_sub_mode)" == lines[76]
+    assert 'if _q_sub_class == "upload_items":' == lines[77].strip()
+    assert 'elif _q_sub_class == "import_clean":' == lines[81].strip()
+    assert 'if choice.startswith("📤"):' == lines[35].strip()
+    assert 'elif choice.startswith("📊"):' == lines[37].strip()

@@ -1,5 +1,6 @@
 """问卷设计页面面板 — 从 app.py 抽取的完整问卷设计流程。"""
 
+import html
 import threading
 import time
 
@@ -214,6 +215,13 @@ def render_questionnaire_page():
                 p_msg = progress.get("msg", "排队中...") if progress else "..."
                 p_pct = float(progress.get("pct", 0.0)) if progress else 0.0
             st.markdown(f"### ⭐ 高质量模式生成中（已 {elapsed_txt}）")
+            if clock_anomaly:
+                # s922-139：premium 链此前只看 elapsed_txt，时钟回拨时只报「已 0s」不报异常
+                # （elapsed 被钳 0、>90 那档也永不触发）。文案与下方同档先例逐字一致。
+                st.warning(
+                    "🕐 时钟异常：任务起始时刻晚于当前时刻（系统时钟回拨或跨机时差），耗时按 0s 显示、"
+                    "超时判断本轮不生效。若反复出现，请校准系统时间后重新提交。"
+                )
             st.progress(min(1.0, p_pct), text=p_msg)
             st.caption("流程：①骨架 → ②并行生成各维度题目 → ③元数据 → ④质检 → ⑤弱题重写")
             if elapsed is not None and elapsed > 90:
@@ -453,17 +461,28 @@ def render_questionnaire_page():
                     "process_diagnostic": "🔍 流程诊断型（诊断流程薄弱环节）",
                     "multi_perspective_audit": "👥 多视角对照型",
                 }.get(rt, rt)
+                _safe_rt_label = html.escape(str(rt_label))
+                _safe_object = html.escape(str(rp.get("research_object", "?")))
+                _safe_population = html.escape(str(rp.get("population", "?")))
+                _safe_role = html.escape(str(rp.get("respondent_role", "?")))
+                _safe_subject = html.escape(str(rp.get("item_subject_template", "?")))
+                _safe_summary = html.escape(str(rp.get("summary", "")))
+                _framework = rp.get("theoretical_framework")
+                _safe_framework_line = (
+                    f"理论框架：<b>{html.escape(str(_framework))}</b><br>"
+                    if _framework else ""
+                )
                 st.markdown(
                     f"""<div style="background:#f0f7ff;border-left:4px solid #2e86de;
                     padding:12px 16px;border-radius:6px;margin:8px 0;">
                     <strong>📋 系统对你研究问题的理解</strong><br>
                     <span style="font-size:0.9em;">
-                    研究层次：<b>{rt_label}</b><br>
-                    评估对象：<b>{rp.get('research_object', '?')}</b><br>
-                    答题人群：<b>{rp.get('population', '?')}</b>（角色：{rp.get('respondent_role', '?')}）<br>
-                    题目主语：<b>{rp.get('item_subject_template', '?')}</b><br>
-                    {f"理论框架：<b>{rp['theoretical_framework']}</b><br>" if rp.get('theoretical_framework') else ""}
-                    研究意图：{rp.get('summary', '')}
+                    研究层次：<b>{_safe_rt_label}</b><br>
+                    评估对象：<b>{_safe_object}</b><br>
+                    答题人群：<b>{_safe_population}</b>（角色：{_safe_role}）<br>
+                    题目主语：<b>{_safe_subject}</b><br>
+                    {_safe_framework_line}
+                    研究意图：{_safe_summary}
                     </span></div>""",
                     unsafe_allow_html=True,
                 )
@@ -642,10 +661,12 @@ def render_questionnaire_page():
                 ("反向题", f"{sc['n_reverse']}题 ({sc['reverse_ratio']})"),
             ]
             for col, (label, value) in zip(tech_cols, _tech_cells):
+                _safe_label = html.escape(str(label))
+                _safe_value = html.escape(str(value))
                 col.markdown(
                     f"<div style='padding:8px 4px;'>"
-                    f"<div style='font-size:0.85em;color:#666;'>{label}</div>"
-                    f"<div style='font-size:1.5em;font-weight:600;'>{value}</div>"
+                    f"<div style='font-size:0.85em;color:#666;'>{_safe_label}</div>"
+                    f"<div style='font-size:1.5em;font-weight:600;'>{_safe_value}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -793,27 +814,43 @@ def render_questionnaire_page():
             )
 
         if export_clicked:
-            import base64
             try:
+                _construct_name = str(design.get("construct_name") or "问卷")
+                _safe_stem = "".join(
+                    ch for ch in _construct_name
+                    if ch.isalnum() or ch in "._-（）()"
+                )[:60] or "问卷"
                 if export_format.startswith("📄 Word"):
                     from src.questionnaire.exporters import export_to_docx
                     docx_bytes = export_to_docx(design)
-                    b64 = base64.b64encode(docx_bytes).decode()
-                    href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{design["construct_name"]}问卷设计报告.docx">点击下载 Word 报告 (.docx)</a>'
-                    st.markdown(href, unsafe_allow_html=True)
+                    st.download_button(
+                        "下载 Word 报告 (.docx)",
+                        data=docx_bytes,
+                        file_name=f"{_safe_stem}问卷设计报告.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        on_click="ignore",
+                    )
                     st.success("✅ Word 报告已生成，可用 Microsoft Word 或 WPS 打开编辑。")
 
                 elif export_format.startswith("📕 PDF"):
                     from src.questionnaire.exporters import export_to_pdf
                     pdf_bytes = export_to_pdf(design)
-                    b64 = base64.b64encode(pdf_bytes).decode()
-                    href = f'<a href="data:application/pdf;base64,{b64}" download="{design["construct_name"]}问卷设计报告.pdf">点击下载 PDF 报告 (.pdf)</a>'
-                    st.markdown(href, unsafe_allow_html=True)
+                    st.download_button(
+                        "下载 PDF 报告 (.pdf)",
+                        data=pdf_bytes,
+                        file_name=f"{_safe_stem}问卷设计报告.pdf",
+                        mime="application/pdf",
+                        on_click="ignore",
+                    )
                     st.success("✅ PDF 报告已生成。")
 
                 else:
                     full_report = generate_design_report(design)
-                    html = f"""<html><head><meta charset='utf-8'>
+                    # 下载的 HTML 可能在浏览器本地打开；先转义全部用户/LLM 文本，
+                    # 再只把受控的 Markdown 标题标记转换成固定标签。
+                    from src.ui.html_safety import questionnaire_report_to_html_fragment
+                    _safe_report = questionnaire_report_to_html_fragment(full_report)
+                    html_report = f"""<html><head><meta charset='utf-8'>
 <style>
 body {{ font-family: 'Microsoft YaHei', sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; line-height: 1.8; }}
 h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; }}
@@ -823,11 +860,15 @@ th, td {{ border: 1px solid #ddd; padding: 8px 12px; }}
 th {{ background-color: #f2f2f2; }}
 pre {{ background: #f8f8f8; padding: 1rem; border-radius: 4px; white-space: pre-wrap; }}
 </style></head><body>
-{full_report.replace(chr(10), '<br>').replace('## ', '<h2>').replace('# ', '<h1>').replace('---', '<hr>')}
+{_safe_report}
 </body></html>"""
-                    b64 = base64.b64encode(html.encode("utf-8")).decode()
-                    href = f'<a href="data:text/html;base64,{b64}" download="{design["construct_name"]}问卷设计报告.html">点击下载 HTML 报告 (.html)</a>'
-                    st.markdown(href, unsafe_allow_html=True)
+                    st.download_button(
+                        "下载 HTML 报告 (.html)",
+                        data=html_report,
+                        file_name=f"{_safe_stem}问卷设计报告.html",
+                        mime="text/html",
+                        on_click="ignore",
+                    )
                     st.success("✅ HTML 报告已生成。")
 
             except Exception as e:
