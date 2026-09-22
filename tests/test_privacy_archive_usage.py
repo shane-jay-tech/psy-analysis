@@ -43,17 +43,22 @@ def test_dataframe_scan_can_limit_itself_to_column_names():
 
 
 def test_export_pre_check_distinguishes_medium_from_high_severity():
+    """pd01 / 20260922-1830 后口径：档位仍分 medium／high，但 email 这类 medium **也纳入拦截**。
+
+    改前这条断言 `medium == {"safe": True, ...}`（检出但不拦）——正是卷宗点名的
+    "导出预检漏放行 email／password" 现状桩，随判据收紧一并翻正；键集合也钉住，
+    少返回一个计数键不会报错，只会让交付摘要里的中风险数静默变 0。
+    """
     medium = privacy_ethics.export_pre_check("contact person@example.com")
     high = privacy_ethics.export_pre_check("contact 13800138000")
 
-    assert medium == {
-        "safe": True,
-        "findings": medium["findings"],
-        "high_count": 0,
-        "total_count": 1,
-    }
+    assert medium["safe"] is False                      # 扩判据后 email 也拦
+    assert [f.severity for f in medium["findings"]] == ["medium"]
+    assert (medium["high_count"], medium["medium_count"], medium["blocking_count"],
+            medium["total_count"]) == (0, 1, 1, 1)
     assert high["safe"] is False
     assert high["high_count"] == high["total_count"] == 1
+    assert (high["medium_count"], high["blocking_count"]) == (0, 1)
 
 
 def test_cache_discovery_size_and_selective_clear(tmp_path):

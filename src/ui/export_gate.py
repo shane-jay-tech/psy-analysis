@@ -94,8 +94,13 @@ def run_export_gate(session_state: dict) -> tuple[bool, list[str], list[ProjectH
     if export_text_parts:
         privacy = export_pre_check("\n".join(export_text_parts), source="正式交付物")
         if not privacy["safe"]:
+            # pd01：safe 判据已扩到 email／password 档 ⇒ 拦下时 high_count 可能是 0，
+            # 旧文案"检测到 0 项高风险敏感信息"会自相矛盾。计数改用 blocking_count，
+            # 前缀 token `[PRIVACY_HIGH]` 原样保留（tests/test_ui_golden_research_flow.py:213 认它）。
+            _n_block = privacy.get("blocking_count", privacy["high_count"])
             block_reasons.append(
-                f"[PRIVACY_HIGH] 检测到 {privacy['high_count']} 项高风险敏感信息，请脱敏后再导出"
+                f"[PRIVACY_HIGH] 检测到 {_n_block} 项须脱敏的敏感信息"
+                f"（其中高风险 {privacy['high_count']} 项），请脱敏后再导出"
             )
 
     allowed = len(block_reasons) == 0

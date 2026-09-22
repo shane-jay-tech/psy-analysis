@@ -59,12 +59,25 @@ class SensitiveFinding:
 _PATTERNS = {
     "id_card": (r"(?<!\d)\d{17}[\dXx](?!\w)", "high"),
     "phone": (r"(?<!\d)1[3-9]\d{9}(?!\d)", "high"),
-    "landline": (r"(?i)(?:电话|座机|tel(?:ephone)?)\s*[：:=]?\s*0\d{2,3}-?\d{7,8}(?!\d)", "high"),
+    # pd01（20260922-1830）：座机后挂的分机号一并吞进替换段——旧写法只到 \d{7,8}，
+    # 脱敏后 "转 802" 原样留在导出文本里（s922-124 探针 test_landline_extension_... 钉的就是这条泄漏现状）。
+    # 只许收紧：新增的是"多盖一段数字"，不缩小任何既有匹配面。
+    "landline": (
+        r"(?i)(?:电话|座机|tel(?:ephone)?)\s*[：:=]?\s*0\d{2,3}-?\d{7,8}"
+        r"(?:\s*[（(]?\s*(?:转|分机号?|extension|ext\.?|#)\s*[：:]?\s*\d{1,6}\s*[)）]?)?(?!\d)",
+        "high",
+    ),
     "email": (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "medium"),
     "api_key": (r"\b(sk-|ak_|AKIA)[A-Za-z0-9]{20,}\b", "high"),
     "password": (r"(?i)(password|passwd|pwd)\s*[=:]\s*\S+", "medium"),
     "messenger": (r"(?i)(微信|wechat|qq)\s*[：:=]?\s*[A-Za-z0-9_-]{5,20}", "high"),
 }
+
+#: 除全部 high 档之外，另外点名拦的两档（用户 2026-09-22 18:2x 拍板「把 safe 判据扩到含
+#: email／password 档」；出处 s922-124 裁决 ①，commit `4a33a88`：门禁只看 high ⇒ 这两档检出也放行）。
+#: 按档名点名而非"medium 全拦"：将来 owner 新增 medium 档时**不会**被顺手放行，也不会被顺手拦下，
+#: 必须回到这里过一次决定。
+_BLOCKING_MEDIUM_TYPES = ("email", "password")
 
 
 def scan_text_for_sensitive(text: str, source: str = "unknown") -> list[SensitiveFinding]:
@@ -183,12 +196,24 @@ def _dir_size(path: str) -> int:
 
 
 def export_pre_check(text_content: str, source: str = "export") -> dict:
-    """导出前敏感信息预检。返回 {'safe': bool, 'findings': [...]}。"""
+    """导出前敏感信息预检。返回 {'safe': bool, 'findings': [...]}。
+
+    判据口径（pd01 / 20260922-1830 起）：`safe` 不再只看 high——
+    `severity == "high"` 全档 **＋** `_BLOCKING_MEDIUM_TYPES`（email／password）都算拦。
+    只增不减：原来会被拦的现在一定还拦。
+    另补 `medium_count`／`blocking_count` 两个键：前者 `app.py` 与 `zip_exporter.py` 早就在用
+    `.get("medium_count", 0)` 读，但本函数此前**从不返回该键** ⇒ 交付摘要里的中风险数恒为 0。
+    """
     findings = scan_text_for_sensitive(text_content, source)
     high_severity = [f for f in findings if f.severity == "high"]
+    medium_severity = [f for f in findings if f.severity == "medium"]
+    blocking = [f for f in findings
+                if f.severity == "high" or f.pattern_type in _BLOCKING_MEDIUM_TYPES]
     return {
-        "safe": len(high_severity) == 0,
+        "safe": len(blocking) == 0,
         "findings": findings,
         "high_count": len(high_severity),
+        "medium_count": len(medium_severity),
+        "blocking_count": len(blocking),
         "total_count": len(findings),
     }

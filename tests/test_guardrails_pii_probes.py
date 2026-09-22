@@ -27,6 +27,14 @@ $ PYTHONUTF8=1 PYTHONPATH=. .venv/Scripts/python.exe tmp/s922-124_pii_probe.py
 本件只锁下限（已检出项不许静默退化）＋登记漏检面（xfail 不阻断），**不替 owner 扩规则**。
 日后 owner 补了规则，xfail 会转 XPASS（`strict=False` ⇒ 不红），那就是"覆盖面变宽"的信号；
 而已检出项一旦不再被检出，本件当场红。
+
+📌 pd01 / 20260922-1830（2026-09-22 18:2x 用户拍板后落的两处收紧，上面的历史基线读数**不回改**）
+- 上面第 3 条（`safe` 只看 high ⇒ email／password 放行）**已改**：`export_pre_check` 现在
+  除 high 全档外还拦 `_BLOCKING_MEDIUM_TYPES = ("email","password")`。第 3 条的桩位随之从
+  "登记现状"翻成"钉住新判据"（`test_export_gate_now_blocks_email_and_password_medium`）。
+- 上面第 2 条点名的"座机加分机"分机号残留**已修**（`_PATTERNS["landline"]` 的替换段吃到分机号）。
+- 值级 25 / 列名 20 两组**探针条数与检测面不变**（本单没加检测规则，只动脱敏覆盖与门禁判据），
+  所以 `test_probe_inventory_matches_the_recorded_baseline_counts` 与 26 条 xfail 仍逐条在册。
 """
 from __future__ import annotations
 
@@ -49,7 +57,7 @@ DETECTED_VALUE_PROBES = [
     ("身份证18位无分隔", "被试 11010119900307551X 已完成", "id_card", "被试 [REDACTED_ID_CARD] 已完成"),
     ("手机11位裸写", "联系 13800138000", "phone", "联系 [REDACTED_PHONE]"),
     ("座机带标签", "电话：010-12345678", "landline", "[REDACTED_LANDLINE]"),
-    ("座机加分机", "座机：010-12345678 转 802", "landline", "[REDACTED_LANDLINE] 转 802"),
+    ("座机加分机", "座机：010-12345678 转 802", "landline", "[REDACTED_LANDLINE]"),
     ("邮箱", "邮箱 student.sample01@example.edu.cn", "email", "邮箱 [REDACTED_EMAIL]"),
     ("微信带中文标签", "微信：liulab_2023", "messenger", "[REDACTED_MESSENGER]"),
     ("QQ号", "QQ：123456789", "messenger", "[REDACTED_MESSENGER]"),
@@ -143,13 +151,53 @@ def test_detected_value_probes_still_fire_and_are_actually_redacted(label, sampl
         assert raw_digits[:6] not in text, f"{label} 脱敏后仍留着前 6 位数字：{text!r}"
 
 
-def test_landline_extension_survives_redaction_registered_leak():
-    """登记式现状钉桩：座机"检出"了，但分机号 `802` 留在导出文本里。"""
-    text, counts = redact_sensitive_text("座机：010-12345678 转 802")
+#: pd01 前这条叫 `test_landline_extension_survives_redaction_registered_leak`（登记式现状钉桩：
+#: 断言 "转 802" **留在**脱敏文本里）。判据已按 2026-09-22 18:2x 拍板收紧，桩位随之翻正为真断言。
+LANDLINE_EXTENSION_FORMS = [
+    "座机：010-12345678 转 802",
+    "座机：010-12345678 转802",
+    "座机：010-12345678 分机 802",
+    "座机：010-12345678（分机号 802）",
+    "电话：010-12345678 ext. 802",
+    "电话：010-12345678#802",
+    "Telephone: 010-12345678 extension 802",
+]
 
-    assert counts == {"landline": 1}
-    assert "转 802" in text                      # 现状：分机未被覆盖，属部分脱敏
-    assert "010-12345678" not in text            # 主体确被摘掉
+
+@pytest.mark.parametrize("sample", LANDLINE_EXTENSION_FORMS,
+                         ids=[f"e{i}" for i in range(len(LANDLINE_EXTENSION_FORMS))])
+def test_landline_extension_is_redacted_together_with_the_number(sample):
+    """收紧面①：座机后挂的分机号不许活到导出文本里（旧行为只摘主体号，留 "转 802"）。"""
+    text, counts = redact_sensitive_text(sample)
+
+    assert counts == {"landline": 1}, f"分机形态 {sample!r} 改变了认领类型或条数"
+    assert "802" not in text, f"分机号残留：{text!r}"
+    assert "010-12345678" not in text                              # 主体照旧被摘
+    assert text.strip() == "[REDACTED_LANDLINE]"
+
+
+@pytest.mark.parametrize("sample, keep", [
+    ("办公 021-65432100 8023", "8023"),          # 无「转/分机/ext」关键词 ⇒ 后挂数字**不许**被顺手吞掉
+    ("座机：010-12345678 备注 20231234567", "20231234567"),   # 同理：非分机词不吞
+])
+def test_landline_extension_group_does_not_swallow_unrelated_trailing_digits(sample, keep):
+    """收紧面②的反向护栏：只多盖"确实写了转/分机/ext"的那一段，别把整句尾巴都吃掉
+    （否则 `test_detected_value_probes...` 那类"锁脱敏产物逐字"的探针会失去判别力）。"""
+    text, _counts = redact_sensitive_text(sample)
+
+    assert keep in text, f"{keep} 被误吞：{text!r}"
+
+
+def test_landline_fix_did_not_loosen_any_registered_miss():
+    """只许收紧不许放宽的可机检面：两条已登记的座机漏检（无标签裸号／空格分组）**必须仍然漏**——
+    若哪天有人把正则放宽到认领它们，这条会红，逼一次"这是不是又把误伤面放大了"的复核。"""
+    landline_misses = [p for p in MISSED_VALUE_PROBES if p[0].startswith("座机")]
+
+    assert len(landline_misses) == 2, [p[0] for p in landline_misses]
+    for label, sample, _why in landline_misses:
+        assert not scan_text_for_sensitive(sample, source="probe"), (
+            f"{label} 现在被认成 landline：放宽了匹配面，请复核误伤风险后再改本桩"
+        )
 
 
 # ══════════════════ 三、S2 值级：漏检项（xfail 登记，防静默退化） ══════════════════
@@ -211,13 +259,59 @@ def test_column_surface_never_looks_at_cell_values_by_design():
 # ══════════════════ 五、S3 门禁 severity 语义 ══════════════════
 
 
-def test_export_gate_passes_medium_severity_findings():
-    """现状钉桩：safe 只看 high ⇒ email/password 被检出也放行（基线里那 2/9）。"""
+def test_export_gate_now_blocks_email_and_password_medium():
+    """pd01 判据（20260922-18:2x 拍板）：`safe` 从"只看 high"扩到含 email／password 档。
+
+    改前这条叫 `test_export_gate_passes_medium_severity_findings`，断言的是
+    `total_count==1 / high_count==0 / safe is True`（即"检出了但照样放行"）——
+    本条把它整个翻正，并顺带钉住新增的两个计数键。
+    """
     email = export_pre_check("邮箱 student.sample01@example.edu.cn", source="probe")
     password = export_pre_check("pwd=abc12345", source="probe")
 
-    assert email["total_count"] == 1 and email["high_count"] == 0 and email["safe"] is True
-    assert password["total_count"] == 1 and password["high_count"] == 0 and password["safe"] is True
+    for verdict, ptype in ((email, "email"), (password, "password")):
+        assert verdict["total_count"] == 1 and verdict["high_count"] == 0    # 档位本身没动（仍是 medium）
+        assert verdict["medium_count"] == 1                                  # 此前该键根本不返回
+        assert verdict["blocking_count"] == 1
+        assert verdict["safe"] is False, f"{ptype} 仍被放行，扩判据没生效：{verdict}"
+        assert [f.pattern_type for f in verdict["findings"]] == [ptype]
+
+
+def test_export_gate_return_shape_is_the_six_keys_consumers_read():
+    """`app.py:2370` 与 `zip_exporter.py:252-253` 是按键名 `.get(...)` 读的（读不到就静默取 0），
+    所以键集合必须钉住：少一个键不会报错，只会把交付摘要里的中风险数写成 0。"""
+    verdict = export_pre_check("联系 13800138000 邮箱 a.b@example.edu.cn", source="probe")
+
+    assert set(verdict) == {"safe", "findings", "high_count", "medium_count",
+                            "blocking_count", "total_count"}
+    assert (verdict["high_count"], verdict["medium_count"], verdict["blocking_count"],
+            verdict["total_count"], verdict["safe"]) == (1, 1, 2, 2, False)
+
+
+def test_export_gate_tightening_is_monotone_never_looser():
+    """「只许收紧」的可机检形式：任取样本，旧判据（只看 high）判拦的，新判据必须也判拦。
+
+    pd01 续作修正（psy5）：psy3 原版把蕴含方向写反了——它断言的是
+    `old_safe is False or safe is False`，即"每个样本至少被一版判拦"，于是任何一条
+    **两版都放行**的漏检探针（如"证件 110101 19900307 551X"）都会让它当场红。
+    真判据是 `old_safe or not new_safe`（旧拦 ⇒ 新必拦），另补一条"确实变严了"的判别面，
+    免得这条退化成"门禁永远放行"的假绿。
+    """
+    samples = [p[1] for p in DETECTED_VALUE_PROBES] + [p[1] for p in MISSED_VALUE_PROBES]
+    newly_blocked = []
+
+    for sample in samples:
+        verdict = export_pre_check(sample, source="probe")
+        old_safe = verdict["high_count"] == 0
+        assert old_safe or verdict["safe"] is False, (
+            f"判据放宽了：{sample!r} 旧拦新放"
+        )
+        if old_safe and verdict["safe"] is False:
+            newly_blocked.append(sample)
+
+    assert newly_blocked == ["邮箱 student.sample01@example.edu.cn", "pwd=abc12345"], (
+        f"扩判据应恰好把 email／password 两档从放行转为拦下，实得 {newly_blocked}"
+    )
 
 
 def test_export_gate_blocks_on_a_single_high_hit():
