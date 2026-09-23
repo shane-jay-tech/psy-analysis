@@ -38,7 +38,8 @@ from src.literature_review.models import LiteratureItem
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-# 含小数的英文量值会先被句号切走——实测原样贴出，勿手改
+# 含小数的量值夹具：pd02 之前会被半角句号切走（实测原样保留，勿手改文案），
+# 修复后 β=0.45 应完整存活——本夹具同时是「旧缺陷态」的对照物。
 ABSTRACT_WITH_DECIMAL = (
     "本研究招募大学生 120 名，n=120。结果表明，社交焦虑与自尊显著负相关（β=0.45）。"
     "本研究的局限在于横断面设计。"
@@ -82,10 +83,17 @@ class TestExtractMainFinding:
         assert len(out) == 120
         assert out.startswith("结果表明，")
 
-    def test_decimal_point_in_cjk_abstract_splits_sentence(self):
-        # 现状钉桩：切句符含半角句号，故「β=0.45」被截在 0 之后
+    def test_decimal_statistic_survives_sentence_split(self):
+        # pd02 修复态（2026-09-23）：本用例原先钉的是**缺陷态** `…（β=0`（半角句号把量值截断）。
+        # 现切句器把「半角句点后紧跟数字」判为量值本体而非句末标点，β=0.45 完整留存。
         out = _extract_main_finding(ABSTRACT_WITH_DECIMAL)
-        assert out == "结果表明，社交焦虑与自尊显著负相关（β=0"
+        assert out == "结果表明，社交焦虑与自尊显著负相关（β=0.45）"
+
+    def test_ordinary_english_period_still_splits(self):
+        # 反向守门：句点后不接数字时照旧按句末标点切，防止守卫被写宽成「半角句点一律不切」。
+        out = _extract_main_finding(
+            "This study enrolled 120 cases. Results showed a reliable negative link here.")
+        assert out == "Results showed a reliable negative link here"
 
 
 # ---------------------------------------------------------------- 局限

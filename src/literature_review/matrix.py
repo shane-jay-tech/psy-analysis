@@ -233,7 +233,11 @@ def _extract_main_finding(abstract: str) -> str:
     if not abstract:
         return ""
     # 寻找含「显示/发现/表明/results showed/findings indicate」的句子
-    sentences = re.split(r"[。.!?！？]", abstract)
+    # 2026-09-23（pd02）：切句前保护数字/统计量本体——半角句点后紧跟数字时它属于量值
+    # （`β=0.45`／`p<.05`／`M=3.2`），不是句末标点。旧字符集 `[。.!?！？]` 把半角 `.`
+    # 和全角 `。` 混在一起，所以必须先把 `.` 从字符类里摘出来单独加 `(?!\d)` 守卫；
+    # 剩下的五个切分符（。 ! ? ！ ？）逐字保留旧口径，差分实测仅两处小数行为变。
+    sentences = re.split(r"[。!?！？]|\.(?!\d)", abstract)
     keywords = ["显示", "发现", "表明", "结果", "found", "showed", "indicated", "revealed", "results"]
     for s in sentences:
         s = s.strip()

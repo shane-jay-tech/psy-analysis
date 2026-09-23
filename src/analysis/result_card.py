@@ -1239,7 +1239,12 @@ def _build_hlm(card: AnalysisResultCard, output: dict):
     # Variables
     dv = card.variables.get("dependent", ["因变量"])[0]
     ivs = card.variables.get("independent", ["预测变量"])
-    grouping = group_var_name or card.variables.get("covariates", ["分组变量"])[0] if card.variables.get("covariates") else "分组变量"
+    # 2026-09-23（pd02）：旧写法 `a or b if cond else c` 里三元式优先级低于 `or`，
+    # 无 covariates 时整式恒等于字面量 `"分组变量"`，`result.group_var`／`cluster_var` 被吞。
+    # 加括号把「取值回退」收进 else 分支，使 group_var_name 无论有无 covariates 都优先生效。
+    grouping = group_var_name or (
+        card.variables.get("covariates", ["分组变量"])[0] if card.variables.get("covariates") else "分组变量"
+    )
 
     # Build APA text
     model_type_zh = "随机截距模型" if "intercept" in str(model_type) else "随机斜率模型"

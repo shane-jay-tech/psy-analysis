@@ -249,9 +249,21 @@ class TestIccIsOnlyPartialSupportInsideHlmCard:
             groups.setdefault(builder.__name__, []).append(key)
         assert sorted(groups["_build_hlm"]) == ["hierarchical_linear_model", "hlm", "mixed_effects"]
 
-    def test_group_var_is_ignored_without_covariates(self):
-        # 现状钉桩：result_card.py:1242 的三元式优先级使 group_var 不生效，
-        # APA 文本里分组变量名退化为字面量「分组变量」
+    def test_group_var_wins_without_covariates(self):
+        # pd02 修复态（2026-09-23）：本用例原先钉的是**缺陷态**——`result_card.py:1242` 的
+        # `a or b if cond else c` 里三元式优先级低于 `or`，无 covariates 时整式恒等于字面量
+        # 「分组变量」，`result.group_var` 被吞 ⇒ APA 面输出「分组变量 分组变量（12 组…）」。
+        # 加括号把取值回退收进 else 分支后，group_var 优先生效且标签不再重复。
         card = build_card_from_output({"test_type": "hlm", "result": FakeHlmResult()})
-        assert "class_id" not in card.apa_text
+        assert "分组变量 class_id（12 组，平均每组 8.5 人）" in card.apa_text
+        assert "分组变量 分组变量" not in card.apa_text
+
+    def test_placeholder_still_used_when_nothing_is_known(self):
+        # 边界钉桩（本单刻意不扩到此层）：既无 group_var 又无 covariates 时仍退回字面量占位，
+        # 于是「分组变量 分组变量」这一重复在**信息缺失**态下依然存在——pd02 只让 group_var 生效，
+        # 未改占位文案口径。真要一并消掉需主班拍板，见 s923 result 遗留问题。
+        class NoGroupVar(FakeHlmResult):
+            group_var = None
+
+        card = build_card_from_output({"test_type": "hlm", "result": NoGroupVar()})
         assert "分组变量 分组变量（12 组，平均每组 8.5 人）" in card.apa_text
