@@ -10,8 +10,25 @@ Fixed seed for reproducibility.
 import numpy as np
 import pandas as pd
 import os
+from pathlib import Path
 
 np.random.seed(42)
+
+
+def _repo_root() -> Path:
+    """仓库根：正常脚本运行按 __file__ 锚定；沙箱 exec 退回 cwd。
+
+    退回分支不是多余的：tests/test_cfa_sem_golden.py::TestGeneratorReproducibility
+    把本文件源码以「只有 __name__ 的 globals」exec 进沙箱（见该件 :59-80 的
+    「不给 __file__ 等模块上下文」口径）来验可复现性，且把 DataFrame.to_csv
+    换成内存捕获、只按文件名认产物。若这里裸写 __file__，沙箱会 NameError，
+    那 4 例可复现性钉桩会当场连坐。
+    """
+    here = globals().get("__file__")
+    return Path(here).resolve().parents[1] if here else Path.cwd()
+
+
+GOLDEN_ROOT = _repo_root() / "tests" / "fixtures" / "golden_stats"
 
 # =============================================================================
 # Task 1: CFA data — 4 factors x 3 items = 12 observed variables
@@ -68,7 +85,7 @@ cfa_columns = [f'q{i+1}' for i in range(12)]
 cfa_df = pd.DataFrame(observed_likert, columns=cfa_columns)
 
 # Save
-cfa_path = r'D:\code\psy-analysis\tests\fixtures\golden_stats\psychometrics\cfa.csv'
+cfa_path = str(GOLDEN_ROOT / "psychometrics" / "cfa.csv")
 cfa_df.to_csv(cfa_path, index=False)
 print(f"CFA data saved: {cfa_path}")
 print(f"  Shape: {cfa_df.shape}")
@@ -136,7 +153,7 @@ sem_columns = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'y1', 'y2', 'y3']
 sem_df = pd.DataFrame(sem_likert, columns=sem_columns)
 
 # Save
-sem_path = r'D:\code\psy-analysis\tests\fixtures\golden_stats\advanced\sem.csv'
+sem_path = str(GOLDEN_ROOT / "advanced" / "sem.csv")
 sem_df.to_csv(sem_path, index=False)
 print(f"SEM data saved: {sem_path}")
 print(f"  Shape: {sem_df.shape}")
