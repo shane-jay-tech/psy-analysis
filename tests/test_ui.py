@@ -230,13 +230,28 @@ class TestPaperWritingFlow:
         assert isinstance(findings, list)
 
     def test_format_consistency(self):
-        from src.paper_writer.psychology_report_format import (
-            STAT_FORMATS, SIG_MARKS, EFFECT_SIZE_GUIDE,
-        )
-        assert "t_test" in STAT_FORMATS
-        assert "f_test" in STAT_FORMATS
-        assert len(SIG_MARKS) > 0
-        assert len(EFFECT_SIZE_GUIDE) > 0
+        """六常量格式一致性：弱断言已上收金档件（s922-116 建档 → s923-29 上收）。
+
+        覆盖常量 6/6 —— PAPER_SECTIONS、STAT_FORMATS、SIG_MARKS、EFFECT_SIZE_GUIDE、
+        WRITING_RULES、ACADEMIC_PHRASES。期望值只在
+        tests/test_psychology_report_format_golden.py 一处维护，本函数逐条**引用**不复制，
+        以免两档各自漂移；单跑本函数即等价于把金档那 6 条核心判据又执行一遍。
+        """
+        from src.paper_writer import psychology_report_format as fmt
+        from tests import test_psychology_report_format_golden as golden
+
+        # 防"引用了个副本"式的静默失明的绿：金档钉的必须是生产模块同一批活对象。
+        for name in golden.CONTAINERS:
+            assert getattr(fmt, name) is getattr(golden, name), name
+
+        golden.test_module_declares_exactly_the_six_golden_constants()  # 6/6 全在册、无新增常量
+        golden.test_container_types_are_not_downgraded()                # 容器类型未降级
+        golden.test_paper_sections_exact_order()                        # PAPER_SECTIONS
+        golden.test_stat_formats_key_set_snapshot()                     # STAT_FORMATS（含 t_test/f_test）
+        golden.test_sig_marks_three_tiers_exact()                        # SIG_MARKS
+        golden.test_effect_size_guide_golden_snapshot()                 # EFFECT_SIZE_GUIDE
+        golden.test_writing_rules_count_and_key_order()                 # WRITING_RULES
+        golden.test_academic_phrases_snapshot_and_placeholder_usage()   # ACADEMIC_PHRASES
 
 
 # ============================================================
