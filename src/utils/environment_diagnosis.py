@@ -106,7 +106,7 @@ def run_full_diagnosis(project_root: Optional[Path] = None) -> EnvironmentDiagno
         zh_fonts = [f.name for f in fm.fontManager.ttflist
                     if any(kw in f.name for kw in ["SimHei", "YaHei", "SimSun", "FangSong", "KaiTi"])]
         if zh_fonts:
-            diag.items.append(DiagnosisItem("中文字体", "ok", f"可用：{', '.join(set(zh_fonts)[:3])}"))
+            diag.items.append(DiagnosisItem("中文字体", "ok", f"可用：{', '.join(list(dict.fromkeys(zh_fonts))[:3])}", required=False))
         else:
             diag.items.append(DiagnosisItem("中文字体", "warning", "未检测到常用中文字体，图表可能显示异常", required=False))
     except Exception:

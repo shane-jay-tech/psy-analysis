@@ -22,9 +22,13 @@
    `shutil.which`（:94/:95/:144）与 `os.environ["LOCALAPPDATA"]`（:145）；
    另加一条 `Path.home` 地雷夹具，真读即炸。
 
-本件顺带钉住一条**在册缺陷**（未改码，见 result 遗留问题）：`environment_diagnosis.py:109`
-对 `set(zh_fonts)[:3]` 取值 —— set 不可下标访问，抛 TypeError 被 :112 的裸 `except Exception` 吞掉，
-导致「中文字体」的 ok 分支**在任何机器上都不可达**（本机装了中文字体也恒报 warning）。
+s922-118 曾在此钉住一条**在册缺陷**，**s923-30 已按建议修法修掉**：`environment_diagnosis.py:109`
+原对 `set(zh_fonts)[:3]` 取值 —— set 不可下标访问，抛 TypeError 被 :112 的裸 `except Exception` 吞掉，
+导致「中文字体」的 ok 分支在任何机器上都不可达（本机装了 11 个常用中文字体也恒报 warning）。
+现改为 `list(dict.fromkeys(zh_fonts))[:3]`（有序去重后截三），并把
+原来那条「ok 分支永不可达」的缺陷钉桩翻正为 `test_chinese_font_ok_branch_reports_deduped_names`。
+:112 裸 `except Exception` 过宽的登记**保持不动**（本件不覆盖它）；
+同笔给 ok 分支补 `required=False` 的理由与两案见 s923-30 result 的「需裁决」段。
 
 红线自查：本件只读环境、不装依赖、不建目录（除 pytest 自带 tmp_path），不碰统计/医疗数值面。
 """
@@ -191,7 +195,11 @@ def test_api_key_detection_is_env_driven(host_isolated, monkeypatch):
 
 
 def test_optional_items_never_break_the_gate(host_isolated):
-    """本机已知读数：Playwright 未装／中文字体分支恒 warning ⇒ 只能是 required=False。"""
+    """五个可选项在任何机器上都不得进门禁：`required is False` 是硬约束。
+
+    s923-30 起「中文字体」本机走 ok 分支（修好切片后可达），两个分支都必须仍带
+    `required=False`，否则该项必选性会随机器字体变化——正是下面 :199 断言拦的事。
+    """
     diag = run_full_diagnosis(host_isolated)
     for name in ("Playwright", "中文字体", "PDF 转换", "WebView2", "LLM API Key"):
         item = _by_name(diag, name)
@@ -202,12 +210,20 @@ def test_optional_items_never_break_the_gate(host_isolated):
     assert diag.all_ok is True
 
 
-def test_chinese_font_ok_branch_is_unreachable(host_isolated, monkeypatch):
-    """在册缺陷钉桩：喂一份「有中文字体」的假 fontManager，ok 分支仍不可达。
+def test_chinese_font_ok_branch_reports_deduped_names(host_isolated, monkeypatch):
+    """s923-30 翻正：`set(zh_fonts)[:3]` → `list(dict.fromkeys(zh_fonts))[:3]` 后，
+    「有字体」时该项**可报 ok**，detail 按 ttflist 出现顺序去重再截前三。
 
-    根因 `environment_diagnosis.py:109` 的 `set(zh_fonts)[:3]` —— set 不支持下标，
-    TypeError 被 :112 裸 except 吞成「无法检测字体」。修好那行（改成 list(...)[:3]）本用例即红，
-    这是有意的：修复要连带改判据，不能悄悄发生。
+    本件由 s922-118 的「ok 分支永不可达」缺陷钉桩翻正而来：
+    原桩断言任何机器都拿不到 ok，:109 修好后那条判据必须跟着翻，不能悄悄留着当绿。
+    :112 裸 `except Exception` 过宽的登记保持不动，本函数不覆盖它。
+
+    四条断言各有独立杀伤力（本机变异实测五刀：换回 `set(zh_fonts)[:3]` 会被 :112 吞成
+    warning 而红；`list(set(...))[:3]`（合法但乱序）三连红；`zh_fonts[:3]`（不去重）因首位
+    SimHei 重复而红；不截断会让 KaiTi 漏进 detail 而红；漏掉 `required=False` 则本件与
+    `test_optional_items_never_break_the_gate` 双双红。喂真 fontManager 会因为真机前三是
+    `Microsoft YaHei*` 族而不是 `SimHei` 而红 —— 所以本件还顺带自证了 fake 真生效
+    （旧桩拿不到这个自证：真机与假数据都会落进同一句「无法检测字体」）。
     """
     import matplotlib  # noqa: F401  确保子模块已进 sys.modules，便于按包属性替换
 
@@ -216,15 +232,18 @@ def test_chinese_font_ok_branch_is_unreachable(host_isolated, monkeypatch):
             self.name = name
 
     class _Manager:
-        ttflist = [_Font("SimHei"), _Font("Microsoft YaHei"), _Font("SimSun")]
+        # 6 条含 2 处重名：有序去重后 4 名，截三 ⇒ 同时钉住「顺序 / 去重 / 截断」三件事
+        ttflist = [_Font(n) for n in ("SimHei", "SimHei", "Microsoft YaHei",
+                                      "SimSun", "KaiTi", "Microsoft YaHei")]
 
     fake = type("_FM", (), {"fontManager": _Manager()})
     monkeypatch.setattr(matplotlib, "font_manager", fake, raising=True)
 
     item = _by_name(run_full_diagnosis(host_isolated), "中文字体")
-    assert item.status == "warning"
-    assert item.detail == "无法检测字体"
-    assert "SimHei" not in item.detail, "ok 分支若被修好，这里会拿到字体名——那时请同步改本判据"
+    assert item.status == "ok", f"修好切片后有字体必报 ok，实得 {item.status} / {item.detail}"
+    assert item.detail == "可用：SimHei, Microsoft YaHei, SimSun", item.detail
+    assert "KaiTi" not in item.detail, "只取前三，第四名不得出现"
+    assert item.required is False, "ok 分支也得是可选项，否则必选性随机器字体漂移（见 :199）"
 
 
 # ===========================================================================
