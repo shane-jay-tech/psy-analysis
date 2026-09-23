@@ -166,6 +166,8 @@
 
 - `IntentRecognitionChain` — 责任链编排器，按优先级依次尝试
 - `create_default_chain()` — 工厂函数，注入 CONSTRUCTS/KEYWORDS/EXTENDED_CONSTRUCTS
+  - **20260923 订正注记**：全仓实测 `EXTENDED_CONSTRUCTS` 只有一处赋值——`src/questionnaire/construct_kb_extended.py:7` 的 `EXTENDED_CONSTRUCTS = {}` 空占位；其余命中全为**只读**：合并消费端 `design_engine.py:213`、`design_engine.py:232`、`academic_literature.py:65`，懒导入 `upstream/topic_funnel.py:247`、`upstream/topic_funnel_kb.py:440`。盘上**无任何写入方**。
+  - 因此本行「工厂函数注入 … EXTENDED_CONSTRUCTS」所含的「自主学习引擎会自动填充」语义**暂无实现支撑**（`docs/history/SELF_ASSESSMENT_REPORT.md:73` 描述的「存储到 `construct_kb_extended.py`」链路未见落地码，`academic_literature.py:6` 自身已把口径写作「用户编辑追加」）。本注记只订正名实差，不引入填充实现。
 - `design_engine.py` 的 `_match_construct()` 已集成链调用（`use_intent_chain=True` 默认启用）
 - 保留原有关键词匹配逻辑作为兜底
 - 保留分析意图识别 `recognize_intent()` 向后兼容接口
