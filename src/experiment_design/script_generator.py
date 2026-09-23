@@ -21,6 +21,83 @@ class JsPsychScript:
     warning: str = ""
 
 
+# ═══════════════════════════════════════════════════════════════
+# 题名转义（台账 #69 案 A：堵「experiment_title 未转义即注入」）
+#
+# ⚠️ 两类上下文的规则**不同**，合一写法必错：
+#   1) JS 字符串上下文（内联 <script> 里的 "..."／'...'／`...`）：
+#      危险字符是「定界符 + 转义符 + 模板插值」⇒ 转义 \ " ' ` ${ 与控制字符；
+#      另外整段串活在 <script> 元素内，HTML 分词器只按字面 "</script" 终结脚本块，
+#      它**不看 JS 语法** ⇒ 单引号/反斜杠转义救不了 `</script>`，必须把 `<` 变成
+#      \u003c 这类 Unicode 转义（JS 侧解析回来仍是 `<`，HTML 侧却凑不出 "</script"）。
+#   2) HTML 文本上下文（<title> 元素、jsPsych 用 innerHTML 渲染的 stimulus）：
+#      危险字符是「标签定界符 + 实体前缀」⇒ 转义 & < >（`&` 必须**最先**，
+#      否则会把 &lt; 二次转成 &amp;lt;）；引号在此不是定界符，但一并转成实体，
+#      同一函数放进属性值里也安全。
+#   混合上下文（模板字符串里的 HTML 片段）＝ **先 HTML 再 JS**（外层上下文最后转），
+#   顺序反了会让 JS 转义产生的 \" 被 HTML 转义改写成 \&quot; 而失去 JS 语义。
+# ═══════════════════════════════════════════════════════════════
+
+_JS_STRING_SUBS = (
+    ("\\", "\\\\"),        # 必须最先：后续每一项都会引入新的反斜杠
+    ('"', '\\"'),
+    ("'", "\\'"),
+    ("`", "\\`"),          # 模板字符串定界符
+    ("${", "\\${"),       # 模板字符串插值
+    ("\r", "\\r"),
+    ("\n", "\\n"),
+    ("\t", "\\t"),
+    ("\u2028", "\\u2028"),  # JS 行终止符，未转义会截断字符串字面量
+    ("\u2029", "\\u2029"),
+    ("<", "\\u003c"),      # 断 "</script>" / "<!--" 的破出
+    (">", "\\u003e"),
+)
+
+_HTML_TEXT_SUBS = (
+    ("<", "&lt;"),
+    (">", "&gt;"),
+    ('"', "&quot;"),
+    ("'", "&#39;"),
+)
+
+
+def _as_text(value) -> str:
+    """把题名/文本入参统一成 str（None → ""，与 f-string 现状一致，不改语义）。"""
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else str(value)
+
+
+def escape_js_string(value) -> str:
+    """上下文 1：JS 字符串字面量内安全（"..."／'...'／`...` 三种定界符通用）。"""
+    text = _as_text(value)
+    for needle, replacement in _JS_STRING_SUBS:
+        text = text.replace(needle, replacement)
+    return text
+
+
+def escape_html_text(value) -> str:
+    """上下文 2：HTML 文本节点／RCDATA（<title>）／属性值内安全。"""
+    text = _as_text(value).replace("&", "&amp;")  # & 最先
+    for needle, replacement in _HTML_TEXT_SUBS:
+        text = text.replace(needle, replacement)
+    return text
+
+
+def escape_html_comment(value) -> str:
+    """上下文 3：HTML 注释内安全。
+
+    注释里唯一的破出是提前收尾序列 `-->`／`--!>` 与非法嵌套 `<!--`，
+    把 < > 实体化即断根（注释内容不做实体解码，故只做最小破坏性替换）。
+    """
+    return _as_text(value).replace("<", "&lt;").replace(">", "&gt;")
+
+
+def escape_html_in_js(value) -> str:
+    """混合上下文：JS 模板字符串里的 HTML 片段（先 HTML 后 JS）。"""
+    return escape_js_string(escape_html_text(value))
+
+
 def generate_jspsych_script(
     design_template: Dict,
     conditions: List[str] = None,
@@ -100,7 +177,7 @@ def _gen_between_subjects(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title}</title>
+  <title>{escape_html_text(title)}</title>
   <!-- jsPsych v7 -->
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
@@ -127,7 +204,7 @@ def _gen_between_subjects(
     // 实验配置 (由 PsyAnalysis 2.0 自动生成)
     // ═════════════════════════════════════════════════════════
     const EXPERIMENT_CONFIG = {{
-      title: "{title}",
+      title: "{escape_js_string(title)}",
       designType: "between_subjects",
       conditions: [{conditions_js_array}],
       participantId: jsPsych.randomization.randomID(8),
@@ -160,7 +237,7 @@ def _gen_between_subjects(
     timeline.push({{
       type: jsPsychHtmlButtonResponse,
       stimulus: `
-        <h2>{title}</h2>
+        <h2>{escape_html_in_js(title)}</h2>
         <hr style="margin: 20px 0;">
         <p style="font-size: 16px; line-height: 1.8;">
           感谢您参加本次心理学实验！<br><br>
@@ -342,7 +419,7 @@ def _gen_within_subjects(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title}</title>
+  <title>{escape_html_text(title)}</title>
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
@@ -361,7 +438,7 @@ def _gen_within_subjects(
 <body>
   <script>
     const EXPERIMENT_CONFIG = {{
-      title: "{title}",
+      title: "{escape_js_string(title)}",
       designType: "within_subjects",
       conditions: [{conditions_js_array}],
       counterbalanceOrders: {all_orders},
@@ -388,7 +465,7 @@ def _gen_within_subjects(
     timeline.push({{
       type: jsPsychHtmlButtonResponse,
       stimulus: `
-        <h2>{title}</h2>
+        <h2>{escape_html_in_js(title)}</h2>
         <hr style="margin: 20px 0;">
         <p style="font-size: 16px; line-height: 1.8;">
           感谢您参加本次实验！您将依次完成所有实验条件。<br>
@@ -529,7 +606,7 @@ def _gen_survey(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title}</title>
+  <title>{escape_html_text(title)}</title>
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
   <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.1.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.3"></script>
@@ -548,7 +625,7 @@ def _gen_survey(
 <body>
   <script>
     const EXPERIMENT_CONFIG = {{
-      title: "{title}",
+      title: "{escape_js_string(title)}",
       participantId: jsPsych.randomization.randomID(8),
     }};
 
@@ -558,7 +635,7 @@ def _gen_survey(
     timeline.push({{
       type: jsPsychHtmlButtonResponse,
       stimulus: `
-        <h2>{title}</h2>
+        <h2>{escape_html_in_js(title)}</h2>
         <hr style="margin: 20px 0;">
         <p style="font-size: 16px; line-height: 1.8;">
           尊敬的参与者：<br><br>
@@ -641,7 +718,7 @@ def _gen_generic(
     return JsPsychScript(
         experiment_id="exp_" + design.get("id", "unnamed"),
         template_name=design.get("name", "未命名模板"),
-        html_content=f"<!-- jsPsych script for {title} -->\n<!-- Generic template - please customize -->",
+        html_content=f"<!-- jsPsych script for {escape_html_comment(title)} -->\n<!-- Generic template - please customize -->",
         js_content="",
         warning=(
             f"设计类型「{design.get('design_type', 'unknown')}」暂无专用 jsPsych 模板。"

@@ -135,18 +135,21 @@ def test_survey_reachable_via_both_design_type_aliases(design_type):
     assert script.html_content.count("jsPsych.init(") == 1
 
 
-def test_survey_title_is_interpolated_unescaped_pinned_as_open_risk():
-    """**现状登记（不是认可）**：title 被原样插进 HTML 与内联 JS 字符串，未做任何转义。
+def test_survey_title_is_escaped_at_all_three_write_points():
+    """**#69 案 A 已落地**（本用例原为「未转义现状登记」，docstring 预言了这次翻红）。
 
-    复算：`generate_jspsych_script({'design_type':'survey'}, experiment_title='Z"; alert(1); //')`
-    ⇒ 该串出现在 <script> 内，可直接闭合 JS 字符串。
-    钉住它是为了：① 别在重构时以为"已经转义过"；② 真正修掉时本用例翻红，逼着改动者同步更新判据。
-    本单**不改**生产码（红线相邻：实验脚本注入面属交付物正确性，交主班裁决）。
+    改前它钉的是 `probe in html`（裸串直插 JS/HTML）；加固后裸串必须消失，
+    且题名仍要**一字不丢地**到达三个写点（转义≠丢弃，见 test_script_generator_title_escaping.py 的往返判据）。
+    判据方向只紧不松：任何把转义摘掉的改动都会在这里翻红。
     """
     probe = 'Z"; alert(1); //'
     html = _survey(experiment_title=probe).html_content
-    assert probe in html
-    assert probe in _inline_js(html), "title 未进入内联 JS ⇒ 注入面形态已变，重新评估本判据"
+    assert probe not in _inline_js(html), "裸串又能进内联 JS ⇒ 转义被摘掉了"
+    assert probe not in html, "裸串仍在产物里（含 <title>）⇒ 未转义"
+    assert 'title: "Z\\"; alert(1); //",' in html, "JS 字符串上下文的转义形状变了"
+    assert "<title>Z&quot;; alert(1); //</title>" in html
+    assert html.count("alert(1)") == 3, "题名写点数变了（<title>／EXPERIMENT_CONFIG.title／指导语 <h2>）"
+    assert html.count("<script") == html.count("</script"), "script 标签配平被打破"
 
 
 # ═══════════════════════════════════════════════════════ generic 回退分支
