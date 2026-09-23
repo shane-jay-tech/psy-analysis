@@ -2,6 +2,14 @@
 
 只测纯函数：archive / latest report / compare reports / write markdown。
 不调真实 LLM，不调 pytest --run-benchmark。
+
+标记口径（s923-34 拆分，原为文件级 `pytestmark = pytest.mark.benchmark`）：
+本件 10 例**全部是纯离线用例** —— 每条都走 `isolated_paths` 夹具，把 `REPORT_DIR` /
+`HISTORY_DIR` 重定向到 `tmp_path`，因此不再受 benchmark 门禁挡着，默认即收集执行。
+真正需要 `--run-benchmark`（会打 LLM）的用例在 `tests/test_socratic_benchmark.py` 与
+`tests/test_socratic_quality.py`，那两件仍是文件级 `pytestmark`，本件不代为门禁。
+⇒ 若日后往本文件加**需要 LLM/带网**的用例，必须**逐例**补
+`@pytest.mark.benchmark`，不要退回文件级标记（那会让离线例再次静默失明）。
 """
 
 from __future__ import annotations
@@ -10,8 +18,6 @@ import json
 from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.benchmark
 
 
 def _fake_report(*, model: str, replies: dict[str, str]) -> dict:
