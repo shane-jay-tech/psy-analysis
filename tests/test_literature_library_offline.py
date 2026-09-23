@@ -115,12 +115,24 @@ class TestMatchReferencesOrdering:
         en = [e for _, e in match_references(["self esteem"], top_n=3)]
         assert zh == en
 
-    def test_mixed_case_keyword_keeps_content_but_echoes_raw_keyword(self):
-        # 现状钉桩：精确分支写入的是未降纲的 kw 本身，故返回键回显原样大小写，
-        # 且因排序键只比对小写化后的关键词，这类输入的条目落到排序后段。
+    def test_mixed_case_keyword_sorts_first_and_echoes_normalized_key(self):
+        # s923-32 翻正 s922-120 的"现状钉桩"：精确分支写入的键已与排序键同为降纲口径，
+        # 故混合大小写输入回显降纲键，且不再掉到排序后段（与全小写调用逐位相等）。
         refs = match_references(["Self Esteem"], top_n=3)
-        assert [k for k, _ in refs] == ["Self Esteem"] * 3
+        assert [k for k, _ in refs] == ["self esteem"] * 3
         assert len(refs) == len(match_references(["self esteem"], top_n=3))
+        assert refs == match_references(["self esteem"], top_n=3), "大小写两种写法应给出同一结果"
+
+    def test_mixed_case_exact_hit_sorts_before_other_keywords(self):
+        # 降纲统一的可判别面：混合大小写的精确命中不得排在同批小写关键词之后。
+        kw = ["Self Esteem", "社交焦虑"]
+        keys = [k for k, _ in match_references(kw, top_n=3)]
+        assert keys == ["self esteem"] * 3, f"精确命中被降纲前的口径挤到后段：{keys}"
+        ten = match_references(kw, top_n=10)
+        assert [k for k, _ in ten][:5] == ["self esteem"] * 5
+        assert sorted(e for _, e in ten) == sorted(
+            e for _, e in match_references(["self esteem", "社交焦虑"], top_n=10)
+        ), "只许改排序档位与键的回显形态，不得改内容"
 
     def test_multiple_keywords_merge_matches(self):
         keys = {k for k, _ in match_references(["自尊", "社交焦虑"], top_n=10)}

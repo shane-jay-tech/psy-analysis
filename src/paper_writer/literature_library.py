@@ -600,6 +600,13 @@ def match_references(keywords: list, top_n: int = 5) -> list:
 
     Returns:
         [(key, citation_tuple), ...] 格式的推荐列表 (去重)
+
+    键语义（s923-32 起）：返回元组首位 **一律是降纲后的关键词**（``kw.lower().strip()``），
+    不再回显调用方传入的原样大小写。原因：精确分支此前写入未降纲的 ``kw``，而排序键
+    （见下方 ``results.sort``）只比对 ``k.lower().strip()`` ⇒ 传 ``"Self Esteem"`` 这类
+    混合大小写输入时，本应优先的精确命中会掉到排序后段。两处口径现已统一，
+    **返回条数与条目内容不受影响**，仅键的回显形态变化。
+    模糊分支写入的 ``lib_key`` 本就是库内键名（模块头已约定为小写英文/中文），不受影响。
     """
     matches = {}
     for kw in keywords:
@@ -608,7 +615,7 @@ def match_references(keywords: list, top_n: int = 5) -> list:
             for entry in LITERATURE_LIBRARY[kw_lower]:
                 sig = (entry[0], entry[1])
                 if sig not in matches:
-                    matches[sig] = (kw, entry)
+                    matches[sig] = (kw_lower, entry)  # 与下方排序键同口径（s923-32）
 
         # 模糊匹配
         for lib_key in LITERATURE_LIBRARY:
