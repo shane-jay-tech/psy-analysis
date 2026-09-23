@@ -528,7 +528,7 @@ def recommend_template(topic: str, keywords: List[str]) -> List[DesignTemplate]:
             if tmpl.id == "priming_experiment":
                 score += 5
         # 内隐/IAT关键词
-        if any(w in all_text for w in ["内隐", "IAT", "态度"]):
+        if any(w in all_text for w in ["内隐", "iat", "态度"]):
             if tmpl.id == "iat":
                 score += 5
         # 因素/交互关键词

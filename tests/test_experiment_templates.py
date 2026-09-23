@@ -267,12 +267,15 @@ def test_list_templates_returns_fresh_objects():
 # --------------------------------------------------------------------------- #
 
 # (topic, keywords, 期望返回的模板 id 序列) —— 全部来自 HEAD e5850b0 的真实运行读数
+# 例外：索引 4（"IAT 效应"）于 2026-09-23 由 s923-27 重新取数——
+# 该行的旧读数钉的是 recommend_template 里 `"IAT"` 字面量与 all_text 降纲不同源的**死码现状**，
+# 字面量对齐为小写后读数由 ["between_subjects_single"] 变为 ["iat"]，属**预期翻正**而非回归。
 RECOMMEND_CASES = [
     ("", [], ["between_subjects_single"]),
     ("压力与情绪", [], ["emotion_induction"]),
     ("情绪诱发", ["情绪"], ["emotion_induction"]),
     ("内隐联想", ["IAT"], ["iat"]),
-    ("IAT 效应", [], ["between_subjects_single"]),
+    ("IAT 效应", [], ["iat"]),
     ("问卷调查研究", ["问卷"], ["survey_correlational"]),
     ("认知干预效果", ["干预"], ["intervention_study"]),
     ("启动", ["启动"], ["priming_experiment"]),
@@ -325,15 +328,25 @@ def test_recommend_keyword_match_is_case_insensitive():
            [t.id for t in recommend_template("内隐联想", ["iat"])]
 
 
-def test_recommend_uppercase_iat_boost_literal_is_dead_registered():
-    """在册现状（只钉不改）：加分表里的 "IAT" 字面量永不命中。
+def test_recommend_uppercase_iat_topic_gets_iat_boost():
+    """正断言（s923-27 翻正，此前该用例钉的是**在册死码现状**）：纯大写 IAT 主题能拿到 iat 加分。
 
-    recommend_template 把 all_text 统一 lower()（:503-505），而 :531 的关键词表写的是
-    大写 "IAT" ⇒ 该分支只能被 "内隐" / "态度" 触发。因此纯大写 IAT 主题（无中文线索词）
-    会掉进默认回退。修好这个字面量后本用例**应当变红**，届时请连同 result 一起复核。
+    背景：`recommend_template` 在 :503-505 把 all_text 统一 `lower()` 降纲，而 :531 的
+    关键词表原样写的是大写 `"IAT"` ⇒ 那枚字面量**永不命中**，分支只能被 "内隐" / "态度"
+    触发，纯大写 IAT 主题（无中文线索）会掉进默认回退。s923-27 把字面量改为小写 `"iat"`
+    对齐降纲口径后，本用例从「钉现状」翻正为「钉设计意图」：
+
+    - 纯大写 IAT 主题 → `["iat"]`（此前是 `["between_subjects_single"]`）；
+    - 大小写两种写法结果相同 ⇒ 加分不依赖主题恰好写成小写；
+    - 中文线索那条路径行为不变（保留原用例的第二条断言）。
+
+    与 `src/experiment_design/experiment_templates.py:531` 那一枚字面量是**一体两笔**，
+    拆开提交则本文件必红。
     """
-    assert [t.id for t in recommend_template("IAT 效应", [])] == ["between_subjects_single"]
-    # 同主题加上中文线索后才会命中 iat 模板
+    assert [t.id for t in recommend_template("IAT 效应", [])] == ["iat"]
+    assert [t.id for t in recommend_template("iat 效应", [])] == ["iat"]
+    assert [t.id for t in recommend_template("IAT效应", ["IAT"])] == ["iat"]
+    # 中文线索分支未受影响
     assert recommend_template("内隐 IAT 效应", [])[0].id == "iat"
 
 
