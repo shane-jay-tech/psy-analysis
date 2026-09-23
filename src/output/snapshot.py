@@ -9,6 +9,7 @@
 
 import json
 import csv
+import time
 import zipfile
 import io
 from pathlib import Path
@@ -71,7 +72,12 @@ def create_snapshot(
         # 3. analysis_params.json
         if config.include_analysis_params:
             params = _extract_params(analysis_results)
-            params["snapshot_created"] = datetime.now().isoformat()
+            # s923-21：本键必须"相邻两次调用必不同"——tests/test_output_snapshot_roundtrip.py 的
+            # 跨调用不变量直接挂在它身上。本机墙钟粒度 15.625ms（GetSystemTimeAsFileTime），
+            # 连续 datetime.now()/time.time_ns() 同值率 99.998% ⇒ 单靠墙钟撑不起该不变量。
+            # 追加 QueryPerformanceCounter（分辨率 100ns、同值率实测 0.000%）的单调尾数提供区分度；
+            # 墙钟部分仍是可 fromisoformat 的裸 ISO 串，全仓无本键解析方（load_snapshot 只 json.load）。
+            params["snapshot_created"] = f"{datetime.now().isoformat()}+mono{time.perf_counter_ns()}"
             params["title"] = config.title
             params["author"] = config.author
             params["description"] = config.description

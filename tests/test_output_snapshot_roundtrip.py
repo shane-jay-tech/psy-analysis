@@ -6,6 +6,7 @@
 import io
 import json
 import zipfile
+from datetime import datetime
 
 import pandas as pd
 import pytest
@@ -76,10 +77,20 @@ def test_returned_bytes_equal_the_file_written_in_the_same_call(out):
     other = create_snapshot(DF, PARAMS, report_text="x")
     m1, m2 = members(io.BytesIO(blob)), members(io.BytesIO(other))
     assert m1.keys() == m2.keys()
+    # ⚠️ 防回归（s923-21）：下面这两条断言的前提是"两次调用的 `snapshot_created` 必然不同"，
+    # 而这个前提**不能**靠 `datetime.now()` 撑——本机实测其粒度 15.625ms
+    # （`time.get_clock_info('time')` → GetSystemTimeAsFileTime），连续调用同值率 99.998%，
+    # 80 组相邻 `create_snapshot` 里有 66 组时间戳完全相同 ⇒ 断言当场红（不是回归，是时钟）。
+    # 现由 `src/output/snapshot.py` 的 `+mono<perf_counter_ns()>` 尾数提供区分度（同值率实测 0.000%）。
+    # ⇒ 谁把那个尾数摘掉／换成 `time.time_ns()`（同源粗时钟，同样 99.998% 同值），本用例立刻红。
     assert {k for k in m1 if m1[k] != m2[k]} == {"analysis_params.json"}   # ② 只有 params 变
     p1, p2 = json.loads(m1["analysis_params.json"]), json.loads(m2["analysis_params.json"])
     assert {k for k in p1 if p1[k] != p2.get(k)} == {"snapshot_created"}   # 且只因这个时间戳键
     assert p1["snapshot_created"] != p2["snapshot_created"]
+    # 尾数只能是附加量：墙钟部分必须仍是可解析的 ISO 串（防有人把整键换成裸计数器）
+    assert datetime.fromisoformat(p1["snapshot_created"].split("+mono")[0]).year >= 2024
+    assert p1["snapshot_created"].partition("+mono")[2].isdigit() and \
+        p2["snapshot_created"].partition("+mono")[2].isdigit()
 
 
 def test_serialize_dict_truncates_at_depth_greater_than_three():

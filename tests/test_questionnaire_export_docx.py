@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import io
 import sys
+import time
 import zipfile
 
 import pytest
@@ -74,11 +75,90 @@ def test_minimal_design_exports_nonempty_bytes_that_is_a_docx_zip_with_document_
     assert len(paragraphs_of(blob)) > 0                          # 真能被 python-docx 再读回来
 
 
+def _zip_member_table(blob: bytes) -> dict[str, tuple[tuple, bytes]]:
+    """把 docx 容器拆成 {成员名: (zip 条目 date_time, 成员字节)}。
+
+    `date_time` 是 zip **容器**字段（由 `time.localtime()` 落，非产物内容），
+    读回时按 DOS 格式只有 **2 秒**粒度 ⇒ 它是"整包字节不确定"的唯一来源。
+    """
+    with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+        return {info.filename: (info.date_time, zf.read(info.filename)) for info in zf.infolist()}
+
+
+def _same_stamp_pair(design: dict) -> tuple[bytes, bytes, bool]:
+    """取一对**容器时间戳相同**的产物，用于保住"整包字节全等"这条原口径。
+
+    连调两次之间的构建耗时约几十毫秒，撞上 2 秒粒度边界的概率极低；
+    重试 5 次仍取不到同戳配对就**显式失败**，不用 `assert True` 假装子断言跑过。
+    """
+    last: tuple[bytes, bytes] | None = None
+    for _ in range(5):
+        a, b = export_to_docx(design), export_to_docx(design)
+        ta = {k: v[0] for k, v in _zip_member_table(a).items()}
+        tb = {k: v[0] for k, v in _zip_member_table(b).items()}
+        if ta == tb:
+            return a, b, True
+        last = (a, b)
+    assert last is not None
+    return last[0], last[1], False
+
+
 def test_docx_output_is_byte_deterministic_for_the_same_design():
-    """同一份 design 两次调用 ⇒ 字节全等（说明产物里没有落时间戳/随机名，可拿去做回归比对）。"""
+    """同一份 design 两次调用 ⇒ **XML 成员**逐字节相等；整包字节只在容器时间戳相同时才等。
+
+    s923-20 改造（原口径来自 s922-13，被 s922-22 实测否证）：原先只写
+    `assert export_to_docx(design) == export_to_docx(design)`，而 zip 条目的 `date_time`
+    取当前时刻 ⇒ **跨秒整包必变**，该断言只在"两次调用落进同一个 2 秒槽"时成立，
+    是一枚负载/时钟相关的偶发红（本机实测：`sleep(1.1)` 后 `bytes equal? False`，
+    而 17 个成员的**内容**全部 `content_eq=True`）。
+    ⇒ 拆成两层，两层都可复跑：
+      ① **主断言**：强制 `time.sleep(1.1)` 跨秒后，比 `word/document.xml` 与
+         `word/styles.xml` 逐字节相等（剔掉 zip 容器时间戳），并加严到"全成员内容相等"；
+      ② **同秒子断言**（原字节口径保留）：另取一对容器时间戳相同的产物，断言整包字节全等
+         —— 这才是"产物里没有落时间戳/随机名"的真正强口径。
+    ③ **鉴别力自证**：换一个 design 再产一次，断言 `word/document.xml` **不相等**；
+      若这条红了，说明成员比对失明（产物根本不随输入变），①②就成了恒真假绿。
+    """
     design = minimal_design()
 
-    assert export_to_docx(design) == export_to_docx(design)
+    # ── ② 同秒子断言：原"整包字节全等"口径，显式限定在容器时间戳相同的配对上 ──
+    same_a, same_b, stamp_pair_found = _same_stamp_pair(design)
+    assert stamp_pair_found, (
+        "重试 5 次仍取不到容器时间戳相同的两次构建 —— 子断言本轮无法执行，"
+        "宁可红也不要静默放过"
+    )
+    assert same_a == same_b, (
+        "容器时间戳相同却整包不等 ⇒ 产物里混进了时间戳以外的非确定源"
+        "（随机部件名 / dict 序 / 环境读数），原口径的『可拿去做回归比对』不成立"
+    )
+
+    # ── ① 主断言：强制跨秒，比 XML 成员（剔容器时间戳）──
+    time.sleep(1.1)                                     # 跨秒：让整包字节断言必然不可依赖
+    first = export_to_docx(design)
+    time.sleep(1.1)                                     # 再跨一次，两次构建分处不同时刻
+    second = export_to_docx(design)
+
+    table_a, table_b = _zip_member_table(first), _zip_member_table(second)
+    assert table_a.keys() == table_b.keys(), "两次构建的部件清单不一致"
+
+    key_members = ("word/document.xml", "word/styles.xml")
+    for name in key_members:
+        assert name in table_a, f"容器缺成员 {name}（口径失效，不是绿）"
+        assert table_a[name][1] == table_b[name][1], (
+            f"{name} 跨秒后内容漂移：字节 {len(table_a[name][1])} vs {len(table_b[name][1])}，"
+            f"date_time {table_a[name][0]} vs {table_b[name][0]}"
+        )
+
+    # 加严：全成员内容面确定（只有容器 date_time 允许不同）
+    assert {k: v[1] for k, v in table_a.items()} == {k: v[1] for k, v in table_b.items()}, (
+        "存在 document/styles 之外的成员跨秒漂移 ⇒ 需定位是哪个部件读了时钟"
+    )
+
+    # ── ③ 鉴别力自证：成员比对对"内容漂移"必须有反应 ──
+    perturbed = _zip_member_table(export_to_docx(minimal_design(construct_name="另一合成构念")))
+    assert perturbed["word/document.xml"][1] != table_a["word/document.xml"][1], (
+        "换 design 而 document.xml 不变 ⇒ 成员比对失明，本用例的确定性断言全是恒真"
+    )
 
 
 def test_docx_body_carries_the_construct_dimensions_items_and_reverse_marks():
