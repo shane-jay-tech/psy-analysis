@@ -80,13 +80,21 @@ def test_no_bare_alpha_threshold_left_in_the_two_sources(module_file):
     assert "EXCELLENT.text" in text and "reliability_bands" in text
 
 
-def test_the_two_tasked_sites_are_clean_but_six_more_still_hardcode_bands():
-    """本单只收口任务点名的两处。全仓扫下来**还有六处**裸写 α 档位（数量按现状钉死，
+def test_the_two_tasked_sites_are_clean_but_seven_more_still_hardcode_bands():
+    """本单只收口任务点名的两处。全仓扫下来**还有七处**裸写 α 档位（数量按现状钉死，
     谁再新增一处、或悄悄收口掉一处，本用例都会红——这是台账，不是终点）。
 
     2026-09-22 s922-18 追加第 7 个持有者 app_pages_text.py：那 2 处是 app.py 片 3
     （_generate_method_description 的中英文方法说明文案）**原样迁入**，不是新增债；
     app.py 从来不在本扫描的 src/ 范围内，迁入 src/ui 后才被登记到。
+
+    改名依据（s923-15，2026-09-23）：原名 `..._six_more_...` 写于只有 6 个持有者时，
+    s922-18 把 app_pages_text.py 计入后已是 **7 个**（下面 dict 的 7 个键、合计 12 处
+    裸阈值即现状），名实差一 ⇒ 按 s922-18 遗留问题 4「改名与否请主班定口」执行改名，
+    **函数体一字未动**（含 dict 与两条 assert）。原名：
+    `test_the_two_tasked_sites_are_clean_but_six_more_still_hardcode_bands`。
+    选 `seven_more` 而非去数字化命名，是为了保留本台账「数量与名字同时钉死」的意图：
+    持有者数再变时，assert 会红、名字也会跟着失配，两道一起提醒，不会静默漂成假名。
     """
     root = pathlib.Path("src")
     holders = {}

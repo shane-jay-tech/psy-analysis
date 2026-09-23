@@ -13,7 +13,21 @@ REM Force ASCII-friendly codepage to avoid GBK/UTF-8 mojibake in logs.
 chcp 65001 >/dev/null 2>&1
 
 set "REPO=D:\code\psy-analysis"
-set "PY=python"
+REM s923-11 (2026-09-23): pin the interpreter to THIS repo's .venv instead of whatever
+REM "python" happens to resolve to on PATH. The supported env is the one built from
+REM requirements.txt / requirements-lock.txt; the global interpreter here already drifts
+REM (sklearn 1.5.2 in .venv vs 1.9.1 globally), so a PATH-based run executes the
+REM extraction/analysis face on unlocked versions -- silent drift is worse than a loud
+REM failure. %~dp0 keeps the anchor relative to this file, so a repo move or a drive
+REM letter change cannot quietly point the daily job at another tree.
+REM Exit code 3 = wrapper-level failure (the CLI itself uses 0/1/2; the cd guard uses 2).
+for %%I in ("%~dp0..\.venv\Scripts\python.exe") do set "VENV_PY=%%~fI"
+if not exist "%VENV_PY%" (
+  echo [ERROR] venv python not found: %VENV_PY%
+  echo Fix: python -m venv .venv ^&^& .venv\Scripts\python.exe -m pip install -r requirements.txt
+  exit /b 3
+)
+set "PY=%VENV_PY%"
 
 cd /d "%REPO%" || (
   echo [ERROR] cannot cd to %REPO%
