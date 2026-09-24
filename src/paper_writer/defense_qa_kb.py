@@ -59,7 +59,8 @@ def difficulty_label(level: str) -> str:
 # --------------------------------------------------------------------------- #
 
 # --------------------------------------------------------------------------- #
-# 类别填补：当某方法缺少 method/data/effect/infer 必备类别时，从这里补
+# 类别填补：本表覆盖 CATEGORIES 全部 6 类（s924-56 补 assumption / limit 两条）。
+# 引擎侧只从 REQUIRED_CATEGORIES（method/data/effect/infer）取用，见 defense_qa.py
 # --------------------------------------------------------------------------- #
 
 CATEGORY_FALLBACK_QA: Dict[str, QATemplate] = {
@@ -111,6 +112,32 @@ CATEGORY_FALLBACK_QA: Dict[str, QATemplate] = {
         category="method",
         difficulty="必问",
         placeholders=["method"],
+    ),
+    "assumption": QATemplate(
+        question="如果数据违背了正态性或方差齐性假设，你怎么办？",
+        answer_template=(
+            "本研究为{method}先做了前提检验：正态性看 Shapiro-Wilk 检验，结果为 {normality_status}；"
+            "方差齐性看 Levene 检验，结果为 {levene_status}。"
+            "假设违背时的应对路径有三条：(1) 依据中心极限定理评估均值检验对偏态的稳健性；"
+            "(2) 改用对该违背更稳健的版本（如 Welch 校正）；"
+            "(3) 改用对应的非参数检验，并同时报告效应量与置信区间。"
+        ),
+        category="assumption",
+        difficulty="必问",
+        placeholders=["method", "normality_status", "levene_status"],
+    ),
+    "limit": QATemplate(
+        question="你的样本有哪些局限？这些局限会不会影响结论？",
+        answer_template=(
+            "本研究的样本局限主要来自抽样方式与样本规模：被试来自{population}，规模 n = {n}，"
+            "{sample_judgment}。"
+            "应对办法是：(1) 在论文中明确说明样本特征与目标总体的差异；"
+            "(2) 谨慎界定推论范围，不把样本结论外推到未覆盖的群体；"
+            "(3) 建议后续研究以分层随机抽样、扩大样本与纵向追踪来复核本研究结果。"
+        ),
+        category="limit",
+        difficulty="必问",
+        placeholders=["population", "n", "sample_judgment"],
     ),
 }
 
@@ -712,7 +739,10 @@ TEST_SPECIFIC_QA: Dict[str, List[QATemplate]] = {
             ),
             category="effect",
             difficulty="必问",
-            placeholders=[],
+            # s924-57：正文用了这两个占位符却没声明（原白名单唯一项），补声明对齐
+            # 同题组其余三法（kruskal_wallis-02 / point_biserial-01 / repeated_anova-02）；
+            # 只改键，正文一字未动。
+            placeholders=["effect_size", "effect_label"],
         ),
         QATemplate(
             question="样本量太小（n<10）时 Friedman 还能用吗？",

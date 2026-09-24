@@ -3,18 +3,22 @@
 动手前实测 `grep -rIn defense_qa_kb tests/` 命中 0 行：既有 `tests/test_defense_qa.py`
 与 `tests/test_defense_qa_paper_aware.py` 测的是**问答引擎**（选哪几题、怎么填占位符），
 题库本身（135 条 QATemplate + 三张索引表）此前零测试面。本件只钉数据形状与索引口径，
-**不与引擎用例重叠**，也不改 `src/paper_writer/defense_qa_kb.py` 一个字。
+**不与引擎用例重叠**；s922-114 交付时不改 `src/paper_writer/defense_qa_kb.py` 一个字，
+s924-56／s924-57 起钉桩与 KB 同笔改（生产码＋测试件是一体，见各行标注）。
 
 钉桩面：
 1. CATEGORIES / DIFFICULTY_LEVELS / DIFFICULTY_ORDER 三张表的键集与取值快照；
 2. difficulty_emoji / difficulty_label 的三档映射 + 未知档的 🟡 兜底；
-3. QATemplate 全量 135 条条目的字段完整性（question / category / difficulty 齐且合法）；
-4. 占位符声明与 answer_template 实际取用的对账（现库唯一 1 处不符，钉成白名单）；
-5. 索引表形状：26 个方法 × 每法 4-6 题、4 条通用题、类别兜底只覆盖 6 类里的 4 类。
+3. QATemplate 全量 137 条条目的字段完整性（question / category / difficulty 齐且合法）；
+4. 占位符声明与 answer_template 实际取用的对账（s924-57 起**全量一致**，白名单已清零，
+   判别力由两条合成探针自证）；
+5. 索引表形状：26 个方法 × 每法 4-6 题、4 条通用题、类别兜底覆盖 6 类全部。
 
-⚠ 口径登记（详见 result「遗留问题」）：任务书写的「CATEGORIES 键集快照」实测是
-**6 类**（docstring 也称 6 大类别），而 CATEGORY_FALLBACK_QA 只有 **4 类兜底**
-（缺 assumption / limit）——这是现状而非缺陷判定，本件按白名单钉住，不代补。
+⚠ 口径登记（s924-56 翻正）：s922-114 当时实测「CATEGORIES 是 **6 类**，而
+CATEGORY_FALLBACK_QA 只有 **4 类兜底**（缺 assumption / limit）」，按白名单钉成现状。
+本班按卷宗补上 assumption / limit 两条兜底模板 ⇒ 题库 135→137 条（**纯增量**，无删除、
+无去重），兜底覆盖 4/6→6/6；引擎侧 `REQUIRED_CATEGORIES` 仍是 4 类（method/data/effect/
+infer），新两条只作数据面兜底，不改变引擎选题行为——该行为不变量由消费面用例复验。
 
 源文件里的 emoji 一律用 chr(0xXXXX) 写，避免本机 cp936 控制台与 Write 通道对
 不可见/宽字符的干扰（同一份字面量在 src 里是 UTF-8 原文，两处取值由断言绑定）。
@@ -65,7 +69,7 @@ def _all_entries():
 
 ENTRIES = _all_entries()
 CASE_IDS = [cid for cid, _, _ in ENTRIES]
-TOTAL_ENTRIES = 135          # 4 GENERIC + 4 FALLBACK + 127（26 方法）
+TOTAL_ENTRIES = 137          # 4 GENERIC + 6 FALLBACK + 127（26 方法）
 
 
 # --------------------------------------------------------------------------- #
@@ -160,13 +164,17 @@ def test_total_entry_count_links_parametrization():
         sum(len(v) for v in TEST_SPECIFIC_QA.values())
 
 
-def test_fallback_category_coverage_is_registered_gap():
-    """现状：类别兜底只有 6 类中的 4 类（assumption / limit 无兜底）。
+def test_fallback_covers_all_six_categories():
+    """s924-56 口径变更：6 大类别**全部**有兜底模板（assumption / limit 已补）。
 
-    补上兜底后本用例应当红——那是**口径变更**，需同步更新快照（不属本班范围）。
+    原钉桩（s922-114）把「只有 4/6 类有兜底」当现状登记，并自述"补上兜底后本用例
+    应当红"——本班按任务书把钉桩翻正为 6/6 全覆盖，保留键-类别对齐与难度不变量。
+    ⚠ 覆盖面自证：`== set()` 一类的空集判据必须同时钉住"扫描面非空"
+    （len(CATEGORY_FALLBACK_QA) == len(CATEGORIES) == 6），否则条目掉光也会假绿。
     """
-    assert sorted(CATEGORY_FALLBACK_QA) == ["data", "effect", "infer", "method"]
-    assert set(CATEGORIES) - set(CATEGORY_FALLBACK_QA) == {"assumption", "limit"}
+    assert sorted(CATEGORY_FALLBACK_QA) == sorted(CATEGORIES)
+    assert set(CATEGORIES) - set(CATEGORY_FALLBACK_QA) == set()
+    assert len(CATEGORY_FALLBACK_QA) == len(CATEGORIES) == 6
     for key, q in CATEGORY_FALLBACK_QA.items():
         assert q.category == key                 # 键与自身 category 对齐
         assert q.difficulty == "必问"
@@ -225,16 +233,17 @@ def test_dataclass_defaults_are_safe():
 
 
 def test_question_text_duplicates_are_registered():
-    """现状：135 条里有 126 个不同问题文本，4 个短问题跨方法重复（共 9 条冗余）。
+    """现状：137 条里有 128 个不同问题文本，4 个短问题跨方法重复（共 9 条冗余）。
 
     重复都是"效应量怎么算？"这类通用短问句被塞进各自方法表——**是否合并属内容口径**，
     本班不判、不改，只把重复组钉成快照：新增重复或原有重复被合并都会红，逼一次显式复核。
+    （s924-56 补的 assumption / limit 两条兜底各用全新问题文本，重复组数与冗余条数不变。）
     """
     groups = {}
     for cid, _, tmpl in ENTRIES:
         groups.setdefault(tmpl.question, []).append(cid)
     dup = {q: sorted(ids) for q, ids in groups.items() if len(ids) > 1}
-    assert len(groups) == 126
+    assert len(groups) == 128
     assert len(dup) == 4
     assert sum(len(v) for v in dup.values()) - len(dup) == 9       # 冗余条数
     assert sorted(dup.values()) == [
@@ -246,7 +255,7 @@ def test_question_text_duplicates_are_registered():
 
 
 def test_answer_templates_are_all_unique():
-    """答案模板侧无重复：135 条 answer_template 逐条互异（问题有重、答案不重）。"""
+    """答案模板侧无重复：137 条 answer_template 逐条互异（问题有重、答案不重）。"""
     answers = [t.answer_template for _, _, t in ENTRIES]
     assert len(answers) == len(set(answers)) == TOTAL_ENTRIES
 
@@ -264,21 +273,77 @@ def _used_fields(tmpl):
     return used
 
 
-# 现状唯一不符项（HEAD e5850b0 实测）：friedman 的效应量题正文用了两个占位符却没声明。
-PLACEHOLDER_MISMATCH_IDS = {"friedman-02"}
+# s924-57 清零：friedman-02 的 answer_template 用了 {effect_size}/{effect_label}，
+# src 侧 placeholders 已补这两键 ⇒ 现库全量条目"声明==取用"，例外表留空。
+# ⚠ 空表会让下面的反向判据失去扫描对象 ⇒ 判别力改由两条 *_still_bites 探针自证
+#   （探针是内存里的合成条目，不写 src、不改 ENTRIES）。
+PLACEHOLDER_MISMATCH_IDS: set = set()
 
 
-def _mismatch_ids():
-    return {cid for cid, _, tmpl in ENTRIES if _used_fields(tmpl) != set(tmpl.placeholders)}
+def _mismatch_ids(entries=None):
+    """声明与取用不等值的条目 id；entries 缺省＝真表（探针可喂合成条目）。"""
+    entries = ENTRIES if entries is None else entries
+    return {cid for cid, _, tmpl in entries if _used_fields(tmpl) != set(tmpl.placeholders)}
 
 
-def test_placeholder_declarations_match_usage_except_whitelist():
-    """声明的 placeholders 应与 question/answer_template 里真正取用的字段等值。
+def _stray_brace_ids(entries=None):
+    """正文有花括号却没声明任何占位符的条目 id（反向对账判据的单源，供主用例与探针共用）。"""
+    entries = ENTRIES if entries is None else entries
+    return sorted(cid for cid, _, tmpl in entries
+                  if not tmpl.placeholders
+                  and any(ch in text for text in (tmpl.question, tmpl.answer_template)
+                          for ch in "{}"))
 
-    唯一例外钉在白名单里；新增不符项即红。修好 friedman-02 后本用例应当红，
-    届时请删掉白名单条目（属实现改动，本班不动 src）。
+
+def test_placeholder_declarations_match_usage_for_all_entries():
+    """s924-57 翻正：声明的 placeholders 与 question/answer_template 取用的字段**全量等值**。
+
+    原用例（s922-114）把唯一不符项钉进白名单，并自述"修好 friedman-02 后本用例应当红，
+    届时请删掉白名单条目"——本班按该设计意图执行：src 补声明＋白名单清成 set()。
+    ⚠ 三刀覆盖面自证在 test_placeholder_mismatch_detector_still_bites，防"扫不到东西"假绿。
     """
+    assert len(ENTRIES) == TOTAL_ENTRIES == 137          # 扫描面非空，清空才谈得上"全量一致"
+    assert PLACEHOLDER_MISMATCH_IDS == set()
     assert _mismatch_ids() == PLACEHOLDER_MISMATCH_IDS
+
+
+def test_placeholder_mismatch_detector_still_bites():
+    """覆盖面自证①：白名单清空后，正向对账判据仍有牙（不是"没东西可查"的恒绿）。
+
+    三刀都在内存合成条目上跑：
+    ① 正对照——声明缺一键，检测器必须点名它；
+    ② 负对照——声明与取用一致，检测器不得误报（证明①的红来自"不符"本身）；
+    ③ 承重对照——把探针混进真表，主用例判据当场转假 ⇒ 主用例的绿是"查过且为空"。
+    """
+    probe_bad = ("probe-bad", "PROBE", QATemplate(
+        question="探针 {a}", answer_template="探针 {b}", category="limit",
+        placeholders=["a"]))
+    probe_good = ("probe-good", "PROBE", QATemplate(
+        question="探针 {a}", answer_template="探针 {b}", category="limit",
+        placeholders=["a", "b"]))
+    assert _mismatch_ids([probe_bad]) == {"probe-bad"}
+    assert _mismatch_ids([probe_good]) == set()
+    assert _mismatch_ids([*ENTRIES, probe_good]) == set()
+    assert _mismatch_ids([*ENTRIES, probe_bad]) == {"probe-bad"}
+    assert _mismatch_ids([*ENTRIES, probe_bad]) != PLACEHOLDER_MISMATCH_IDS
+
+
+def test_stray_brace_reverse_check_still_bites():
+    """覆盖面自证②：白名单例外支变死支后，反向对账判据仍有牙、且确有扫描对象。
+
+    原 `test_entries_without_placeholders_have_no_braces` 里 `cid in PLACEHOLDER_MISMATCH_IDS`
+    那一支随白名单清空变成永不命中的死支 ⇒ 用同一单源判据（_stray_brace_ids）亲见
+    "没声明却带花括号"会被点名，并钉住 67 条真在反向判据的扫描面里。
+    """
+    probe_stray = ("probe-stray", "PROBE", QATemplate(
+        question="探针 {orphan}", answer_template="纯文案正文", category="limit",
+        placeholders=[]))
+    probe_clean = ("probe-clean", "PROBE", QATemplate(
+        question="探针", answer_template="纯文案正文", category="limit", placeholders=[]))
+    assert _stray_brace_ids([probe_stray]) == ["probe-stray"]
+    assert _stray_brace_ids([probe_clean]) == []
+    assert _stray_brace_ids([*ENTRIES, probe_stray]) == ["probe-stray"]
+    assert sum(1 for _, _, t in ENTRIES if not t.placeholders) == TOTAL_ENTRIES - 70 == 67
 
 
 @pytest.mark.parametrize("case_id,source,tmpl", ENTRIES, ids=CASE_IDS)
@@ -289,30 +354,29 @@ def test_entry_declared_placeholders_are_substitutable(case_id, source, tmpl):
 
 
 def test_entries_without_placeholders_have_no_braces():
-    """反向对账（68/135 条不声明占位符）：这些条目正文里不得出现孤立花括号。
+    """反向对账（67/137 条不声明占位符）：这些条目正文里不得出现孤立花括号。
 
-    白名单里的 friedman-02 是唯一例外（正文用 {effect_size}/{effect_label} 却声明为空），
-    已由 test_placeholder_declarations_match_usage_except_whitelist 钉住。
+    s924-57：friedman-02 补上 {effect_size}/{effect_label} 的声明后，原"白名单里的唯一
+    例外"文案作废（例外集已空），判据改为单源 `_stray_brace_ids() == []`；
+    判别力由 test_stray_brace_reverse_check_still_bites 用合成探针盯住。
     """
-    for cid, _, tmpl in ENTRIES:
-        if tmpl.placeholders or cid in PLACEHOLDER_MISMATCH_IDS:
-            continue
-        assert "{" not in tmpl.answer_template and "}" not in tmpl.answer_template, cid
-        assert "{" not in tmpl.question and "}" not in tmpl.question, cid
+    assert _stray_brace_ids() == []
 
 
 def test_stray_brace_entries_count_snapshot():
-    """现状计数：67 条正文完全不含花括号（纯文案题）＝67 条声明了占位符。
+    """现状计数（s924-57 起两侧闭合）：67 条正文不含花括号；70 条有花括号＝70 条声明了占位符。
 
-    两侧都是 67 但**不是同一批**：135 - 67 = 68 条正文里有花括号，其中 1 条
-    （白名单里的 friedman）有占位符却没声明 ⇒ 68 - 1 = 67。这个减式就是第四确证。
+    s924-56 补 2 条兜底 ⇒ brace_full 68→70、with_decl 67→69；
+    s924-57 修 friedman-02 的声明 ⇒ with_decl 69→70 ⇒ 70 - 70 = 0 = 空白名单。
+    原"68 - 1 = 67"的减式（第四确证）自此**消失**，两侧必须同时读 70，
+    任一侧重复出现不符项即红。
     """
     brace_free = sum(1 for _, _, t in ENTRIES
                      if "{" not in t.answer_template and "{" not in t.question)
     brace_full = TOTAL_ENTRIES - brace_free
     with_decl = sum(1 for _, _, t in ENTRIES if t.placeholders)
-    assert (brace_free, brace_full, with_decl) == (67, 68, 67)
-    assert brace_full - with_decl == len(PLACEHOLDER_MISMATCH_IDS)
+    assert (brace_free, brace_full, with_decl) == (67, 70, 70)
+    assert brace_full - with_decl == len(PLACEHOLDER_MISMATCH_IDS) == 0
 
 
 def test_kb_read_only_for_the_suite():
@@ -323,4 +387,4 @@ def test_kb_read_only_for_the_suite():
         difficulty_label(level)
     after = (len(GENERIC_QA), len(CATEGORY_FALLBACK_QA), len(TEST_SPECIFIC_QA),
              sum(len(v) for v in TEST_SPECIFIC_QA.values()))
-    assert before == after == (4, 4, 26, 127)
+    assert before == after == (4, 6, 26, 127)
