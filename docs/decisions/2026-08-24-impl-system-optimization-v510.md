@@ -167,3 +167,87 @@ Playwright 环境跳过、多实例文件锁、大快照同步序列化、编排
 最终独立复审先因本科向导正式下载仍可绕过门禁、普通文本单元格中的手机号未脱敏而给出
 `DO_NOT_SHIP`。修复后，四个正式下载在门禁失败时不创建按钮并清除已生成字节；归档与作业包
 按共享模式扫描全部文本单元格，新增归档回读和真实按钮行为测试。独立复审最终改判 `SHIP`。
+
+---
+
+## 附注：残余风险两行现值核销（2026-09-24 实测）
+
+> 执行：信箱单 `s923-44`，班 `qoder-executor-20260924-0955-psy26`（psy 文档位，只授权改 `docs/**`）。
+> 卷宗正文要求追加「2026-09-23 现值注记」小节，但本单实际于 **2026-09-24 13:5x** 执行，注记日期按实测日落笔，语义不变。
+> **本节只追加、不回改上文**：`:68` 仲裁句、`:95`「损坏索引恢复、跨进程文件锁：不在本轮扩张…风险明确保留」、`:121` 残余风险第 1 条、`:159`/`:164` 补遗句全部逐字保留。
+> 核销对象是 `:68`＋`:95` 里并列的那两行残余：**跨进程锁** 与 **损坏索引恢复**（对应 `:121` 残余风险第 1 条）。
+
+### 销项一：损坏索引恢复 —— **核销成立**
+
+现状：索引损坏走「先隔离备份、再从 workspace 文件重建」的完整闭环，且有专项行为测试。
+
+- `src/utils/project_manager.py:150-176` `_read_index()` 捕获 `json.JSONDecodeError/OSError/KeyError/TypeError/ValueError` 后，先把损坏索引 `os.replace` 挪成 `index.corrupt.<时间戳>.<uid>.bak`（`:163-165`，隔离失败即抛，防后续 `create_project` 覆盖唯一证据），再调 `_recover_index_from_workspaces()`（定义 `:126`、调用 `:167`）重建最小索引、`_write_index` 落盘并 `logger.error` 记账。
+- `:126` 重建函数自带「绝不删除原项目文件」约束，项目名统一前缀「恢复的项目」并提示核对重命名。
+- 行为测试 `tests/test_project_manager.py:118 test_corrupt_index_is_quarantined_and_workspaces_are_recovered`：断言恢复后项目 id 集合等于原两个、名称带前缀、`index.corrupt.*.bak` **恰好 1 份**、两个 workspace 载荷逐字节仍可读、恢复后 `create_project` 仍可正常追加。
+
+证据命令与读数（2026-09-24 本机 `.venv` 实跑）：
+
+```
+$ rg -n '_recover_index_from_workspaces' src/utils/project_manager.py
+126:def _recover_index_from_workspaces() -> List[Project]:
+167:            recovered = _recover_index_from_workspaces()
+
+$ rg -n 'def test_corrupt_index_is_quarantined_and_workspaces_are_recovered' tests/test_project_manager.py
+118:def test_corrupt_index_is_quarantined_and_workspaces_are_recovered(temp_projects):
+
+$ .venv/Scripts/python.exe -m pytest tests/test_project_manager.py -q
+18 passed in 3.25s
+```
+
+### 销项二：跨进程锁 —— **机制已落地，核销成立，但保留两处限定**
+
+现状：`:121`「RLock 只保护单进程；若未来同时运行多个应用实例，需要 OS 文件锁」的那句已被满足——OS 文件锁已在场并与线程锁分层。
+
+- `src/utils/instance_lock.py`（146 行）：`project_lock()`（`:88`）用 `os.open(O_CREAT|O_EXCL|O_WRONLY)`（`:112`）原子建锁、锁文件写 `pid + ISO 时间戳`；被占时 `_pid_alive()`（`:47`）按平台探活（Windows 走 `ctypes` OpenProcess+GetExitCodeProcess，因 `os.kill` 在本平台是 TerminateProcess 语义会误杀持有者；POSIX 走 `os.kill(pid,0)`），陈旧锁（锁龄 > `stale_seconds` 且 pid 不存活）先 `os.replace` 挪走再删（`:120-128`，防双夺取竞态），否则抛 `ProjectLockedError`（`:31`）携带持有者 pid，不静默等待。
+- 两级互斥接线点：`src/utils/project_manager.py:77-89 _locked()` 装饰器 = `project_lock(PROJECTS_DIR)` 外层＋`_IO_LOCK`（`:40 threading.RLock()`）内层；`:34` 导入。UI 侧 `src/ui/project_panel.py:17`、`src/ui/literature_review_panel.py:18` 复用 `locked_user_prompt` 把锁转成用户可见提示。
+- 真两进程实证：`tests/test_instance_lock.py:127 test_concurrent_subprocesses_exactly_one_wins`（`subprocess.Popen` 起多 worker 抢同一把锁）；另有 `:103 test_foreign_holder_blocks_with_pid` 用真实子进程当外部持有者。
+
+```
+$ rg -n '^@_locked' src/utils/project_manager.py
+201:@_locked
+220:@_locked
+236:@_locked
+248:@_locked
+266:@_locked
+280:@_locked
+296:@_locked          （7 处：create_project / rename_project / update_note / delete_project / copy_project / touch_project / save_workspace）
+$ rg -c '^@_locked' src/utils/project_manager.py
+7
+
+$ rg -n 'def test_concurrent_subprocesses_exactly_one_wins|def test_foreign_holder_blocks_with_pid' tests/test_instance_lock.py
+103:def test_foreign_holder_blocks_with_pid(lock_dir, tmp_path):
+127:def test_concurrent_subprocesses_exactly_one_wins(lock_dir, tmp_path):
+
+$ .venv/Scripts/python.exe -m pytest tests/test_project_manager.py tests/test_instance_lock.py -q
+26 passed in 3.88s
+```
+
+保留的限定（不为好看而抹平）：
+
+1. **锁只覆盖写路径**：`@_locked` 现值 7 处，全部是变更类 API；`list_projects:187`、`get_project:194`、`load_workspace:311`、`migrate_legacy_autosave:327` 不经 OS 锁。推论：**销项一的隔离动作（`_read_index:151` 只持 `_IO_LOCK`）在多实例并发下仍可能竞争**——若两进程同时读到损坏索引，各自都有一次 `os.replace` 机会（先到者改名将令后到者的 `os.replace(INDEX_FILE, …)` 抛 `FileNotFoundError`）。此面**不在本单授权内**（属生产码），只作现值登记。
+2. **告警日志仍推进中**：`KNOWN_ISSUES.md:101` P1 行的余留＝「可选告警日志与锁粒度/回退策略」，且带 2026-09-21 的防混淆限定。本班独立复证该限定成立：
+
+```
+$ rg -n 'alert' src/utils/instance_lock.py
+（rc=1，零命中）
+```
+
+### 核销结论与文档零删改自证
+
+- 两行残余风险的**主体均已落地并有可复跑测试**：损坏索引恢复 ⇒ 全额核销；跨进程锁 ⇒ 核销，但保留上述两条限定（读路径未纳锁、锁告警未推进）。
+- `:121` 残余风险第 1 条自本注起应按「OS 文件锁已具备，余留见上列限定」读，**原文不划改**。
+- 本注对该文档**只末尾追加**：
+
+```
+$ git diff --numstat -- docs/decisions/2026-08-24-impl-system-optimization-v510.md
+84      0       docs/decisions/2026-08-24-impl-system-optimization-v510.md
+$ git diff -- docs/decisions/2026-08-24-impl-system-optimization-v510.md | rg -c '^-[^-]'
+（rc=1，零删除行）
+```
+
+（追加件同时把行数从 169 推到 253，纯 LF、`count(b'\r\n')==0`。）
