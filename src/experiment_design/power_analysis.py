@@ -4,11 +4,13 @@
 参考: Cohen (1988), Faul et al. (2007, G*Power)
 """
 
+import math
+
 import numpy as np
 from scipy.stats import nct, ncf, ncx2, norm
 from scipy.optimize import brentq
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional
 
 
 @dataclass
@@ -28,6 +30,28 @@ class PowerResult:
     df: int = 0
     note: str = ""
     assumptions: str = ""
+    # s924-04 出口 A′（docs/insights/psy-power-solver-redesign-20260923.md §4）：
+    # 求解失败不再兜底成搜索区间上界，改由下面两字段显式表达「算不出来」。
+    solved: bool = True                 # False ⇒ 本结果是未解哨兵，数值字段不可引用
+    failure_reason: str = ""            # solved=False 时的失败诊断文本
+
+
+def _solve_failure_reason(f: Callable[[float], float], n_lo: float,
+                          n_hi: float, exc: ValueError) -> str:
+    """诊断 brentq 抛错的原因（只读判据，不改任何可解点的公式）。"""
+    msg = str(exc)
+    if "NaN" in msg:
+        # 设计稿 §2：大 df + 大非中心参数处 scipy 返回 NaN（效应量越大越易触发）
+        return f"数值求解失败（迭代进入 NaN 发散区，scipy 非中心 t 已知数值不稳定）：{msg}"
+    with np.errstate(all="ignore"):
+        f_lo, f_hi = float(f(n_lo)), float(f(n_hi))
+    if math.isnan(f_lo) or math.isnan(f_hi):
+        return f"数值求解失败（搜索区间端点功效为 NaN）：{msg}"
+    if f_lo > 0 and f_hi > 0:
+        return f"最小样本量低于搜索下界 {n_lo}，区间内无变号点"
+    if f_lo < 0 and f_hi < 0:
+        return f"目标样本量超出搜索区间上界 {n_hi}（欠配），区间内无变号点"
+    return f"求解器失败：{msg}"
 
 
 # ── 效应量基准（Cohen的约定） ──────────────────────────────────
@@ -81,18 +105,23 @@ def _solve_n_for_t_test(d: float, power: float, alpha: float,
         try:
             n = brentq(f, n_lo, n_hi, maxiter=100)
             n = int(np.ceil(n))
-        except ValueError:
-            n = int(np.ceil(n_hi))
+            solved, failure_reason = True, ""
+        except ValueError as exc:
+            # 出口 A′：求根失败不再把区间上界当答案，返回未解哨兵
+            solved, failure_reason = False, _solve_failure_reason(f, n_lo, n_hi, exc)
+            n = 0
 
-        actual = power_at_n(n)
+        actual = power_at_n(n) if solved else float("nan")
         return PowerResult(
             test_type="paired_t", test_name_zh="配对样本t检验",
             required_n=n, required_per_group=n, n_groups=1,
             power=power, alpha=alpha, effect_size=d,
             effect_size_name="Cohen's d", effect_size_label=_label_effect(d, EFFECT_BENCHMARKS["cohens_d"]),
-            actual_power=actual, df=n - 1,
-            note=f"配对设计，需要{n}名被试",
+            actual_power=actual, df=(n - 1) if solved else 0,
+            note=(f"配对设计，需要{n}名被试" if solved
+                  else "配对设计：区间内无法求解样本量，不给出数字以免误导"),
             assumptions=f"效应量d={d:.2f}，双侧α={alpha}，效力1-β={power}",
+            solved=solved, failure_reason=failure_reason,
         )
     else:
         # 独立样本t检验: n2 = ratio * n1
@@ -114,22 +143,31 @@ def _solve_n_for_t_test(d: float, power: float, alpha: float,
         N_lo, N_hi = 4, 4000
         try:
             N = brentq(f, N_lo, N_hi, maxiter=100)
-        except ValueError:
-            N = N_hi
+            solved, failure_reason = True, ""
+        except ValueError as exc:
+            # 出口 A′：求根失败不再把区间上界当答案，返回未解哨兵
+            solved, failure_reason = False, _solve_failure_reason(f, N_lo, N_hi, exc)
+            N = 0
 
-        n1 = max(int(np.ceil(N / (1 + ratio))), 2)
-        n2 = max(int(np.ceil(ratio * n1)), 2)
-        N_actual = n1 + n2
-        actual = power_at_total(N_actual)
+        if solved:
+            n1 = max(int(np.ceil(N / (1 + ratio))), 2)
+            n2 = max(int(np.ceil(ratio * n1)), 2)
+            N_actual = n1 + n2
+            actual = power_at_total(N_actual)
+        else:
+            n1 = n2 = N_actual = 0
+            actual = float("nan")
 
         return PowerResult(
             test_type="independent_t", test_name_zh="独立样本t检验",
             required_n=N_actual, required_per_group=n1, n_groups=2,
             power=power, alpha=alpha, effect_size=d,
             effect_size_name="Cohen's d", effect_size_label=_label_effect(d, EFFECT_BENCHMARKS["cohens_d"]),
-            actual_power=actual, df=N_actual - 2,
-            note=f"独立组设计，两组分别{n1}人和{n2}人，共{N_actual}人",
+            actual_power=actual, df=N_actual - 2 if solved else 0,
+            note=(f"独立组设计，两组分别{n1}人和{n2}人，共{N_actual}人" if solved
+                  else "独立组设计：区间内无法求解样本量，不给出数字以免误导"),
             assumptions=f"效应量d={d:.2f}，双侧α={alpha}，效力1-β={power}，分组比={ratio}",
+            solved=solved, failure_reason=failure_reason,
         )
 
 
@@ -351,6 +389,23 @@ def calculate_sample_size(
 
 def format_power_report(result: PowerResult) -> str:
     """格式化效力分析报告（中文）"""
+    if not result.solved:
+        # 出口 A′：未解哨兵走「无法求解」分支——不透出假样本量，也不打达标勾
+        return "\n".join([
+            "## 统计效力分析报告",
+            "",
+            f"**检验方法：** {result.test_name_zh}",
+            f"**预设效应量：** {result.effect_size_name} = {result.effect_size:.2f}（{result.effect_size_label}效应）",
+            f"**显著性水平：** α = {result.alpha}",
+            f"**目标统计效力：** 1-β = {result.power:.0%}",
+            "",
+            "### 无法给出样本量建议",
+            f"- ⛔ 求解失败：{result.failure_reason}。",
+            "- 系统已按 A′ 口径拒答，不再把搜索区间上界当答案（旧版本此处是假数）。",
+            "- 请改用文献报告的近似样本量，或放宽目标效力/显著性水平后重算。",
+            "",
+            f"*计算前提：* {result.assumptions}",
+        ])
     lines = [
         f"## 统计效力分析报告",
         f"",
@@ -378,7 +433,14 @@ def format_power_report(result: PowerResult) -> str:
 
     # 添加具体建议
     if result.actual_power < result.power - 0.02:
-        lines.append(f"- ⚠ 实际效力略低于目标，建议增加{int(result.required_n * 0.15)}名被试作为缓冲。")
+        # s924-04：不再按固定 15% 加成——按「目标效力 − 实际效力」的缺口另行估算。
+        # round(…, 6) 是浮点尾噪护栏：0.8-0.5=0.30000000000000004，直接乘再 ceil 会多算 1 人。
+        gap = result.power - result.actual_power
+        extra = math.ceil(round(result.required_n * gap, 6))
+        lines.append(
+            f"- ⚠ 实际效力低于目标（缺口 {gap:.3f}），"
+            f"按缺口另行估算建议增加约{extra}名被试，重算后复核。"
+        )
     else:
         lines.append(f"- ✅ 实际效力达到目标水平。")
 
@@ -401,4 +463,5 @@ def quick_sample_size(test_type: str, effect_size: float = 0.5) -> Dict:
         "effect_label": result.effect_size_label,
         "actual_power": round(result.actual_power, 3),
         "note": result.note,
+        "solved": result.solved,
     }

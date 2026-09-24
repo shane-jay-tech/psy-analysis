@@ -199,12 +199,34 @@ def abs_arr_off_diag(arr):
     return best if found else None
 
 
+def _unsolved_post_hoc(n: int, effect, test_type: str, reason: str) -> Dict[str, Any]:
+    """A′ 哨兵（s924-04）：求解失败时不产 n_needed_for_080，改带 solved=False。
+
+    旧行为是把搜索区间上界当 n_needed 透出（假数），或经裸 except 静默变 None；
+    两条都已被本哨兵取代——失败必须可见，但不编造数字。
+    """
+    return {
+        "needs_more_n": False,
+        "solved": False,
+        "observed_n": n,
+        "observed_effect": round(float(effect), 4),
+        "observed_effect_name": _effect_name(test_type),
+        "skipped_reason": (
+            f"无法求解所需样本量（{reason}）；系统按 A′ 口径拒答，"
+            f"不提供 n_needed_for_080，也不以区间上界充数。"
+        ),
+        "footnote": FOOTNOTE,
+        "alpha": 0.05,
+    }
+
+
 def estimate_post_hoc(output: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """估计当前样本量是否够用，给出 n_needed 建议。
 
     返回 dict 结构（写入 output["post_hoc_power"]）：
         {
             "needs_more_n": bool,            # 是否给出建议
+            "solved": bool,                  # 仅本文件视角的求解可用性（A′ 哨兵）
             "observed_n": int,
             "observed_effect": float,
             "observed_effect_name": str,
@@ -213,6 +235,7 @@ def estimate_post_hoc(output: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             "footnote": str,                 # 必须随建议一同显示的脚注
             "skipped_reason": str,           # needs_more_n=False 时的理由
         }
+    solved=False：求解器在区间内无解/未收敛，不产出 n_needed_for_080。
     None: test_type 不支持事后样本量估算。
     """
     test_type = output.get("test_type", "")
@@ -230,6 +253,7 @@ def estimate_post_hoc(output: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if abs(effect) < 1e-4:
         return {
             "needs_more_n": False,
+            "solved": True,
             "observed_n": n,
             "observed_effect": effect,
             "observed_effect_name": _effect_name(test_type),
@@ -272,8 +296,20 @@ def estimate_post_hoc(output: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             )
         else:
             return None
-    except Exception:
-        return None
+    except (ValueError, RuntimeError) as exc:
+        # s924-04 收窄（原为裸 `except Exception: return None`）：
+        # 只接求解器会抛的 ValueError（含不支持类型）/ RuntimeError（迭代不收敛），
+        # 且不再静默变 None——转成可见的 solved=False 哨兵。
+        return _unsolved_post_hoc(
+            n, effect, test_type, f"求解器抛出 {type(exc).__name__}"
+        )
+
+    if not getattr(res_080, "solved", True):
+        # 出口 A′：求解器已不产「区间上界」假数，未解时透传哨兵。
+        return _unsolved_post_hoc(
+            n, effect, test_type,
+            getattr(res_080, "failure_reason", "") or "区间内无法求解"
+        )
 
     n_needed = int(res_080.required_n)
 
@@ -281,6 +317,7 @@ def estimate_post_hoc(output: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if n >= n_needed:
         return {
             "needs_more_n": False,
+            "solved": True,
             "observed_n": n,
             "observed_effect": round(effect, 4),
             "observed_effect_name": _effect_name(test_type),
@@ -295,6 +332,7 @@ def estimate_post_hoc(output: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     return {
         "needs_more_n": True,
+        "solved": True,
         "observed_n": n,
         "observed_effect": round(effect, 4),
         "observed_effect_name": _effect_name(test_type),

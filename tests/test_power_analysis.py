@@ -14,20 +14,25 @@
 ③（能成立处）N−1 不达标 = 最小性。测试侧重写的是 Cohen(1988)/G*Power 的标准式子
 （非中心 t/F/χ² 与 Fisher-z），不是把实现里的闭包抄一遍——实现改 ncp 或 df 的任一处都会打断闭合。
 
-红线自约（本单零生产码改动，一个统计数值都没动）：
-本文件只**登记**求解器现状，不评判任何样本量结论，也不改判据。
+红线自约（s922-12 建档时零生产码改动；s924-04 翻正亦不动任何可解点公式）：
+本文件登记并钉桩求解器行为，不评判任何样本量结论，也不改判据。
 
-⚠ 补测中发现一处**数值缺陷（只读登记，未修）**：`_solve_n_for_t_test` 在若干**标准效应量**下
-返回搜索区间上界（独立样本 4000 / 配对 2000），而不是真解。根因实测：scipy 的 `nct.cdf`
-在「大 df + 大非中心参数」处返回 **NaN** ⇒ `brentq` 抛 `ValueError` ⇒ `:84-85` 与 `:117-118` 的
+⚠ 补测中发现一处**数值缺陷（s922-12 只读登记）**：`_solve_n_for_t_test` 在若干**标准效应量**下
+曾返回搜索区间上界（独立/配对两族），而不是真解。根因实测：scipy 的 `nct.cdf`
+在「大 df + 大非中心参数」处返回 **NaN** ⇒ `brentq` 抛 `ValueError` ⇒ 旧 `:84-85` 与 `:117-118` 的
 `except ValueError: n = ceil(n_hi)` 兜底把上界当答案返回，且 `actual_power` 本身也可能是 NaN。
 受污染点位（本机实测，全部命中兜底；「真值」= 本模块自己的功效式下首个达标 N，逐点扫描得出）：
-独立 d=0.3/0.5/0.8 → 4000（真值 N=351/128/52），配对 d=0.3/0.4/0.5 → 2000（真值 n=90/52/34）；
+独立 d=0.3/0.5/0.8 → 上界（真值 N=351/128/52），配对 d=0.3/0.4/0.5 → 上界（真值 n=90/52/34）；
 未污染：独立 d=0.1/0.2/0.4、配对 d=0.1/0.15/0.2。
 兜底不随效应量单调出现，因为命中与否取决于 `brentq` 的迭代路径是否走进 NaN 区。
-本文件用 `test_t_test_*_currently_returns_the_bracket_ceiling` 把**现状**钉住（命名照本仓
-`test_sidecar_in_uncreated_directory_currently_fails` 的「currently=现状而非认可」惯例）。
-**修好那天这些例子必须同步改**——它们红就是提醒，不是回归。可执行出口见 result 的「遗留问题」。
+
+✅ **s924-04 已按设计稿 §4 出口 A′ 落地 t 族**（docs/insights/psy-power-solver-redesign-20260923.md）：
+求解失败不再返回区间上界，而是返回 `PowerResult(solved=False, failure_reason=…)` 哨兵；
+报告遇未解走「无法给出样本量建议」分支；`quick_sample_size` 键集 +1 键（`solved`）。
+原「currently_returns_the_bracket_ceiling / leak_a_nan / inherits_the_ceiling」三组现状桩
+**按第 5 节清单翻正为哨兵断言**（当时红就是提醒，今天已翻正）。
+**未随单修**：anova/相关/卡方/多因素四族仍保留区间上界兜底（设计稿 §3.3 认定同雷，
+本波范围只有 t 族）；独立 t 最小性 D3（`:131` 桩）与坏 design 串（`:225` 桩）不动。
 """
 from __future__ import annotations
 
@@ -228,40 +233,68 @@ def test_factorial_anova_bad_design_string_falls_back_to_2x2_currently():
         assert _solve_n_for_factorial_anova(0.25, bad, TARGET, ALPHA).n_groups == 4
 
 
-# ═════════════════ 二、缺陷现状钉桩：t 检验族走进区间上界 ═════════════════
-@pytest.mark.parametrize("d, ceiling_n", [
-    (0.30, 4000),
-    (0.50, 4000),
-    (0.80, 4000),
-])
-def test_solve_n_for_t_test_independent_currently_returns_the_bracket_ceiling(d, ceiling_n):
-    """**现状而非认可**：本模块口径下的真值应为 N=351/128/52，兜底返回了 `N_hi=4000`（:114-118）。"""
+# ═════════ 二、A′ 哨兵（s924-04 翻正）：t 族不可解不再产上界假数 ═════════
+@pytest.mark.parametrize("d", [0.30, 0.50, 0.60, 0.70, 0.80])
+def test_solve_n_for_t_test_independent_unsolvable_returns_solved_false_sentinel(d):
+    """翻正自 s922-12 的区间上界现状桩：本族求根失败 ⇒ `solved=False` 哨兵。
+    数值字段一律清零/NaN（真值应为 N=351/128/90/67/52，扫描法属出口 B，本波未做）。"""
     r = _solve_n_for_t_test(d, TARGET, ALPHA, paired=False)
 
-    assert r.required_n == ceiling_n and r.required_per_group == ceiling_n // 2
-    assert r.df == ceiling_n - 2
-    assert r.note == f"独立组设计，两组分别{ceiling_n // 2}人和{ceiling_n // 2}人，共{ceiling_n}人"
+    assert r.solved is False
+    assert r.failure_reason                                      # 失败必须可见、可归因
+    assert r.required_n == 0 and r.required_per_group == 0       # 不再返回搜索上界假数
+    assert r.n_groups == 2 and r.df == 0
+    assert math.isnan(float(r.actual_power))
+    assert "无法求解" in r.note
 
 
-@pytest.mark.parametrize("d, ceiling_n", [(0.30, 2000), (0.40, 2000), (0.50, 2000)])
-def test_solve_n_for_t_test_paired_currently_returns_the_bracket_ceiling(d, ceiling_n):
-    """**现状而非认可**：本模块口径下的真值应为 n=90/52/34，兜底返回了 `n_hi=2000`（:80-85）。"""
+@pytest.mark.parametrize("d", [0.30, 0.40, 0.50, 0.60, 0.70, 0.80])
+def test_solve_n_for_t_test_paired_unsolvable_returns_solved_false_sentinel(d):
+    """翻正自配对族上界现状桩（真值 n=90/52/34/24/19/15，同上属 B 口径不在此断言）。"""
     r = _solve_n_for_t_test(d, TARGET, ALPHA, paired=True)
 
-    assert r.required_n == ceiling_n and r.df == ceiling_n - 1
+    assert r.solved is False
+    assert r.failure_reason
+    assert r.required_n == 0 and r.required_per_group == 0 and r.df == 0
+    assert math.isnan(float(r.actual_power))
+    assert "无法求解" in r.note
 
 
 @pytest.mark.parametrize("paired, d", [(False, 0.80), (True, 0.30)])
-def test_t_test_ceiling_can_leak_a_nan_actual_power_currently(paired, d):
-    """**现状而非认可**：兜底之后 :87/:123 再算一次 `power_at_n(上界)`，scipy 给 NaN ⇒
-    `actual_power=NaN` 直接进结果对象。下游 `format_power_report:380` 的
-    `if result.actual_power < result.power - 0.02` 对 NaN 恒为 False ⇒ 报告会打「✅ 实际效力达到目标」。
-    这条是本单发现的最需要 owner 拍板的一处（数值结论，本班一律未改）。"""
+def test_t_test_unsolved_report_cannot_leak_fake_green(paired, d):
+    """翻正自 NaN 假绿现状桩：未解点报告走「无法给出样本量建议」分支，
+    既不出现 `1-β ≈ nan`，也不出现「✅ 实际效力达到目标水平。」。
+    可解点的反向不变量（含 ✅ ⇒ actual_power ≥ power−0.02）由
+    `test_solvable_points_never_pair_check_with_low_power` 补钉。"""
+    r = _solve_n_for_t_test(d, TARGET, ALPHA, paired=paired)
+    report = format_power_report(r)
+
+    assert r.solved is False
+    assert "### 无法给出样本量建议" in report
+    assert "✅ 实际效力达到目标水平。" not in report
+    assert "1-β ≈" not in report                                  # 实际效力数值行整段不透出
+    assert "所需总样本量" not in report                            # 假数整段不透出
+
+
+def test_solvable_points_never_pair_check_with_low_power():
+    """可解面不变量：返回解的点位上，报告出现 ✅ 必须与实际效力达标同时成立。"""
+    for d in (0.10, 0.20, 0.40):
+        r = _solve_n_for_t_test(d, TARGET, ALPHA, paired=False)
+        assert r.solved is True
+        if "✅" in format_power_report(r):
+            assert r.actual_power >= r.power - 0.02
+
+
+@pytest.mark.parametrize("paired, d", [(False, 0.03), (True, 0.02)])
+def test_t_test_under_allocation_returns_solved_false_with_reason(paired, d):
+    """**欠配**形态哨兵（设计稿 §3.2 反方向污染在 t 族的对应面）：
+    真值样本量高于搜索区间上界 ⇒ solved=False 且 failure_reason 点名「欠配」，
+    不再把上界当答案。判据②要求：欠配场景 solved 存在且为 False。"""
     r = _solve_n_for_t_test(d, TARGET, ALPHA, paired=paired)
 
-    assert math.isnan(float(r.actual_power))
-    report = format_power_report(r)
-    assert "nan" in report and "✅ 实际效力达到目标水平。" in report      # 假绿透出
+    assert "solved" in r.__dict__ and r.solved is False
+    assert "欠配" in r.failure_reason
+    assert r.required_n == 0 and r.required_per_group == 0
 
 
 # ═════════════════ 三、公开 API 的分发闭合（:308 calculate_sample_size） ═════════════════
@@ -300,16 +333,22 @@ def test_calculate_sample_size_rejects_unknown_test_type():
 
 # ═════════════════ 四、quick_sample_size / format_power_report 快照 ═════════════════
 def test_quick_sample_size_keyset_and_mirrors_calculate_sample_size():
-    """键集合契约 + 与 :308 的逐字段同源（quick 只是薄封装，不许自己另算一套）。"""
-    keys = {"test", "n_total", "n_per_group", "n_groups", "effect_label", "actual_power", "note"}
+    """键集合契约 + 与 :308 的逐字段同源（quick 只是薄封装，不许自己另算一套）。
+    s924-04 起键集 +1 键 `solved`（A′ 哨兵）；t_test@0.30 落在不可解区 ⇒ 走哨兵镜像分支。"""
+    keys = {"test", "n_total", "n_per_group", "n_groups", "effect_label",
+            "actual_power", "note", "solved"}
     for test_type in ("correlation", "chisq", "t_test", "rm_anova", "factorial"):
         d = quick_sample_size(test_type, 0.30)
         assert set(d) == keys
         src = calculate_sample_size(test_type, 0.30)
+        assert d["solved"] == src.solved
         assert d["n_total"] == src.required_n and d["n_per_group"] == src.required_per_group
         assert d["n_groups"] == src.n_groups and d["test"] == src.test_name_zh
         assert d["note"] == src.note and d["effect_label"] == src.effect_size_label
-        assert d["actual_power"] == pytest.approx(round(float(src.actual_power), 3))
+        if src.solved:
+            assert d["actual_power"] == pytest.approx(round(float(src.actual_power), 3))
+        else:
+            assert math.isnan(d["actual_power"])     # 未解 ⇒ NaN 占位，不是假数
 
 
 def test_quick_sample_size_snapshot_correlation_r_030():
@@ -322,12 +361,18 @@ def test_quick_sample_size_snapshot_correlation_r_030():
         "effect_label": "中",
         "actual_power": pytest.approx(0.8),
         "note": "需要85名被试以检测r=0.30的相关",
+        "solved": True,
     }
 
 
-def test_quick_sample_size_defaults_to_d_half_and_inherits_the_ceiling_currently():
-    """缺省 `effect_size=0.5` ⇒ quick_sample_size("t_test") 正落在上面的缺陷区（现状 4000）。"""
-    assert quick_sample_size("t_test")["n_total"] == 4000
+def test_quick_sample_size_defaults_to_d_half_now_reports_unsolved():
+    """翻正自缺省路径现状桩：缺省 d=0.5 落在不可解区 ⇒ `solved=False`、`n_total=0`，
+    不再把搜索区间上界当答案透出（这条钉的正是「不传参用户」拿到的数）。"""
+    d = quick_sample_size("t_test")
+
+    assert d["solved"] is False
+    assert d["n_total"] == 0 and d["n_per_group"] == 0 and d["n_groups"] == 2
+    assert math.isnan(d["actual_power"])
 
 
 def test_format_power_report_snapshot_single_group():
@@ -364,14 +409,16 @@ def test_format_power_report_snapshot_single_group():
 
 
 def test_format_power_report_short_power_branch_and_group_lines():
-    """三条条件排版：n_groups>1 才出「每组样本量」；效力差 0.02 以上才出 ⚠ 且缓冲量 = int(N*0.15)。"""
+    """三条条件排版：n_groups>1 才出「每组样本量」；效力差 0.02 以上才出 ⚠。
+    s924-04 起 ⚠ 缓冲量 = ceil(N×缺口)（缺口=目标−实际，含 6 位浮点护栏），不再固定 15%：
+    N=10、actual=0.5、power=0.8 ⇒ 缺口 0.300 ⇒ ceil(round(3.0000000000000004,6))=3。"""
     r = PowerResult(test_type="chisq", test_name_zh="卡方检验", required_n=10, required_per_group=6,
                     n_groups=3, power=0.8, alpha=0.05, effect_size=0.1, effect_size_name="w",
                     effect_size_label="小", actual_power=0.5, df=1, note="n", assumptions="a")
     lines = format_power_report(r).split("\n")
 
     assert "- **每组样本量：** n = **6**（共3组）" in lines
-    assert "- ⚠ 实际效力略低于目标，建议增加1名被试作为缓冲。" in lines      # int(10*0.15)=1
+    assert "- ⚠ 实际效力低于目标（缺口 0.300），按缺口另行估算建议增加约3名被试，重算后复核。" in lines
     assert not any("✅" in l for l in lines)
     # 恰好卡在 0.02 边界内侧 ⇒ 仍走 ✅ 分支（判据是 < power-0.02，边界不翻）
     ok = PowerResult(**{**{k: getattr(r, k) for k in
@@ -379,3 +426,61 @@ def test_format_power_report_short_power_branch_and_group_lines():
                             "power", "alpha", "effect_size", "effect_size_name", "effect_size_label",
                             "df", "note", "assumptions")}, "actual_power": 0.7801})
     assert "- ✅ 实际效力达到目标水平。" in format_power_report(ok).split("\n")
+
+
+# ═════════ 五、s924-04 新增：post_hoc_power 的 A′ 哨兵与裸 except 收窄 ═════════
+from types import SimpleNamespace  # noqa: E402
+
+from src.analysis import post_hoc_power  # noqa: E402
+
+
+def _fake_t_output(effect, df_value, test_type="independent_ttest"):
+    """不经 runner 的最小 output：result 带 effect_size/df 即可走通提取链。"""
+    return {"test_type": test_type,
+            "result": SimpleNamespace(effect_size=effect, df=df_value)}
+
+
+class TestPostHocUnsolvedSentinel:
+    def test_independent_t_unsolvable_effect_returns_solved_false_without_needed_key(self):
+        """观察 d=0.5（不可解区）⇒ solved 存在且为 False，且 **不再返回区间上界假数**
+        （n_needed_for_080 键整个不出现）。"""
+        ph = post_hoc_power.estimate_post_hoc(_fake_t_output(0.5, 28))
+
+        assert ph is not None
+        assert "solved" in ph and ph["solved"] is False
+        assert "n_needed_for_080" not in ph
+        assert ph["needs_more_n"] is False
+        assert "拒答" in ph["skipped_reason"]
+        assert ph["observed_n"] == 30 and ph["observed_effect"] == 0.5
+        assert ph["footnote"]
+
+    def test_paired_t_unsolvable_effect_returns_solved_false(self):
+        ph = post_hoc_power.estimate_post_hoc(
+            _fake_t_output(0.3, 29, test_type="paired_ttest"))
+
+        assert ph["solved"] is False and "n_needed_for_080" not in ph
+        assert ph["observed_n"] == 30
+
+    def test_solvable_effect_keeps_advice_and_flags_solved_true(self):
+        """可解面哨兵：d=0.2、n=200 ⇒ 建议 788 与翻桩前逐位一致，且新增 solved=True 键。"""
+        ph = post_hoc_power.estimate_post_hoc(_fake_t_output(0.2, 198))
+
+        assert ph["solved"] is True
+        assert ph["needs_more_n"] is True and ph["n_needed_for_080"] == 788
+
+    def test_solver_exception_becomes_visible_sentinel_not_silent_none(self, monkeypatch):
+        """:275 收窄自证：求解器抛 ValueError 不再被裸 except 吞成 None，而是转哨兵；
+        非求解异常（如 KeyError）不再被本层捕获（静默缺席面同步消失）。"""
+        def raiser(*a, **kw):
+            raise ValueError("boom")
+        monkeypatch.setattr(post_hoc_power, "calculate_sample_size", raiser)
+
+        ph = post_hoc_power.estimate_post_hoc(_fake_t_output(0.5, 28))
+        assert ph["solved"] is False
+        assert "ValueError" in ph["skipped_reason"]
+
+        def weird(*a, **kw):
+            raise KeyError("not-a-solver-error")
+        monkeypatch.setattr(post_hoc_power, "calculate_sample_size", weird)
+        with pytest.raises(KeyError):
+            post_hoc_power.estimate_post_hoc(_fake_t_output(0.5, 28))

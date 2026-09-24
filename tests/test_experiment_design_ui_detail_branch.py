@@ -441,7 +441,12 @@ def test_subjects_tab_renders_criteria_and_grouping_line(render, real_design):
 # ═══════════════ 四、统计检验力详情（:287-289） ═══════════════
 
 def test_power_detail_expander_body_is_the_full_power_report(render, real_design):
-    """:287 真 → expander 出现，且**它的体内**就是 format_power_report 全文（不是别处的副本）。"""
+    """:287 真 → expander 出现，且**它的体内**就是 format_power_report 全文（不是别处的副本）。
+
+    s924-04 连动（设计档 §5「连动 2 处」之一）：夹具 medium 效应量（d=0.5）的独立 t
+    现在走 A′ 未解分支，锚点断言按 solved 条件化——哨兵态下体内必须是拒答报告、
+    假数段整段缺席。
+    """
     from src.experiment_design import format_power_report
 
     d = real_design
@@ -455,8 +460,13 @@ def test_power_detail_expander_body_is_the_full_power_report(render, real_design
     )
     body = fake_st.body(TAB_SUBJECTS, POWER_EXPANDER_LABEL)
     assert report in body, ":289 的效力全文不在该 expander 体内"
-    for anchor in ("统计效力分析报告", "所需总样本量", "实际达到效力", "计算前提"):
-        assert anchor in body, f"效力详情缺锚点词：{anchor}"
+    if d.power_result.solved:
+        for anchor in ("统计效力分析报告", "所需总样本量", "实际达到效力", "计算前提"):
+            assert anchor in body, f"效力详情缺锚点词：{anchor}"
+    else:
+        for anchor in ("统计效力分析报告", "无法给出样本量建议", "计算前提"):
+            assert anchor in body, f"未解哨兵报告缺锚点词：{anchor}"
+        assert "所需总样本量" not in body and "✅" not in body, "假数段泄漏进了未解报告"
 
 
 def test_power_report_text_also_lives_in_full_report_tab(render, real_design):
