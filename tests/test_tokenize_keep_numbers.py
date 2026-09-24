@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """`tokenize_keep_numbers` 分支现状钉测（s922-142）。
 
-被钉对象：`src/parser/tokenizer.py:61 def tokenize_keep_numbers(text: str) -> list:`
-（锚点复核于 2026-09-22：磁盘行号 61 与该 def 逐字一致，无漂移。）
+被钉对象：`src/parser/tokenizer.py:64 def tokenize_keep_numbers(text: str) -> list:`
+（锚点复核于 2026-09-22 时为 `:61`；**2026-09-25 随 s924-55 在 `:7` 插入 `_PUNCT_CHARS` 整体 +3 → `:64`**，主班按 `rg -n "^def tokenize_keep_numbers"` 现取刷新。引用前请现取，别信注释里的行号。）
 
 钉的是什么：四类输入（中英混合 / 纯数字 / 空串 / 带标点数字）此前无直接测试。
 本文件把探针跑出的**现值快照**固化为 golden，给后续任何分词改动提供回归面——
