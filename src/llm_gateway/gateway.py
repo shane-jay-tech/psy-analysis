@@ -588,6 +588,7 @@ def llm_chat_stream(
     - 不支持流式时，自动回退一次性调用并 yield 整段
     - 取消标志在每块前后检查
     - 自动累积内容并记录 trace（在 generator 关闭时 record）
+    - 同参响应已在缓存时整段交付、不打上游（s924-52 起与 llm_chat 的前置命中对齐）
     - 若 LLM 不可用，抛 LLMUnavailableError
     """
     cfg = llm_config or _resolve_llm_config()
@@ -596,6 +597,27 @@ def llm_chat_stream(
 
     used_model = model or cfg.get("model", "")
     module_name = _module_from_messages(messages)
+
+    # s924-52：与 llm_chat 的前置命中对齐——同参结果已在缓存时整段复用，不再重复打上游
+    # （命中只落一条 cached trace，不进下面的 try/finally，避免二次记账）
+    # 已置取消标志的 id 不走快路：保持"取消 ⇒ 零交付 + 一条 cancelled trace"的既有契约
+    cache_k = _cache_key(messages, used_model, temperature)
+    cached = _cache_get(cache_k)
+    if cached and not _is_cancelled(cancel_id):
+        prompt_tok = sum(_estimate_tokens(m.get("content", "")) for m in messages)
+        comp_tok = _estimate_tokens(cached)
+        _record_trace(LLMTrace(
+            timestamp=datetime.now().isoformat(timespec="seconds"),
+            module=module_name, model=used_model, backend=_DEFAULT_BACKEND,
+            streaming=True,
+            elapsed_ms=0.0, cached=True, success=True,
+            prompt_tokens_estimate=prompt_tok,
+            completion_tokens_estimate=comp_tok,
+            cost_cny=0.0,  # 缓存命中不计费
+        ))
+        yield cached
+        return
+
     accumulated = []
     start = time.time()
     error_msg = ""
@@ -653,6 +675,13 @@ def llm_chat_async_stream(
 
     Returns: {"future": Future, "cancel_id": str}
         future.result() 返回累积的完整文本字符串。
+
+    s924-53 观测注记（**不改返回契约**）：
+    - 整场失败（含 LLM 不可用）只在中断出口落一条默认可见的 warning，
+      调用方拿到的仍是拼接串（失败时为 ""）⇒ 「静默空串」与「真无内容」至今不可区分，
+      要带 error 字段才能区分，那是破坏性改动，只留此注记不实施。
+    - callback 异常**仍留 debug 级**：回调是调用方代码，其异常文本可能含调用方上下文，
+      不上抬到默认可见级，以免把上层内容顺带写进日志。
     """
     cancel_id = kwargs.pop("cancel_id", None) or _new_cancel_id()
     with _cancel_lock:
@@ -669,7 +698,13 @@ def llm_chat_async_stream(
                     except Exception:
                         logger.debug("stream callback 异常", exc_info=True)
         except Exception:
-            logger.debug("LLM stream 中断", exc_info=True)
+            # 只带相关 id 前 8 位与模型名：不写 messages、不写 cfg（含 api_key）、不写 base_url
+            _cfg = kwargs.get("llm_config") or {}
+            _mdl = (kwargs.get("model")
+                    or (_cfg.get("model") if isinstance(_cfg, dict) else "")
+                    or "")
+            logger.warning("LLM stream 中断（cancel_id=%s model=%s）",
+                           (cancel_id or "")[:8], _mdl, exc_info=True)
         finally:
             with _cancel_lock:
                 _cancel_flags.pop(cancel_id, None)

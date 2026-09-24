@@ -723,3 +723,275 @@ class TestN8FallbackTrace:
         # 仅断言 get_trace_summary 不抛
         summary = get_trace_summary()
         assert "total_calls" in summary
+
+
+# ---------------------------------------------------------------------------
+# s924-51：空响应不得进响应缓存（缓存投毒守卫）
+# ---------------------------------------------------------------------------
+
+def _s92451_msgs(tag: str) -> list:
+    """用例唯一 tag ⇒ 缓存键互不相同，不与兄弟用例串味。"""
+    return [{"role": "user", "content": f"s92451::{tag}"}]
+
+
+class TestEmptyResponseCacheGuard:
+    """backend 返回 None / 空串时，响应缓存必须保持干净（零网络：注入自定义 backend）。
+
+    钉的是 `_cache_put` 中心位的空值守卫 —— 若该守卫被摘掉，本类两条用例都会转红
+    （变异自证见 s924-51 result 的证据节）。
+    """
+
+    def test_empty_backend_response_leaves_no_cache_entry(self):
+        from src.llm_gateway import gateway as gw
+        from src.llm_gateway import clear_cache, register_llm_backend, set_cache_enabled
+
+        clear_cache()
+        set_cache_enabled(True)
+        cfg = _ok_config()
+        msgs = _s92451_msgs("empty-not-cached")
+        seen = {"n": 0}
+
+        def _empty_backend(messages, model="", **kwargs):
+            seen["n"] += 1
+            return ""
+
+        register_llm_backend("s92451_empty", _empty_backend)
+        r1 = llm_chat(msgs, llm_config=cfg, backend="s92451_empty")
+        assert r1.content == ""
+        assert seen["n"] == 1
+
+        key = gw._cache_key(msgs, cfg["model"], 0.7)
+        assert key not in gw._response_cache            # 键根本没进缓存
+        assert gw._cache_get(key) is None               # 也读不出空串
+        assert "" not in gw._response_cache.values()
+
+    def test_none_backend_response_is_not_cached_and_next_call_gets_real_text(self):
+        """首次空（这里 None）→ 不写缓存；同 key 第二次必须拿到真文而非缓存空串。"""
+        from src.llm_gateway import gateway as gw
+        from src.llm_gateway import clear_cache, register_llm_backend, set_cache_enabled
+
+        clear_cache()
+        set_cache_enabled(True)
+        cfg = _ok_config()
+        msgs = _s92451_msgs("none-then-real")
+        seq = iter([None, "真文"])
+        seen = {"n": 0}
+
+        def _flaky_backend(messages, model="", **kwargs):
+            seen["n"] += 1
+            return next(seq)
+
+        register_llm_backend("s92451_flaky", _flaky_backend)
+        r1 = llm_chat(msgs, llm_config=cfg, backend="s92451_flaky")
+        assert r1.content == ""                         # 归一化后对外仍是空串
+        assert seen["n"] == 1
+
+        key = gw._cache_key(msgs, cfg["model"], 0.7)
+        assert key not in gw._response_cache
+
+        r2 = llm_chat(msgs, llm_config=cfg, backend="s92451_flaky")
+        assert r2.content == "真文"                     # 第二次打后端拿到真文
+        assert "cached" not in r2.fields                # 且不是缓存回吐
+        assert seen["n"] == 2
+        assert gw._cache_get(key) == "真文"             # 这一次才允许写缓存
+
+
+# ---------------------------------------------------------------------------
+# s924-52：流式出口前置缓存命中（与 llm_chat 对齐）
+# ---------------------------------------------------------------------------
+
+def _s92452_msgs(tag: str) -> list:
+    return [{"role": "user", "content": f"s92452::{tag}"}]
+
+
+class TestStreamCachePrecheck:
+    """llm_chat_stream 进入 generator 前先查响应缓存（案 A）。
+
+    注：流式出口不吃 `register_llm_backend`（现状由 s923-46 的
+    `test_llm_chat_stream_never_consults_registered_backend` 钉死），它写死
+    `ai_tutor.chat_with_tutor_stream` ⇒ 卷宗「注入 backend」在本件里对流式侧只能
+    落成「monkeypatch 假上游」，两条合计的调用数才是"零重复打后端"的可观测面。
+    """
+
+    def test_stream_reuses_chat_cache_and_never_touches_upstream(self, monkeypatch):
+        import streamlit as st
+        from src.paper_writer import ai_tutor
+        from src.llm_gateway import clear_traces, register_llm_backend
+
+        clear_cache()
+        clear_traces()
+        set_cache_enabled(True)
+        cfg = _ok_config()
+        msgs = _s92452_msgs("chat-then-stream")
+        hits = {"backend": 0, "upstream": 0}
+
+        def _backend(messages, model="", **kwargs):
+            hits["backend"] += 1
+            return "缓存正文"
+
+        register_llm_backend("s92452_be", _backend)
+        r1 = llm_chat(msgs, llm_config=cfg, backend="s92452_be")
+        assert r1.content == "缓存正文"
+        assert hits["backend"] == 1
+
+        def _fake_upstream(messages, **kwargs):
+            hits["upstream"] += 1
+            yield "不该再打上游"
+
+        monkeypatch.setattr(ai_tutor, "chat_with_tutor_stream", _fake_upstream)
+
+        out = list(llm_chat_stream(msgs, llm_config=cfg))
+        assert out == ["缓存正文"]                              # 整段一次性交付，逐字等于缓存值
+        assert hits["upstream"] == 0
+        assert hits["backend"] + hits["upstream"] == 1          # 判据②：两口合计只打一次
+
+        traces = st.session_state.get("llm_traces") or []
+        assert len(traces) == 2, "命中路径不应二次记账（try/finally 那一条不得再落）"
+        hit = traces[-1]
+        assert hit["cached"] is True                            # 判据④
+        assert hit["cost_cny"] == 0.0                           # 判据④
+        assert hit["streaming"] is True
+        assert hit["success"] is True
+
+    def test_stream_cache_miss_still_calls_upstream_once(self, monkeypatch):
+        """对照组：未命中 ⇒ 上游照打一次、且落的是非 cached trace（证明上一条的 0 不是夹具坏了）。"""
+        import streamlit as st
+        from src.paper_writer import ai_tutor
+        from src.llm_gateway import clear_traces
+
+        clear_cache()
+        clear_traces()
+        set_cache_enabled(True)
+        cfg = _ok_config()
+        hits = {"upstream": 0}
+
+        def _fake_upstream(messages, **kwargs):
+            hits["upstream"] += 1
+            yield "甲"
+            yield "乙"
+
+        monkeypatch.setattr(ai_tutor, "chat_with_tutor_stream", _fake_upstream)
+        out = list(llm_chat_stream(_s92452_msgs("miss"), llm_config=cfg))
+        assert out == ["甲", "乙"]
+        assert hits["upstream"] == 1
+
+        traces = st.session_state.get("llm_traces") or []
+        assert len(traces) == 1
+        assert traces[-1]["cached"] is False
+        assert traces[-1]["streaming"] is True
+
+    def test_pre_cancelled_id_does_not_take_cached_fast_path(self, monkeypatch):
+        """取消契约优先于缓存快路：预置取消标志的 id 仍须零交付（不被缓存命中绕过去）。"""
+        import streamlit as st
+        from src.paper_writer import ai_tutor
+        from src.llm_gateway import clear_traces, register_llm_backend
+        from src.llm_gateway.gateway import _cancel_flags, _cancel_lock
+
+        clear_cache()
+        clear_traces()
+        set_cache_enabled(True)
+        cfg = _ok_config()
+        msgs = _s92452_msgs("cancel-vs-cache")
+
+        def _backend(messages, model="", **kwargs):
+            return "缓存正文"
+
+        register_llm_backend("s92452_be2", _backend)
+        assert llm_chat(msgs, llm_config=cfg, backend="s92452_be2").content == "缓存正文"
+
+        hits = {"upstream": 0}
+
+        def _fake_upstream(messages, **kwargs):
+            hits["upstream"] += 1
+            yield "块"
+
+        monkeypatch.setattr(ai_tutor, "chat_with_tutor_stream", _fake_upstream)
+
+        cid = "s92452-pre-cancel"
+        pre = threading.Event()
+        pre.set()
+        with _cancel_lock:
+            _cancel_flags[cid] = pre
+        try:
+            out = list(llm_chat_stream(msgs, llm_config=cfg, cancel_id=cid))
+        finally:
+            with _cancel_lock:
+                _cancel_flags.pop(cid, None)
+
+        assert out == []                                    # 零交付（不是整段缓存）
+        assert hits["upstream"] == 1                        # 走的是原有循环，取消在那儿生效
+        traces = st.session_state.get("llm_traces") or []
+        assert traces[-1]["cancelled"] is True
+        assert traces[-1]["cached"] is False
+
+
+# ---------------------------------------------------------------------------
+# s924-53：异步流式静默空串的观测接线（caplog）
+# ---------------------------------------------------------------------------
+
+class TestAsyncStreamObservability:
+    def test_interruption_warns_without_leaking_secrets_and_callback_stays_debug(
+            self, caplog, monkeypatch):
+        """后端整场失败 ⇒ 默认可见的 warning（带 cancel_id 前 8 位＋model），回值仍是 str；
+        callback 异常仍留 debug 级（回调属调用方代码，不上抬以免带出上层内容）。
+
+        同一条用例顺手钉住凭据红线：新日志行里既不得出现注入的 api_key 值，
+        也不得出现 messages 正文（请求体明文）。
+        """
+        import logging
+
+        from src.paper_writer import ai_tutor
+        from src.llm_gateway.gateway import logger as gw_logger
+
+        caplog.set_level(logging.DEBUG, logger="src.llm_gateway.gateway")
+        clear_cache()
+        secret_key = "sk-s92453-should-never-be-logged"
+        secret_body = "s92453::被测请求正文-不得进日志"
+
+        # ── 场景一：整场失败（LLM 不可用）→ 中断告警
+        bad_cfg = dict(_ok_config(), api_key="", model="gpt-4")
+        with caplog.at_level(logging.DEBUG):
+            res = llm_chat_async_stream([{"role": "user", "content": secret_body}],
+                                        llm_config=bad_cfg)
+            out = res["future"].result(timeout=10)
+        assert isinstance(out, str)                         # 现状语义钉住：仍是拼接串
+        assert out == ""                                    # 且整场失败时为空串
+
+        gw_records = [r for r in caplog.records
+                      if r.name == "src.llm_gateway.gateway"]
+        warns = [r for r in gw_records if r.levelno >= logging.WARNING]
+        assert warns, "整场失败必须默认可见（升 warning）"
+        msg = warns[-1].getMessage()
+        assert res["cancel_id"][:8] in msg                  # 带相关 id 前 8 位
+        assert "model=gpt-4" in msg                         # 带模型名
+        # 精确量"这条日志自己带出什么"：消息本体 + 它自己的 traceback 文本
+        rendered = "\n".join(
+            [r.getMessage() + (r.exc_text or "") for r in gw_records]
+        )
+        assert secret_key not in rendered                   # 凭据不外泄
+        assert secret_body not in rendered                  # 请求体明文不外泄
+        assert "api_key" not in msg                         # 消息自身不引用配置字段
+
+        # ── 场景二：callback 抛错 → 仍只有 debug，不产生 warning
+        caplog.clear()
+
+        def _fake_upstream(messages, **kwargs):
+            yield "甲"
+            yield "乙"
+
+        monkeypatch.setattr(ai_tutor, "chat_with_tutor_stream", _fake_upstream)
+
+        def _bad_callback(chunk):
+            raise RuntimeError("回调内部炸了")
+
+        caplog.set_level(logging.DEBUG, logger="src.llm_gateway.gateway")
+        with caplog.at_level(logging.DEBUG):
+            res2 = llm_chat_async_stream(_s92452_msgs("cb-observ"), callback=_bad_callback,
+                                         llm_config=_ok_config())
+            full2 = res2["future"].result(timeout=10)
+        assert full2 == "甲乙"                              # 回调炸掉不影响交付
+        recs2 = [r for r in caplog.records if r.name == "src.llm_gateway.gateway"]
+        cb = [r for r in recs2 if "callback" in r.getMessage()]
+        assert cb, "callback 异常仍须留痕"
+        assert all(r.levelno == logging.DEBUG for r in cb)  # 但级别不上抬
+        assert not [r for r in recs2 if r.levelno >= logging.WARNING]
