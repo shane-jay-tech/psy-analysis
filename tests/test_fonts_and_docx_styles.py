@@ -4,11 +4,17 @@
 样式侧钉常量现值。任务书提到的「matplotlib 缓存」与磁盘不符——本模块不 import matplotlib，
 缓存是模块级 `_FONT_FAMILY`，按现状测。
 """
+import io
 import os
+import re
+import zipfile
 from types import SimpleNamespace
 
 import pytest
+from docx import Document
+from docx.oxml.ns import qn
 
+from src.output import docx_exporter
 from src.output import docx_styles as ds
 from src.visualization import fonts as fnt
 
@@ -140,7 +146,17 @@ def test_docx_size_and_spacing_constants_pinned():
     assert (ds.SIZE_TITLE, ds.SIZE_H1, ds.SIZE_H2, ds.SIZE_H3) == (16, 14, 13, 12)
     assert (ds.SIZE_BODY, ds.SIZE_CAPTION, ds.SIZE_TABLE) == (12, 10.5, 10.5)
     assert ds.LINE_SPACING == 1.5
-    assert (ds.SPACE_BEFORE_HEADING_PT, ds.SPACE_AFTER_HEADING_PT, ds.SPACE_AFTER_BODY_PT) == (12, 6, 0)
+    # s924-24：原为一条三元组断言，拆成三条独立断言以便单点定位（s923-18 三案共同前置）。
+    # 期望值零变化，仍是 12 / 6 / 0。
+    assert ds.SPACE_BEFORE_HEADING_PT == 12, (
+        f"标题段前距常量现值漂移：期望 12，实得 {ds.SPACE_BEFORE_HEADING_PT}"
+    )
+    assert ds.SPACE_AFTER_HEADING_PT == 6, (
+        f"标题段后距常量现值漂移：期望 6，实得 {ds.SPACE_AFTER_HEADING_PT}"
+    )
+    assert ds.SPACE_AFTER_BODY_PT == 0, (
+        f"正文段后距常量现值漂移：期望 0，实得 {ds.SPACE_AFTER_BODY_PT}"
+    )
     assert ds.FIRST_LINE_INDENT_CM == 0.74
 
 
