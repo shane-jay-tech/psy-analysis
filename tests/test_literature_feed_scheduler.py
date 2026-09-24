@@ -177,6 +177,45 @@ class TestDailyRunner:
         assert s2.sources["good"].duplicates == 1
         store.close()
 
+    def test_abandoned_stale_count_goes_to_log_and_summary(
+        self, feed_root, mock_fetchers, fake_extractor_factory, monkeypatch, caplog,
+    ):
+        """s924-15：扫掉的 running 僵尸条数要同时进日志与 run summary。
+
+        案前 `abandon_stale_runs()` 的返回值在 `daily_runner.py` 里被直接丢弃，
+        所以"这一轮清了几条"既不可见也不入库；这里用假 store 固定返回 2，
+        断言三处：summary 字段、summary 序列化键、日志文案。
+        """
+        import logging
+        from src.literature_feed.scheduler import DailyRunner
+        from src.literature_feed.storage import FeedStore
+        from src.literature_feed.storage.budget_tracker import BudgetTracker
+        from src.literature_feed.trend import DomainWeights
+
+        store = FeedStore()
+        seen: dict = {}
+
+        def fake_abandon(*, ttl_seconds=None):
+            seen["ttl_seconds"] = ttl_seconds
+            return 2
+
+        monkeypatch.setattr(store, "abandon_stale_runs", fake_abandon)
+        runner = DailyRunner(
+            store=store, weights=DomainWeights.empty(),
+            budget=BudgetTracker(monthly_limit_usd=10.0),
+            extractor_factory=fake_extractor_factory, fetcher_builder=mock_fetchers,
+        )
+        with caplog.at_level("INFO", logger="src.literature_feed.scheduler.daily_runner"):
+            summary = runner.run(
+                trigger="t-abandon", days_back=30, do_extract=False, compute_trending=False,
+            )
+
+        assert summary.abandoned_stale == 2
+        assert summary.to_dict()["abandoned_stale"] == 2
+        assert "abandon_stale_runs 清理 2 条 running 僵尸" in caplog.text
+        assert seen["ttl_seconds"] is None  # 调用面不变：仍沿用 store 侧默认 TTL
+        store.close()
+
     def test_run_daily_no_sources_returns_empty_summary(self, feed_root):
         """run_daily 在空库（没有 source）时应正常返回，不抛异常，自建 store 被关闭。"""
         from src.literature_feed.scheduler import daily_runner as dr_mod

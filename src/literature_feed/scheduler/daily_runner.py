@@ -136,6 +136,7 @@ class RunSummary:
     extracted_failed: int = 0
     budget_exceeded: bool = False
     error: Optional[str] = None
+    abandoned_stale: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -151,6 +152,7 @@ class RunSummary:
             "extracted_failed": self.extracted_failed,
             "budget_exceeded": self.budget_exceeded,
             "error": self.error,
+            "abandoned_stale": self.abandoned_stale,
         }
 
 
@@ -281,14 +283,24 @@ class DailyRunner:
         trending_cap: float = 1.3,
     ) -> RunSummary:
         # 清理别的进程留下的 stale running 记录
+        # s924-15 (2026-09-25): 返回值以前被丢弃——扫掉几条既不进日志也不进 summary，
+        # 崩溃残留对运维完全是静默的。现在接住计数：>0 才 info（0 条是常态，不刷屏），
+        # 失败分支保持原样（扫不动也只是不响，绝不让整轮 run 因此失败）。
+        abandoned_stale = 0
         try:
-            self.store.abandon_stale_runs()
+            n = self.store.abandon_stale_runs() or 0
+            if n > 0:
+                abandoned_stale = n
+                logger.info("abandon_stale_runs 清理 %d 条 running 僵尸", n)
         except Exception as exc:  # noqa: BLE001
             logger.warning("abandon_stale_runs 失败（忽略继续）：%s", exc)
 
         run_id = self.store.start_run(trigger)
         started = self._iso_now()
-        summary = RunSummary(run_id=run_id, trigger=trigger, started_at=started)
+        summary = RunSummary(
+            run_id=run_id, trigger=trigger, started_at=started,
+            abandoned_stale=abandoned_stale,
+        )
         any_failed = False
         any_ok = False
 

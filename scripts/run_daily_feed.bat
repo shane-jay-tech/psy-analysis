@@ -1,18 +1,26 @@
 @echo off
 REM run_daily_feed.bat - Literature feed daily runner for Windows Task Scheduler
 REM
-REM Schedule via:
-REM   schtasks /Create /SC DAILY /TN "PsyLiteratureFeed" /TR "D:\code\psy-analysis\scripts
-un_daily_feed.bat" /ST 09:00
+REM Schedule via: <ROOT> stands for the folder that holds this repo, i.e. the parent
+REM of the folder this script sits in (the script derives its own root from %~dp0).
+REM   schtasks /Create /SC DAILY /TN "PsyLiteratureFeed" /TR "<ROOT>\scripts\run_daily_feed.bat" /ST 09:00
 REM
 REM Logs to data\literature_feed\logs\daily_runner.log
 
 setlocal
 
 REM Force ASCII-friendly codepage to avoid GBK/UTF-8 mojibake in logs.
-chcp 65001 >/dev/null 2>&1
+REM s924-14 (2026-09-25): the POSIX bit-bucket idiom used here before is not valid
+REM under cmd, so the redirect could not be opened and chcp never actually ran.
+REM The cmd null device is NUL, hence the form below.
+chcp 65001 >nul 2>&1
 
-set "REPO=D:\code\psy-analysis"
+REM s924-14 (2026-09-25): the repo root is now derived from the location of this
+REM script itself instead of a hardcoded drive letter, so a moved checkout or another
+REM drive cannot point the daily job at a different tree (same rationale as the .venv
+REM pin right below). The %%~fI qualifier normalizes the "%~dp0.." tail so that the
+REM LOG and PYTHONPATH values stay plain absolute paths.
+for %%I in ("%~dp0..") do set "REPO=%%~fI"
 REM s923-11 (2026-09-23): pin the interpreter to THIS repo's .venv instead of whatever
 REM "python" happens to resolve to on PATH. The supported env is the one built from
 REM requirements.txt / requirements-lock.txt; the global interpreter here already drifts
