@@ -2,13 +2,26 @@
 
 `write_trending_yaml` 打桩成捕获器 ⇒ **不写真实 trending_weights.yaml**；
 TrendingWeights 用真类型（frozen dataclass）构造，不渲染 Streamlit。
-锚点：src/literature_feed/ui/feed_panel.py:462（模块 882 行；此前仅 _save_domain_weights 被测）。
+锚点：src/literature_feed/ui/feed_panel.py（模块期常量 DOMAIN_WEIGHTS_PATH、
+函数级懒导入 write_trending_yaml；此前仅 _save_domain_weights 被测）。
+
+隔离口径（s924-29）：本件**不做模块期绑定**。兄弟件 tests/test_literature_feed_*.py
+的 feed_root 夹具会把 src.literature_feed* 整批从 sys.modules 删掉，模块期 import
+到的模块对象因此变成僵尸对象 ⇒ patch 打空、生产码懒导入拿到新模块、
+**真写 trending_weights.yaml** 且用例只报 IndexError。现由 `written` 夹具在用例内
+现取现 patch（见 test_capture_survives_a_sibling_evicting_every_feed_module）。
 """
+import importlib
+import sys
+
 import pytest
 
-import src.literature_feed.trend.trending_weights as tw_mod
 from src.literature_feed.trend.trending_weights import TrendingWeights
 from src.literature_feed.ui.feed_panel import _apply_trending_override
+
+# 与生产懒导入 `from ..trend.trending_weights import ...` 同名的唯一字面串
+TRENDING_WEIGHTS_MODULE = "src.literature_feed.trend.trending_weights"
+FEED_PACKAGE_PREFIX = "src.literature_feed"
 
 
 def _tw(ignored=(), promoted=(), log=()):
@@ -19,14 +32,55 @@ def _tw(ignored=(), promoted=(), log=()):
 
 
 @pytest.fixture
+def wide_eviction(tmp_path, monkeypatch):
+    """复刻兄弟件 feed_root 的**宽口径**驱逐：把 FEED_PACKAGE_PREFIX 下所有模块删出
+    sys.modules（现值：7 个 test_literature_feed_* 件仍是这种写法），并留下还原点。
+
+    本夹具刻意不用 monkeypatch.setitem 做还原——它在 teardown 会**再删一次**键，
+    等于把驱逐泄漏给后面的用例。
+    """
+    monkeypatch.setenv("LITERATURE_FEED_DATA_ROOT", str(tmp_path))
+    snapshot = {k: v for k, v in sys.modules.items() if k.startswith(FEED_PACKAGE_PREFIX)}
+    for name in snapshot:
+        del sys.modules[name]
+    try:
+        yield tmp_path
+    finally:
+        for name in [k for k in sys.modules if k.startswith(FEED_PACKAGE_PREFIX)]:
+            del sys.modules[name]
+        sys.modules.update(snapshot)
+
+
+@pytest.fixture
 def written(monkeypatch):
+    """捕获 write_trending_yaml 的调用；模块对象在夹具期现取，不缓存模块期引用。"""
     calls = []
 
     def capture(weights, path):
         calls.append((weights, path))
 
-    monkeypatch.setattr(tw_mod, "write_trending_yaml", capture)
+    monkeypatch.setattr(importlib.import_module(TRENDING_WEIGHTS_MODULE),
+                        "write_trending_yaml", capture)
     return calls
+
+
+def test_capture_survives_a_sibling_evicting_every_feed_module(wide_eviction, written):
+    """【隔离回归钉桩 s924-29】宽口径驱逐之后，捕获必须仍然命中且不落真盘。
+
+    原缺陷读数（本单实测，非卷宗点名的那一对文件）：与仍做宽口径驱逐的兄弟件连跑时
+    本件 8 例全红，错误是 `IndexError: list index out of range`（`written[0]` 取空表），
+    同时 trending_weights.yaml 被**真写进沙盒根目录** —— 沙盒守卫缺失时即真库。
+    """
+    panel = importlib.import_module("src.literature_feed.ui.feed_panel")
+
+    panel._apply_trending_override(_tw(ignored=["AI"], promoted=[]), "推广该关键词", "AI")
+
+    assert len(written) == 1, "补丁打空：本件又退化成模块期绑定，兄弟夹具一驱逐就会真写盘"
+    weights, path = written[0]
+    assert weights.promoted == ("AI",) and weights.ignored == ()
+    assert str(path).endswith("trending_weights.yaml")
+    assert not (wide_eviction / "trending_weights.yaml").exists(), \
+        "捕获失效 ⇒ 生产码真写盘了（真库无守卫时会落在 data/literature_feed/）"
 
 
 def test_promote_adds_to_promoted_logs_it_and_clears_ignored(written):
