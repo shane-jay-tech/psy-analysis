@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""正文内引用替换器：[key] → (Author, Year)。
+r"""正文内引用替换器：[key] → (Author, Year)。
 
 口径与 literature_manager.LiteratureEntry.format_reference 同源：
 - 1/2 作者拼写全名（中文 2 作者用「与」连接），≥3 作者用 et al.（中文用「等」）——

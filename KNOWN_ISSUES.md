@@ -100,7 +100,7 @@
 |---|---|---|
 | P1 | 多实例项目写入 | 已落地两级互斥（线程 RLock＋OS 文件锁，instance_lock.project_lock）；余留＝可选告警日志与锁粒度/回退策略。限定（2026-09-21）：`instance_lock.py` grep alert 零命中＝本行未推进；feed 侧 `lock_manager._alert_once`（d914-19）与 untracked `tests/test_lock_alert_log.py` 是**另一把锁**，勿混为抵账 |
 | P1 | 大工作区快照 | 已按方案 B 后台化（a02626c）＋「返回＝受理」语义与换案阈值已入码（h912-06，实测阈值=序列化 CSV 10MB≈worker 2s/内存峰值≈52MB）；残留：超阈值需评估方案 A 增量资产化 |
-| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，26 项明确跳过（e2e∪playwright 标记项实测，2026-09-17，2026-09-21 复核仍 26 skipped；口径注：同标记 `--collect-only` 收集仅 25 项，第 26 项来自模块级 skip，两数不可互换；复现：.venv/Scripts/python.exe -m pytest -q -rs -m "playwright or e2e"）；发布认证环境补装后重跑（安装后本行及 :138 行作废） |
+| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，标记面＝**25 个标记用例＋1 条模块级 `pytest.importorskip`＝26 skip 条目**（e2e∪playwright 实测 2026-09-25：`-rs` 26 skipped、`--collect-only` 25 项，第 26 条无 nodeid——它不是被 skipif 遮住的用例而是模块收集期抛 Skipped，整件 11 例连 collect 都不进＝0 item，两数不可互换；2026-09-17／09-21／09-25 三次复核同为 26）；模块级 skip 归因＝`tests/test_playwright_e2e.py:24`，由 `097a657`（2026-07-14 12:25，checkpoint 笔；`git log -S importorskip -- tests/` 唯一命中，同笔一并带进 v52／golden 两侧的 skipif 文案）引入；**补装后待重跑 36 例＝25＋11**（句式出处 `docs/insights/psy-e2e-skip26-roster-20260922.md` §四；≠旧档 `docs/insights/psy-e2e-count-caliber-20260917.md:18` 对 25/26 之差的归因「playwright-only 有 1 项不在 e2e 内」——2026-09-25 复测 `-m "playwright and not e2e"` 仍是 no tests collected，真因只有上面那条模块级 importorskip；旧档不回改，勘误以本行为准）；复现：.venv/Scripts/python.exe -m pytest -q -rs -m "playwright or e2e"；发布认证环境补装后重跑（安装后本行及 :138 行作废） |
 | P2 | 交付入口收敛 | 正式交付已统一硬门禁；草稿、作业包与正式交付仍需统一入口语义 |
 | P2 | 编排层拆分 | `app.py` 保持兼容但体量较大；按页面控制器渐进拆分 |
 
