@@ -2,6 +2,7 @@
 
 import sys
 import os
+import logging
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -51,6 +52,8 @@ from src.ui.cleaning_wizard import (
     cleaning_log_to_method_paragraph, render_cleaning_wizard,
 )
 from src.ui.export_gate import run_export_gate
+
+logger = logging.getLogger(__name__)
 
 
 def _render_official_download(
@@ -122,7 +125,8 @@ def _collect_literature_gaps() -> list:
                 if desc:
                     result.append({"gap_description": desc})
         return result
-    except Exception:
+    except Exception as exc:
+        logger.warning("向导推荐文献渲染失败（整块降级为空）: %s", exc)
         return []
 
 
