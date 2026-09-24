@@ -77,10 +77,15 @@ PSY_ANALYSIS_LOG_DIR=logs                  # 运行日志目录；默认是「�
 ## 验证
 
 ```powershell
-pytest                           # 单元与回归测试
-python scripts/release_gate.py   # 发布门禁（环境/隐私/导出等）
-python scripts/perf_smoke.py     # 性能冒烟
+# 以下命令在仓库根目录执行，一律走仓内虚拟环境解释器（口径单源见 docs/TESTING.md）
+.\.venv\Scripts\python.exe -m pytest                # 单元与回归测试
+.\.venv\Scripts\python.exe -m scripts.release_gate  # 发布门禁（环境/隐私/导出等）
+.\.venv\Scripts\python.exe -m scripts.perf_smoke    # 性能冒烟
 ```
+
+解释器口径（为什么必须用 `.venv`、两口径数字为何不可混比）见
+[`docs/TESTING.md`](docs/TESTING.md) 的「解释器口径（两口径数字不可混比）」一节；
+本文不抄列任何测试计数，改口径只改那一处。
 
 测试覆盖分析结果、UI 面板、隐私防护、导出门禁、版本一致性与模板流程。公开仓库不包含 `data/` 与 `archive/` 实验数据；请在共享分析结果前确认已去标识化，并遵守知情同意、伦理审查和数据最小化要求。
 
