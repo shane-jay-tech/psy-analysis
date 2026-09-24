@@ -3,7 +3,32 @@
 使用预定义数据集 + 预期统计结果进行数值级验证，
 确保分析方法输出与 R/SPSS/JASP 参考值一致。
 
-覆盖: t检验、方差分析、非参数检验、回归、信度、相关。
+覆盖: t检验、方差分析、非参数检验、回归、信度、相关、中介。
+
+============================================================
+可选性兜底 census（s923-48 追加，2026-09-24）
+============================================================
+判据两分法：被试符号在本仓 ⇒ 必须硬失败（符号改名/损坏即在收集期报错）；
+被试者是真·可选外部依赖 ⇒ 保留 skipif 兜底。
+
+本件原先在 test_mediation_runs 函数体内用 try/ImportError → pytest.skip
+守护 `mediation_analysis`——那是 src/analysis/advanced.py:116 的仓内符号，
+兜底没有任何判别力，只会让整段中介金档在符号被改坏时静默消失。
+现翻正为下方那条模块级硬导入：用例数与期望值均未改动，
+改变的只是"跑不到"的表现形态（静默 skip → 立刻可见的收集期错误）。
+
+全仓同类 ImportError 兜底共 4 处，逐处判定：
+  1. tests/test_golden_stats.py:338  仓内符号 → 本单已翻正为硬导入（见文件末 import 段）
+  2. tests/test_docx_export.py:44    PIL/Pillow：requirements-lock.txt 未声明该行，
+     .venv 实装 12.3.0（系传递依赖）→ 真可选外部依赖，**保留**；
+     建议（不在本单范围）：要么把 Pillow 写进 lockfile 后翻正，
+     要么至少换成模块级 skipif，别在 fixture 中途静默 skip 掉一条用例。
+  3. tests/test_e2e_v52_paths.py:27  playwright：lockfile 未声明、.venv 未安装，
+     还需另装浏览器二进制 → 真可选外部依赖，**保留**；
+     且已是 `pytestmark = [skipif(not _playwright_available())]` 的正解形态。
+  4. tests/test_playwright_golden_research_flow.py:27  同为 playwright，**保留**；
+     E2E_AVAILABLE 只门住该件 :450 的 skipif 与 :401 的浏览器段，
+     其 Part 1 离线用例不受该标志影响 ⇒ 不会连坐吞掉本应执行的用例。
 """
 
 import json
@@ -11,6 +36,9 @@ import pytest
 import pandas as pd
 import numpy as np
 from pathlib import Path
+
+# 仓内符号（src/analysis/advanced.py:116）：硬导入，失败即收集期报错，不得兜底
+from src.analysis.advanced import mediation_analysis
 
 FIXTURES = Path(__file__).parent / "fixtures" / "golden_stats"
 
@@ -332,12 +360,11 @@ class TestGoldenCorrelation:
 
 class TestGoldenMediation:
     def test_mediation_runs(self):
-        """Verify mediation analysis produces expected structure."""
-        try:
-            from src.analysis.advanced import mediation_analysis
-        except ImportError:
-            pytest.skip("mediation_analysis not available")
+        """Verify mediation analysis produces expected structure.
 
+        被试者 `mediation_analysis` 由文件头的模块级硬导入提供（s923-48）：
+        该符号一旦改名或损坏，本件在收集期就报错，不再静默 skip 掉整段中介金档。
+        """
         np.random.seed(42)
         n = 100
         x = np.random.randn(n)
