@@ -21,7 +21,15 @@
 （见 `tests/test_items_upload_airview.py:28 FakeSt` ／ `tests/test_feed_panel_charac.py:146`）：
 `monkeypatch.setattr(panel, "st", fake)` ＋ `__getattr__` 对未预期调用直接判红。
 **后来人若要把本件升级成真 AppTest，必须同时改 `_APP_TEST_FILES`，否则等于零隔离。**
+
+追加（s924-02，2026-09-24）：下面第四、五节把 `_render_results` 的 **summary 缺键形态**钉进本件——
+来账 `zcode-bridge/done/s923-01.result.md` 自述「`:179-181` 是直接下标而非 `.get`，
+缺键会 `KeyError` 冒到 UI 层而不是降级提示，本单只测了正常形态、没测缺键形态」。
+那三处直接下标**今天仍在位**（锚点复核见下文注释）。**钉的是现状，不是规范**：
+是否改成 `.get` ＋降级文案属生产行为改动，**待主班/人工裁决**，本单零 `src/` 改动。
 """
+from dataclasses import replace
+
 import pandas as pd
 import pytest
 
@@ -265,3 +273,107 @@ def test_render_and_deliverable_agree_on_entry_count(st, cleaned_state):
     qip._render_results(state)
     rendered = [m for m in st.markdowns if m.startswith("- **")]
     assert len(rendered) == len(qip.get_cleaning_log_for_deliverable(state)) == len(result.log)
+
+
+# --------------------------------------------------------------------------- #
+# 四、summary 缺键形态（s924-02 特征化：钉的是现状，非规范）
+# --------------------------------------------------------------------------- #
+#
+# 被测面（复核于 2026-09-24，与 `src/ui/questionnaire_import_panel.py:179-181` 逐字一致）：
+#     col1.metric("原始样本", result.summary["original_n"])
+#     col2.metric("有效样本", result.summary["valid_n"])
+#     col3.metric("剔除样本", result.summary["invalid_n"])
+# 三处都是**直接下标**，故缺键时 KeyError 直接冒到 UI 层（没有 try、没有降级文案）。
+# 下面几例把这个行为钉成现状：**若将来改判为 `.get` ＋降级提示，这些用例会翻红，
+# 那是预期信号**——翻红时要连同「本段注释」一起改写，别只摘掉红的那几条。
+SUMMARY_METRIC_ORDER = (
+    ("原始样本", "original_n"),
+    ("有效样本", "valid_n"),
+    ("剔除样本", "invalid_n"),
+)
+SUMMARY_KEYS = tuple(k for _, k in SUMMARY_METRIC_ORDER)
+
+
+def _summary_without(result, *keys):
+    """在**真清洗产物**上摘掉指定 summary 键（其余字段一字不动）。"""
+    patched = {k: v for k, v in result.summary.items() if k not in keys}
+    assert patched != result.summary, f"夹具里没有 {keys} 可摘，变异没发生"
+    return replace(result, summary=patched)
+
+
+def test_control_full_summary_renders_all_three_metrics(st, cleaned_state):
+    """控制组：三键齐全时一条都不炸、三列 metric 全落地。
+
+    没有这一条，下面的 `pytest.raises(KeyError)` 就可能只是"夹具本来就不全"的假绿。
+    """
+    state, result = cleaned_state
+    assert set(SUMMARY_KEYS) <= set(result.summary)  # 真跑 import_cleaning 的读数
+    qip._render_results(state)
+    assert [label for label, _ in st.metrics] == [label for label, _ in SUMMARY_METRIC_ORDER]
+    assert len(st.downloads) == 1
+
+
+@pytest.mark.parametrize("missing", SUMMARY_KEYS)
+def test_single_missing_summary_key_raises_keyerror_mid_render(st, cleaned_state, missing):
+    """缺任一个 summary 键 ⇒ `_render_results` 抛 KeyError，且 `str(exc)` 里就是那个键名。
+
+    顺带钉下**半渲染态**的爆炸半径：抛点之前的 metric 已经落到屏上（用户看到半截数字），
+    之后的维度预览与下载口一条都不会出现。
+    """
+    _, result = cleaned_state
+    cut = _summary_without(result, missing)
+    idx = SUMMARY_KEYS.index(missing)
+
+    with pytest.raises(KeyError) as exc:
+        qip._render_results({qip._CLEANED_KEY: cut})
+
+    assert missing in str(exc.value), "判据 ①：异常消息里必须含被缺的键名"
+    # 消息**恰等于**那一个键名。⚠ 不要写成"其它键名不得出现在消息里"：
+    # `invalid_n` 字面上就含着 `valid_n`，那种断言会在 missing='invalid_n' 臂上假红。
+    assert str(exc.value) == repr(missing), f"KeyError 消息形态漂了：{str(exc.value)!r}"
+    # 抛点之前已经渲染出去的部分（逐字取自 :179-181 的顺序）
+    assert st.metrics == [
+        (label, result.summary[key]) for label, key in SUMMARY_METRIC_ORDER[:idx]
+    ]
+    assert st.markdowns == ["### 清洗摘要"]      # 只到小标题，一条降级提示都没有
+    assert st.columns_calls == [3]
+    assert st.dataframes == []                    # df_scored 明明非空，却再也渲染不到
+    assert st.downloads == []                     # 清洗日志下载口随渲染一起消失
+
+
+def test_all_three_summary_keys_missing_dies_on_the_first_one_only(st, cleaned_state):
+    """缺多键（三枚计数键一起摘）：KeyError 只报**第一个**被碰的键，
+    错误消息根本不告诉维护者还缺几个。
+
+    ⚠ 实测：`run_questionnaire_cleaning` 产出的 summary 除三枚计数键外还有
+    `item_columns` / `dimensions_scored` 两键（2026-09-24 读数），故"摘掉三枚计数键"
+    ≠ "整张 summary 为空"——别把这条误读成 default_factory 形态。
+    """
+    _, result = cleaned_state
+    assert set(SUMMARY_KEYS) <= set(result.summary)
+    cut = _summary_without(result, *SUMMARY_KEYS)
+    assert set(SUMMARY_KEYS).isdisjoint(cut.summary)      # 三枚计数键确实全缺
+
+    with pytest.raises(KeyError) as exc:
+        qip._render_results({qip._CLEANED_KEY: cut})
+
+    assert "original_n" in str(exc.value)
+    assert "valid_n" not in str(exc.value) and "invalid_n" not in str(exc.value)
+    assert st.metrics == []                       # 一个数字都没落地
+    assert st.markdowns == ["### 清洗摘要"]
+    assert st.downloads == []
+
+
+def test_missing_summary_keys_do_not_reach_the_deliverable_path(cleaned_state):
+    """钉影响面边界：同一份缺键 result 喂另一个出口（交付包摊平）**不炸**，
+    因为它不读 summary。⇒ 这条 KeyError 是**渲染摘要面**的局部缺陷，别升级成全链路面报告。"""
+    _, result = cleaned_state
+    cut = _summary_without(result, *SUMMARY_KEYS)
+    state = {qip._CLEANED_KEY: cut}
+
+    assert set(SUMMARY_KEYS).isdisjoint(cut.summary)
+    assert qip.get_cleaned_result(state) is cut
+    out = qip.get_cleaning_log_for_deliverable(state)
+    assert len(out) == len(result.log) == 4
+    assert all(set(d) == FLATTEN_KEYS for d in out)
+
