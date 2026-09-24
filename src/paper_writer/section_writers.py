@@ -3,13 +3,15 @@
 每个生成器接收 PaperContext，输出格式化的论文段落。
 """
 
+import re
+
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 
 from .psychology_report_format import (
-    STAT_FORMATS, SIG_MARKS, EFFECT_SIZE_GUIDE, ACADEMIC_PHRASES
+    STAT_FORMATS, SIG_MARKS, EFFECT_SIZE_GUIDE, ACADEMIC_PHRASES, WRITING_RULES
 )
 from .literature_manager import LiteratureManager
 
@@ -66,19 +68,50 @@ class PaperContext:
 # 标题与摘要
 # ===========================================================================
 
+# --- 标题字数口径（接心理学报规约表 WRITING_RULES）--------------------------
+# 规约表 WRITING_RULES["title"] 写的是「不超过 25 个字」，历史上写点却用一个字面量
+# 魔数硬切假设串：25 - len("基于") - len("的研究") = 20，那个 20 恰好让成品等于 25，
+# 属巧合而非派生——改模板（换前/后缀）就会静默破限。现在上限只在规约表一处，
+# 成品一律过 clamp，超长带「…」截断标记。
+TITLE_MAX_LEN = 25                     # 规约表读不到数字时的回落口径
+_TITLE_RULE_NUM_RE = re.compile(r"(\d+)\s*个字")
+_TITLE_PREFIX = "基于"
+_TITLE_SUFFIX = "的研究"
+_TITLE_FALLBACK = "心理学实证研究"
+
+
+def _title_rule_max_len() -> int:
+    """标题字数上限：以规约表 WRITING_RULES['title'] 为唯一来源，读不到回落 TITLE_MAX_LEN。"""
+    match = _TITLE_RULE_NUM_RE.search(WRITING_RULES.get("title", ""))
+    return int(match.group(1)) if match else TITLE_MAX_LEN
+
+
+def _clamp_title(title: str, limit: int) -> str:
+    """把生成的标题截断到 limit 字以内；截断时末位留「…」作标记。"""
+    if len(title) <= limit:
+        return title
+    return title[: max(limit, 1) - 1] + "…"
+
+
 def write_title(context: PaperContext) -> str:
-    """生成论文标题（心理学报风格：不超过25字）"""
+    """生成论文标题（心理学报风格：不超过规约表 WRITING_RULES['title'] 的字数上限，现为 25 字）。
+
+    title_hint 是用户手填标题，原样返回、不静默改写；只有自动推断出的标题受上限约束。
+    """
     if context.title_hint:
         return context.title_hint
 
+    limit = _title_rule_max_len()
     # 从研究变量推断标题
     hypotheses = context.hypotheses
     if hypotheses:
         # 提取第一个假设中的关键变量
         h1 = hypotheses[0]
-        return f"基于{h1[:20]}的研究" if len(h1) > 20 else h1
+        title = f"{_TITLE_PREFIX}{h1}{_TITLE_SUFFIX}" if len(h1) > limit else h1
+    else:
+        title = context.topic if context.topic else _TITLE_FALLBACK
 
-    return context.topic if context.topic else "心理学实证研究"
+    return _clamp_title(title, limit)
 
 
 def write_abstract(context: PaperContext) -> str:

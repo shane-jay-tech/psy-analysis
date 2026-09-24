@@ -3,10 +3,14 @@
 
 锚点复核（开工第一动作，磁盘实测）
 --------------------------------
-- `src/paper_writer/section_writers.py:18` = `class PaperContext:` —— **未漂移**。
-- `src/paper_writer/section_writers.py:84` = `def write_abstract(context: PaperContext) -> str:` —— **未漂移**。
-- 模块实测 996 行；writer 函数体位置：write_title :69 / write_abstract :84 / write_keywords :114 /
-  write_introduction :146 / write_methods :216。
+s922-117 建件时：`class PaperContext:` 在 :18、`def write_abstract` 在 :84、模块 996 行。
+**s924-60 接入 WRITING_RULES 字数口径后这些行号整体下移**，本件按"唯一文本"复核后的现值为：
+- `src/paper_writer/section_writers.py` 模块 1029 行；writer 函数体位置：write_title :96 /
+  write_abstract :117 / write_keywords :147 / write_introduction :179 / write_methods :249。
+  （行号只是本次复核的快照，别再当契约——按 `rg -n "^def write_"` 现取。）
+- write_title 的字数上限**不再由写点字面量决定**：上限来自
+  `psychology_report_format.WRITING_RULES["title"]`（"不超过25个字…"），成品统一过
+  `_clamp_title`，超长带「…」标记。旧版把假设串硬切到 20 字符的写点已消失。
 
 任务书前提的两处失真（按磁盘实况收窄，不据此判 failed）
 ------------------------------------------------
@@ -32,6 +36,7 @@
 
 import ast
 import inspect
+import re
 import socket
 import sys
 
@@ -39,12 +44,17 @@ import pytest
 
 from src.paper_writer.section_writers import (
     PaperContext,
+    TITLE_MAX_LEN,
+    _title_rule_max_len,
     write_abstract,
     write_introduction,
     write_keywords,
     write_methods,
     write_title,
 )
+# WRITING_RULES 从其**源头**导入（section_writers 里的同名符号是转发绑定）：
+# 互证用例要证明的是"规约表说了 25"，而不是"section_writers 自己抄了一份 25"。
+from src.paper_writer.psychology_report_format import WRITING_RULES
 
 # 被测面（任务书点名的四个 + 容错分支的 write_methods）
 TESTED_WRITERS = (
@@ -115,15 +125,67 @@ def test_write_title_returns_injected_hint_verbatim():
 
 def test_write_title_fallback_chain_is_context_driven():
     # 无 title_hint：有假设 → 走「基于…的研究」包装；无假设 → 退回 topic；全空 → 兜底常量
-    # 实测钉桩：section_writers.py:79 用 h1[:20] 硬截 20 字符，长假设会被切尾
+    # s924-60 改后钉桩（收紧，非放宽）：成品一律受规约表字数上限约束，超长时截断并留「…」标记。
+    # 旧口径是把假设串硬切到 20 字符——成品恰好 25 只是 25-2-3 的巧合，且切尾无声。
     long_h = "HYPOTHESIS-MARKER-9c2a-and-its-very-long-tail"
-    assert write_title(PaperContext(hypotheses=[long_h])) == f"基于{long_h[:20]}的研究"
-    assert write_title(PaperContext(hypotheses=[long_h])) == "基于HYPOTHESIS-MARKER-9c的研究"
+    got = write_title(PaperContext(hypotheses=[long_h]))
+    assert got == "基于HYPOTHESIS-MARKER-9c2a…"
+    assert len(got) <= 25, "超长假设产出的标题必须落在规约表上限内"
+    assert got.endswith("…"), "截断必须留可见标记，不许再无声切尾"
+    # 21~25 字假设：旧口径会包成「基于…的研究」并切掉尾字符，新口径原样作题（不损信息）
+    mid_h = "MID-MARKER-21chars-abc"                      # 22 字，正落在旧 20 / 新 25 之间
+    assert len(mid_h) == 22
+    assert write_title(PaperContext(hypotheses=[mid_h])) == mid_h
     short_h = "SHORT-MARKER-7e"
-    assert write_title(PaperContext(hypotheses=[short_h])) == short_h, "≤20 字符时原样作题"
+    assert write_title(PaperContext(hypotheses=[short_h])) == short_h, "≤25 字符时原样作题"
     topic_only = write_title(PaperContext(topic="TOPIC-MARKER-2f8b"))
     assert topic_only == "TOPIC-MARKER-2f8b"
     assert write_title(PaperContext()) == "心理学实证研究"
+
+
+# --- s924-60：标题字数口径接 WRITING_RULES -----------------------------------
+
+def test_write_title_overlong_hypothesis_never_exceeds_rule_limit():
+    """完成标准②：超长输入产出的标题恒 <= 25 字，且截断后恰好铺满上限。"""
+    limit = _title_rule_max_len()
+    assert limit == 25
+    for h1 in ("假" * 60, "A" * 26, "焦虑与自尊" * 20,
+               "HYPOTHESIS-MARKER-9c2a-and-its-very-long-tail"):
+        assert len(h1) > limit, f"夹具本身要够长才测得到截断（{len(h1)} 字）"
+        got = write_title(PaperContext(hypotheses=[h1]))
+        assert len(got) <= 25, f"标题 {got!r} 超出 25 字上限（输入 {len(h1)} 字）"
+        assert len(got) == limit, f"{got!r} 未铺满上限，截断策略走形"
+        assert got.endswith("…")
+
+
+def test_title_limit_two_sources_agree_with_independent_literal():
+    """两源互证（刻意避免恒真）。
+
+    若只断言 `TITLE_MAX_LEN == _title_rule_max_len()`，两者同源于 psychology_report_format
+    就成了永真式、失去判别力。这里做两件事把它变回可判别的断言：
+    ① 先断言规约表原文里**正则必须命中**「N个字」——命中不了运行时会静默走回落口径、把不一致伪装成一致；
+    ② 再用**第三处独立字面量 25** 同时夹住"规约表解析值"和"模块常量"两源，任一源单独漂移即红。
+    """
+    rule_text = WRITING_RULES["title"]
+    match = re.search(r"(\d+)\s*个字", rule_text)
+    assert match is not None, f"规约表 title 条目缺「N个字」数字，回落口径会被静默启用：{rule_text!r}"
+    assert int(match.group(1)) == 25, "规约表口径变了，需同步重评 write_title 的截断策略"
+    assert TITLE_MAX_LEN == 25, "模块常量口径变了，需同步重评规约表与用例"
+    assert _title_rule_max_len() == TITLE_MAX_LEN == 25
+
+
+def test_title_rule_missing_number_falls_back_to_constant(monkeypatch):
+    """让 TITLE_MAX_LEN 成为**承重件**：规约表读不到数字时上限必须仍是字面的 25。
+
+    没有本用例，"改 TITLE_MAX_LEN 常量"这一刀杀不死任何断言（运行期上限来自规约表、
+    常量只在回落时生效），自证就会变成假绿。
+    """
+    monkeypatch.setitem(WRITING_RULES, "title", "不超过若干个字，准确概括研究核心变量与关系")
+    assert _title_rule_max_len() == 25, "回落口径字面值漂移（此处 25 是独立对照，不取模块常量）"
+    got = write_title(PaperContext(hypotheses=["H" * 80]))
+    assert len(got) == 25 and got.endswith("…")
+    # 兜底常量与 topic 回落同样受上限约束
+    assert write_title(PaperContext(topic="题" * 80)).endswith("…")
 
 
 # ===========================================================================
