@@ -2,6 +2,11 @@
 
 只能测纯函数（不依赖 Streamlit 全局）。Streamlit-testing 框架要等 Phase 4g+ 接入。
 覆盖 _save_domain_weights：round-trip / 原子替换 / 空行过滤 / domain 验证。
+
+夹具清理面（pd07 案 A，台账 #94）：原先按前缀删掉**所有** `src.literature_feed*`，
+撞上 tests/test_feed_panel_trending_override.py 的「模块期绑定 × 生产函数级懒导入」
+⇒ 同跑 8 failed，且那 8 例会把 trending_weights.yaml **真写进 data/literature_feed/**。
+现只删本件真正作用的三个模块名（见 _FEED_UI_MODULES）。
 """
 
 from __future__ import annotations
@@ -10,14 +15,23 @@ from pathlib import Path
 
 import pytest
 
+# 本件唯一作用的缓存点：paths 计算 DATA_ROOT 与各 *_PATH（导入期求值），
+# trend / ui.feed_panel 在导入期把 DOMAIN_WEIGHTS_PATH 绑成模块常量。
+# 刻意**不删** src.literature_feed.trend.trending_weights：兄弟件在模块期 import 它
+# 并 monkeypatch 其 write_trending_yaml，删了就让补丁打空、生产码懒导入拿到新对象。
+_FEED_UI_MODULES = (
+    "src.literature_feed.paths",
+    "src.literature_feed.trend",
+    "src.literature_feed.ui.feed_panel",
+)
+
 
 @pytest.fixture
 def feed_root(tmp_path, monkeypatch):
     monkeypatch.setenv("LITERATURE_FEED_DATA_ROOT", str(tmp_path))
     import sys
-    for mod in list(sys.modules):
-        if mod.startswith("src.literature_feed"):
-            del sys.modules[mod]
+    for mod in _FEED_UI_MODULES:
+        sys.modules.pop(mod, None)
     return tmp_path
 
 
