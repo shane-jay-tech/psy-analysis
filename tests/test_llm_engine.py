@@ -12,7 +12,23 @@ assert len(prompt) > 3000, f"Prompt too short: {len(prompt)} chars"
 print(f"System prompt: {len(prompt)} chars")
 for cname in CONSTRUCTS:
     assert cname in prompt, f"Missing construct: {cname}"
-print(f"All {len(CONSTRUCTS)} constructs in system prompt: OK")
+
+# Test 1b: 构念条目的**枚数＋集合双向守恒**（s924-03：原先这一行只报数、不看守，删多少构念都不红）
+#   N = 51 现取于 2026-09-24（HEAD `86fcf2f`，`src/questionnaire/construct_kb.py` 字节 sha8 `3c660295`），
+#   与 `tests/test_construct_kb_census.py:15` 的 TOTAL、`tests/test_construct_kb_extended_placeholder.py:42`
+#   的 CENSUS_TOTAL 三处同值 ⇒ 增减构念时这三处连同本行注记要一起同步。
+#   为什么上面那个 in 循环不够：实测 CONSTRUCTS 里有 3 对名字互为子串（"焦虑" 是 "社交焦虑" 的一部分），
+#   漏渲染一整节也可能照样绿。这里改按 prompt 的构念小节标题做守恒——生产码唯一产点是
+#   `src/questionnaire/llm_engine.py:141` 的 `### {cname} ({name_en})`（实测全文只有它产 `### `，
+#   其余分节都是 `## `）⇒ 少一节、多一节、名字串位三种破法都当场红。
+construct_sections = [ln[4:].split(" (")[0] for ln in prompt.splitlines() if ln.startswith("### ")]
+assert len(construct_sections) == len(CONSTRUCTS), (
+    f"prompt 里的构念小节 {len(construct_sections)} 枚 ≠ CONSTRUCTS {len(CONSTRUCTS)} 条"
+)
+assert set(construct_sections) == set(CONSTRUCTS), (
+    f"prompt 漏渲染 {sorted(set(CONSTRUCTS) - set(construct_sections))}；"
+    f"多渲染 {sorted(set(construct_sections) - set(CONSTRUCTS))}"
+)
 
 # Test 2: User prompt
 user_prompt = _build_user_prompt("测试问题")

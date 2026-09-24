@@ -97,8 +97,16 @@ class TestConstructKB:
         assert len(DOMAIN_KEYWORDS) >= 5
 
     def test_construct_count(self):
-        """确保内置构念数量充足"""
-        assert len(CONSTRUCTS) >= 40
+        """内置构念数不许低于现值 N（s924-03 收紧：原判据的下界是 2026-09-23 前的松哨 40，
+        按现值 51 算等于留着 11 个构念的静默消失空间——见 `docs/insights/psy-census-values-recheck-20260923.md`）。
+        """
+        # N = 51 现取于 2026-09-24（HEAD `86fcf2f`，`src/questionnaire/construct_kb.py` 字节 sha8 `3c660295`）。
+        # 同值的另两处硬钉：`tests/test_construct_kb_census.py:15` 的 TOTAL、
+        # `tests/test_construct_kb_extended_placeholder.py:42` 的 CENSUS_TOTAL；
+        # `tests/test_llm_engine.py` 的 Test 1b 还盯「prompt 构念小节枚数 == CONSTRUCTS 条数」。
+        # ⇒ 涨过 51 须同步：本行下界 ＋ 上述三处常量 ＋ 那两行注记里的 N，一处不改就会红在那儿提醒你。
+        # 本行刻意留**下界**而不是等值：精确增减由 census 那件负责，这里只兜"再也不许掉"。
+        assert len(CONSTRUCTS) >= 51
 
     def test_all_constructs_have_dimensions(self):
         for name, entry in CONSTRUCTS.items():
