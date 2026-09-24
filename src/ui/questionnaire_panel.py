@@ -62,6 +62,15 @@ def pending_clock_anomaly(started_at, now: float) -> bool:
     return (now - started_at) < 0
 
 
+# s924-37：pending 链两处异常警示文案的单一事实源。抽取前两处各写一份逐字复制的字面量
+# （由 test_both_clock_anomaly_warnings_share_one_verbatim_text 钉住"不许漂"），现在两调用点
+# 各引同一常量，漂移在结构上不可能；常量值与抽取前的字面量逐字节相同（207 B）。
+CLOCK_ANOMALY_WARNING_TEXT = (
+    "🕐 时钟异常：任务起始时刻晚于当前时刻（系统时钟回拨或跨机时差），耗时按 0s 显示、"
+    "超时判断本轮不生效。若反复出现，请校准系统时间后重新提交。"
+)
+
+
 def render_questionnaire_page():
     """渲染问卷设计页面的完整流程。"""
     st.title("📋 问卷设计工具")
@@ -217,11 +226,8 @@ def render_questionnaire_page():
             st.markdown(f"### ⭐ 高质量模式生成中（已 {elapsed_txt}）")
             if clock_anomaly:
                 # s922-139：premium 链此前只看 elapsed_txt，时钟回拨时只报「已 0s」不报异常
-                # （elapsed 被钳 0、>90 那档也永不触发）。文案与下方同档先例逐字一致。
-                st.warning(
-                    "🕐 时钟异常：任务起始时刻晚于当前时刻（系统时钟回拨或跨机时差），耗时按 0s 显示、"
-                    "超时判断本轮不生效。若反复出现，请校准系统时间后重新提交。"
-                )
+                # （elapsed 被钳 0、>90 那档也永不触发）。警示文案走 s924-37 的单一事实源常量。
+                st.warning(CLOCK_ANOMALY_WARNING_TEXT)
             st.progress(min(1.0, p_pct), text=p_msg)
             st.caption("流程：①骨架 → ②并行生成各维度题目 → ③元数据 → ④质检 → ⑤弱题重写")
             if elapsed is not None and elapsed > 90:
@@ -229,10 +235,7 @@ def render_questionnaire_page():
         elif elapsed is None:
             st.info("⏳ LLM 正在生成问卷（缺少 started_at，耗时未知）...")
         elif clock_anomaly:
-            st.warning(
-                "🕐 时钟异常：任务起始时刻晚于当前时刻（系统时钟回拨或跨机时差），耗时按 0s 显示、"
-                "超时判断本轮不生效。若反复出现，请校准系统时间后重新提交。"
-            )
+            st.warning(CLOCK_ANOMALY_WARNING_TEXT)
         elif elapsed < 30:
             st.info(f"⏳ LLM 正在生成问卷（已 {elapsed}s，通常 30-90s 完成）...")
         elif elapsed < 90:

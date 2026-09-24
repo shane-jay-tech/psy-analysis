@@ -21,6 +21,10 @@
    新增/删除页面时按各自覆盖面复核。
 3. 同文件的 `MODE_DESCRIPTIONS`（现读与 `PAGE_MODES` **同序同集**，本件第 6 用例钉住）——
    漏了它，侧栏 `format_func` 会拿到缺键。
+4. s924-38 起回退槽页名提成同文件的 `DEFAULT_PAGE_MODE` 常量（单一事实源）：`PAGE_MODES` 那一格、
+   `MODE_DESCRIPTIONS` 那个键与 `get_mode_index` 的回退分支**都引它，不再各写一份字面量**。
+   换回退页只改这一处；把任何一处退回内联复制会被最后一用例（`…falls_back_to_the_named_default_page_constant`）
+   当场读成"复制了 N 份"。
 
 ## 快照取法（先命令后数字，任务书点名口径）
 
@@ -135,3 +139,35 @@ def test_unknown_mode_still_falls_back_to_data_analysis_slot():
     """未知页回退到「📈 数据分析」——回退目标本身也是顺序的一部分（index 4）。"""
     assert get_mode_index("不存在的页面") == SNAPSHOT_PAGE_MODES.index("📈 数据分析") == 4
     assert PAGE_MODES[get_mode_index("不存在的页面")] == "📈 数据分析"
+
+
+# ─────────────────── 4. 回退槽单一事实源（s924-38 常量化＋删页防御）───────────────────
+def test_unknown_mode_falls_back_to_the_named_default_page_constant():
+    """「mode 不在 PAGE_MODES 时安全回退默认页」这条路径的端到端钉＋回退目标的单一事实源。
+
+    s922-141 登记的病案：回退槽当时硬编码页名字面量，删页或改名会让 `get_mode_index` **自己抛
+    ValueError**（而不是回退）——"安全回退"这句承诺根本没被兜住。提成 `DEFAULT_PAGE_MODE` 后，
+    本例把四件事一起钉住，缺一即红：
+
+    ① 常量存在、且它就是回退目标（**在函数体内 import**：常量被删时只有本例红，不牵连整件收集）；
+    ② 删页防御的可执行版——`DEFAULT_PAGE_MODE in PAGE_MODES`。真删了默认页，本例先红，而不是等到
+       运行时抛 ValueError（回退分支刻意不做二次兜底，见 `get_mode_index` docstring）；
+    ③ 未知 mode（含空串／None 两类边缘输入）→ 返回值 == 常量所在格，**不抛异常**；
+    ④ 单一事实源——该页名字面量（带引号的整串）在 `src/ui/navigation.py` 原文里只出现 1 次
+       ＝常量定义处；半途退回内联复制（PAGE_MODES／MODE_DESCRIPTIONS／回退分支各写一份）当场红。
+    """
+    from src.ui.navigation import DEFAULT_PAGE_MODE
+
+    nav_text = (
+        pathlib.Path(__file__).resolve().parents[1] / "src" / "ui" / "navigation.py"
+    ).read_text(encoding="utf-8")
+    copies = nav_text.count(f'"{DEFAULT_PAGE_MODE}"')
+
+    assert copies == 1, f"回退槽页名在事实源里被复制了 {copies} 份（期望只在常量定义处 1 份）；{SYNC_HINT}"
+    assert DEFAULT_PAGE_MODE in PAGE_MODES, SYNC_HINT
+    assert list(MODE_DESCRIPTIONS)[PAGE_MODES.index(DEFAULT_PAGE_MODE)] == DEFAULT_PAGE_MODE
+
+    fallback_slot = SNAPSHOT_PAGE_MODES.index(DEFAULT_PAGE_MODE)
+    for unknown in ("不存在的页面", "", None):
+        assert get_mode_index(unknown) == PAGE_MODES.index(DEFAULT_PAGE_MODE) == fallback_slot
+    assert PAGE_MODES[get_mode_index("不存在的页面")] == DEFAULT_PAGE_MODE

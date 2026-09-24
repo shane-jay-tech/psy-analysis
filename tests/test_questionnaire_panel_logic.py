@@ -87,12 +87,14 @@ def test_pending_elapsed_page_puts_the_clock_anomaly_branch_before_the_under_30_
         return hits[0]
 
     assert first("elapsed_txt =") > first("clock_anomaly =") > first("_now = _t.time()")
-    # s922-139 起「🕐 时钟异常」字面量出现在**两处**（premium 分支内一处 ＋ 兜底链一处），
+    # s922-139 起警示出现在**两处**（premium 分支内一处 ＋ 兜底链一处）；s924-37 常量化后两处
+    # 都只写常量名，字面量整体搬进模块常量 ⇒ 次序钉改钉调用点原文。
     # 次序钉的是兜底链那一处 ⇒ 从自己的分支头往后找，顺带把「警示紧跟分支头」也钉住。
     anomaly_head = first("elif clock_anomaly:")
     chain = ["elif elapsed is None:", "elif clock_anomaly:", "elif elapsed < 30:"]
     assert [first(c) for c in chain] == sorted([first(c) for c in chain])
-    assert anomaly_head < first('"🕐 时钟异常', after=anomaly_head) < first("elif elapsed < 30:")
+    assert anomaly_head < first("st.warning(CLOCK_ANOMALY_WARNING_TEXT)", after=anomaly_head) \
+        < first("elif elapsed < 30:")
     assert first("elif clock_anomaly:") < first("elif elapsed < 30:")
     assert src.count("_now = _t.time()") == 1                       # 单一时钟读数，两判据同源
     assert "compute_pending_elapsed(started_at, _t.time())" not in src   # 旧的一次性读数写法已消失
@@ -354,29 +356,43 @@ def test_clock_anomaly_guard_in_the_pending_chain_is_exactly_two_sites():
 
 
 def test_both_clock_anomaly_warnings_share_one_verbatim_text():
-    """「文案照既有分支」＝两处 st.warning 的**字面量值**逐字符同一（比源码段更严也更能容缩进：
-    premium 那处多一层缩进，比源码段会因空白误红）。"""
-    def literal(node):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            return node.value
-        if isinstance(node, ast.JoinedStr):
-            return "".join(v.value for v in node.values
-                           if isinstance(v, ast.Constant) and isinstance(v.value, str))
-        return None
+    """「文案照既有分支」＝两处警示的文案逐字符同一。
 
-    body = _render_body(_module_source())
-    texts = []
+    s924-37 常量化前：比的是两处**内联字面量的值**（比源码段更严也更能容缩进——premium 那处
+    多一层缩进，比源码段会因空白误红）。抽取后两调用点各引同一个模块常量，"不许漂"从
+    「测得出来」升级为「结构上不可能」⇒ 本例改钉三件，覆盖面不缩：
+    ①render 体内恰好两处引该常量的 `st.warning`（少一处＝s922-139 那个 premium 缺警示的病复发）；
+    ②render 体内不许再内联复制该文案（常量化被半途退回／有人新增第三份拷贝都会红）；
+    ③常量是模块级唯一赋值，值仍含原三条关键子串（文案语义不许被顺手改掉）。
+    """
+    source = _module_source()
+    body = _render_body(source)
+    CONST = "CLOCK_ANOMALY_WARNING_TEXT"
+
+    sites, leftovers = 0, 0
     for n in ast.walk(ast.parse(body)):
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) \
                 and n.func.attr == "warning" and n.args:
-            s = literal(n.args[0])
-            if s and "时钟异常" in s:
-                texts.append(s)
+            arg = n.args[0]
+            if isinstance(arg, ast.Name) and arg.id == CONST:
+                sites += 1
+                continue
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and "时钟异常" in arg.value:
+                leftovers += 1
+            if isinstance(arg, ast.JoinedStr) and "时钟异常" in "".join(
+                    v.value for v in arg.values if isinstance(v, ast.Constant) and isinstance(v.value, str)):
+                leftovers += 1
 
-    assert len(texts) == 2, f"期望两处时钟异常警示，实得 {len(texts)}"
-    assert len(set(texts)) == 1, "两处文案已漂移"
-    assert "耗时按 0s 显示" in texts[0] and "超时判断本轮不生效" in texts[0]
-    assert "校准系统时间" in texts[0]
+    assert sites == 2, f"期望两处引 {CONST} 的警示，实得 {sites}"
+    assert leftovers == 0, "页面体内仍有内联副本 ⇒ 去重未完成"
+
+    defs = [n for n in ast.parse(source).body
+            if isinstance(n, ast.Assign) and len(n.targets) == 1
+            and isinstance(n.targets[0], ast.Name) and n.targets[0].id == CONST]
+    assert len(defs) == 1, f"{CONST} 必须是模块级唯一赋值，实得 {len(defs)} 处"
+    text = ast.literal_eval(defs[0].value)
+    assert "耗时按 0s 显示" in text and "超时判断本轮不生效" in text
+    assert "校准系统时间" in text
 
 
 

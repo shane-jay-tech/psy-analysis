@@ -5,7 +5,7 @@
 **不做设计稿第 4 节的结构性抽取**（那是日间拍板的事）。
 
 锚点复核（相对设计稿有一处漂移，按磁盘实况钉）：
-- 设计稿 `st.rerun()` 记 **9 处**，磁盘实况 **8 处**（见 test_rerun_*）；`st.stop()` 仍 3 处（s920-10 时为 :43/:47/:517；s921-06/07 抽取后 :67/:71/:544；s922-02 加 anomaly 判据后 :80/:84/:564；s922-138 反向刷齐后 :81/:85/:576；s922-139 premium 补 anomaly 警示后 :81/:85/:583）。
+- 设计稿 `st.rerun()` 记 **9 处**，磁盘实况 **8 处**（见 test_rerun_*）；`st.stop()` 仍 3 处（s920-10 时为 :43/:47/:517；s921-06/07 抽取后 :67/:71/:544；s922-02 加 anomaly 判据后 :80/:84/:564；s922-138 反向刷齐后 :81/:85/:576；s922-139 premium 补 anomaly 警示后 :81/:85/:583；s924-37 警示文案提模块常量后 :90/:94/:586）。
 - 本页确实零测试：`tests/test_app_routes_v6_panels.py:62` 那个同名用例 import 的是
   `src.ui.questionnaire_import_panel`（别的模块），不是本页。
 
@@ -167,8 +167,9 @@ def test_page_is_still_one_monster_function():
     fn = funcs[-1]
     # s921-07 后 51/767；s922-02 加 pending_clock_anomaly 后 64/774；
     # s922-138 反向刷齐（顶部 import html 占 1 行＋三处渲染/下载面按 app.py 加长）后 65/807；
-    # s922-139 premium 分支补 anomaly 警示（+7 行）后 65/814
-    assert fn.lineno == 65 and (fn.end_lineno - fn.lineno + 1) == 814
+    # s922-139 premium 分支补 anomaly 警示（+7 行）后 65/814；
+    # s924-37 警示文案提模块常量（页面外 +9，页面内两处 4 行各收成 1 行 ⇒ −6）后 74/808
+    assert fn.lineno == 74 and (fn.end_lineno - fn.lineno + 1) == 808
 
 
 def test_reentry_is_all_via_rerun_with_zero_callbacks():
@@ -192,7 +193,7 @@ def test_reentry_is_all_via_rerun_with_zero_callbacks():
 def test_stop_sites_are_the_two_branch_heads_plus_one_deep_in_report():
     lines = [(i, ln.strip()) for i, ln in enumerate(BODY.splitlines(), 1) if "st.stop()" in ln]
 
-    assert [i for i, _ in lines] == [81, 85, 583]         # s921-06 后 58/62/532；s921-07 后 67/71/544；s922-02 加 anomaly 后 80/84/564；s922-138 刷齐后 81/85/576；s922-139 premium 警示（+7 行，在第 3 个 stop 之前）后 81/85/583
+    assert [i for i, _ in lines] == [90, 94, 586]         # s921-06 后 58/62/532；s921-07 后 67/71/544；s922-02 加 anomaly 后 80/84/564；s922-138 刷齐后 81/85/576；s922-139 premium 警示（+7 行，在第 3 个 stop 之前）后 81/85/583；s924-37 文案常量化（页面外 +9、第 3 个 stop 之前 −6）后 90/94/586
     assert lines[0][1].startswith("st.stop()") and lines[1][1].startswith("st.stop()")
 
 
@@ -200,7 +201,7 @@ def test_session_state_touches_are_20_and_three_keys_dominate():
     """20 处 `st.session_state.` 引用（设计稿口径），其中 language/questionnaire_design/_q_design_pending 是主写键。"""
     n = sum(1 for _ in BODY.splitlines() if "st.session_state" in _)
 
-    assert len(BODY.splitlines()) == 878                 # s921-06 后 805；s921-07 后 817；s922-02 加 anomaly 与负秒钉后 837；s922-138 反向刷齐后 871；s922-139 premium 分支补 anomaly 警示后 878
+    assert len(BODY.splitlines()) == 881                 # s921-06 后 805；s921-07 后 817；s922-02 加 anomaly 与负秒钉后 837；s922-138 反向刷齐后 871；s922-139 premium 分支补 anomaly 警示后 878；s924-37 常量化（模块常量 +9、两调用点各 4 行收成 1 行 −6）后 881
     assert BODY.count("st.session_state.") >= 20
     for key in ("language", "questionnaire_design", "_q_design_pending", "_q_premium_mode"):
         assert key in BODY
@@ -208,11 +209,14 @@ def test_session_state_touches_are_20_and_three_keys_dominate():
 
 def test_branch_head_prefixes_live_on_the_expected_lines():
     """s921-06 抽取后翻正：页面判据行变成对纯函数的调用（钉调用原文+行位），
-    emoji 前缀串比较原文整体搬进 classify 体内（钉函数体原文）——两处判据仍逐字在钉。"""
+    emoji 前缀串比较原文整体搬进 classify 体内（钉函数体原文）——两处判据仍逐字在钉。
+
+    s924-37：模块常量插在 classify 之后、页面函数之前 ⇒ 下面前三条整体上移 9 行，
+    后两条（classify 体内）不动。"""
     lines = BODY.splitlines()
 
-    assert "    _q_sub_class = classify_questionnaire_sub_mode(_q_sub_mode)" == lines[76]
-    assert 'if _q_sub_class == "upload_items":' == lines[77].strip()
-    assert 'elif _q_sub_class == "import_clean":' == lines[81].strip()
+    assert "    _q_sub_class = classify_questionnaire_sub_mode(_q_sub_mode)" == lines[85]
+    assert 'if _q_sub_class == "upload_items":' == lines[86].strip()
+    assert 'elif _q_sub_class == "import_clean":' == lines[90].strip()
     assert 'if choice.startswith("📤"):' == lines[35].strip()
     assert 'elif choice.startswith("📊"):' == lines[37].strip()
