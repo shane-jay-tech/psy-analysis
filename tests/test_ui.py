@@ -487,7 +487,11 @@ class TestPerformanceBenchmarks:
         elapsed = time.perf_counter() - t0
 
         assert elapsed < 1.0, f"元分析耗时 {elapsed:.2f}s 超过 1s 阈值"
-        assert result.pooled_effect is not None
+        # s923-47：弱断言（is not None）升级为数值断言，金档单一来源见
+        # tests/test_meta_analysis_golden.py（值取自现码实测，性能阈值原样不动）
+        from tests.test_meta_analysis_golden import GOLDEN, TOL
+        assert result.pooled_effect == pytest.approx(
+            GOLDEN["B_random"]["pooled_effect"], abs=TOL)
         assert result.k == 50
 
 
