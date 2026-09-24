@@ -141,7 +141,7 @@
 
 - **默认推荐方法（完整支持）**：Pearson/Spearman 相关、独立/配对 t 检验、单因素/双因素方差分析、重复测量方差分析、非参数检验（Mann-Whitney/Wilcoxon/Kruskal-Wallis）、卡方检验、多元/层次回归、Cronbach's α / McDonald's ω、描述统计。
 - **高级方法（大部分有 APA 表格）**：中介分析（路径系数表+Bootstrap CI）、调节分析（回归系数+简单斜率表）、Logistic 回归（B/SE/Wald/OR/CI 表）、EFA/CFA/SEM（因子载荷/模型拟合表）、HLM/混合效应（固定+随机效应表）、AVE/CR/区分效度（无自动表格，结果卡片可用）。
-- **实验性方法（基础支持）**：未注册结果卡片的方法输出为原始格式，需用户自行整理。实验性标记以 runner 结果卡片注册现状为准（2026-09-09 注：假设检验路由已扩至 14 法，精确清单以 src/analysis/ 代码为准）。
+- **实验性方法（基础支持）**：未注册结果卡片的方法输出为原始格式，需用户自行整理。实验性标记以 runner 结果卡片注册现状为准（2026-09-09 注：假设检验路由已扩至 15 法；2026-09-24 s923-55 复测订正——按 `src/analysis/assumption_router.py` 注册表 `_METHOD_ASSUMPTIONS` 现值实测为 15 键，该注原记「14」系落笔当日即已存在的登记笔误（写下该注的 blob `aee4139` 里已是 15 键），精确清单以 src/analysis/ 代码为准，现值钉桩见 `tests/test_assumption_route_count_pin.py`）。
 
 ## 安全与隐私边界
 
