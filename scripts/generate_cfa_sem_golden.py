@@ -9,7 +9,6 @@ Fixed seed for reproducibility.
 
 import numpy as np
 import pandas as pd
-import os
 from pathlib import Path
 
 np.random.seed(42)

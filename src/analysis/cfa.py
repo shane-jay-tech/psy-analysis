@@ -278,6 +278,17 @@ def confirmatory_factor_analysis(
             pass
 
     except Exception as e:
+        # 案 B（s923-08 设计稿 §5，零数值变化）：拟合链抛异常时把"降级"明说出来。
+        # 只置哨兵位与说明文本，不改任何拟合指标/载荷/效度数值——下游 renderers.py
+        # 与 interpretation.py 早已消费 is_fallback，此前因这里没置位而始终显示成
+        # "看着像结果"的全 0 对象。
+        result.is_fallback = True
+        result.fallback_note = (
+            f"⚠ 非严格CFA，拟合指标不可用于判断模型优度：semopy 拟合链抛出 "
+            f"{type(e).__name__}: {e}，下方 chi2/CFI/TLI/RMSEA/SRMR/AIC/BIC "
+            "均为未拟合的占位 0。收敛效度（AVE/CR）与区分效度（HTMT/Fornell-Larcker）"
+            "由独立的探索性支路算出，不依赖本次拟合，仅供参照。"
+        )
         result.warnings.append(f"⚠ semopy模型拟合失败：{e}")
         result.fit_summary_zh = f"模型拟合出错：{e}。请检查数据质量和因子-题目映射。"
 

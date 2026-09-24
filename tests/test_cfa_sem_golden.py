@@ -7,8 +7,10 @@
     带宽失守时把「失守」本身钉成断言（见 ``test_cfa_golden_bands_currently_unmet``），
     而不是去改 json、不是把断言写松。
   * 不改判据、不改数值、不修实现：CFA 在当前环境下 semopy 拟合必失败（``obj=estimator``
-    把字符串 'ML' 传给 semopy 的目标函数位），本文件只把这处降级透出钉住并给出口，不碰
-    ``src/analysis/cfa.py``。
+    把字符串 'ML' 传给 semopy 的目标函数位），本文件只把这处降级透出钉住并给出口。
+    （口径更新 by s924-12 案 B：``src/analysis/cfa.py`` 的 except 分支现已置 ``is_fallback``
+    ＋``fallback_note`` 两槽把降级明说出来，数值面逐位不变；本文件对"不调阈值、不发明数字"
+    的约束不变，改的只是"这里绝不碰实现"那句已作废的前提。）
   * 夹具 CSV 只读：生成器在沙箱里 exec，``to_csv`` 被替换成内存捕获，绝不让它写盘。
 """
 import contextlib
@@ -218,12 +220,37 @@ class TestCfaGoldenOnFourFactorFixture:
         assert cfa_result.fit_summary_zh.startswith("模型拟合出错")
 
     def test_failure_is_surfaced_as_exactly_one_semopy_warning(self, cfa_result):
+        """案 B 落地后的新语义（s923-08 设计稿 §5 第 2 步）：降级必须被明说。
+
+        ``warnings`` 仍恰好 1 条 —— 案 B 不追加告警，免得同一次失败被说两遍；
+        新增的是 ``is_fallback`` 哨兵与 ``fallback_note``：下游 renderers / interpretation
+        早已按 ``is_fallback`` 分支渲染，此前 except 里没置位，用户拿到的仍是
+        「看着像结果」的全 0 对象。
+
+        两态覆盖口径：True 态由本例的 ``cfa_result`` 钉；False 态**不能**用「拟合成功」
+        来钉（当前环境 semopy 拟合必失败，成功要等案 A），改用「未进入 semopy 拟合链
+        的提前返回」钉 —— 那才是现实里唯一合法的 False。
+        """
         assert len(cfa_result.warnings) == 1
         assert cfa_result.warnings[0].startswith("⚠ semopy模型拟合失败")
         assert "unknown objective function" in cfa_result.warnings[0]
-        # 走的是 semopy 分支而不是 factor_analyzer 降级分支
-        assert cfa_result.is_fallback is False
-        assert cfa_result.fallback_note == ""
+        # 走的是 semopy 分支，但拟合链抛了异常 ⇒ 必须显式承认降级
+        assert cfa_result.is_fallback is True
+        assert cfa_result.fallback_note.startswith("⚠ 非严格CFA")
+        assert "unknown objective function" in cfa_result.fallback_note
+        assert "占位" in cfa_result.fallback_note
+
+        # False 态：题目不足 3 个时函数在拟合链之前就返回，哨兵必须保持「未降级」，
+        # 否则会把「根本没做 CFA」也说成「CFA 失败」。
+        from src.analysis.cfa import confirmatory_factor_analysis
+
+        too_few = confirmatory_factor_analysis(
+            pd.DataFrame({"a": [1, 2, 3], "b": [2, 3, 4]}), {"F1": ["a", "b"]}
+        )
+        assert too_few.is_fallback is False
+        assert too_few.fallback_note == ""
+        assert too_few.warnings[-1].startswith("❌ 可用题目不足3个")
+        assert too_few.loadings is None
 
     def test_golden_bands_currently_unmet(self, cfa_result):
         """在册金标准带宽（R lavaan 0.6-18）现值一条都不满足 —— 把「未达标」钉死。
