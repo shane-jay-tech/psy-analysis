@@ -167,3 +167,80 @@ def test_docx_apa7_margins_and_table_style_pinned():
     assert ds.TABLE_BORDER_COLOR == "000000"
     assert ds.TABLE_BORDER_SIZE == 4
     assert (ds.FIG_PREFIX, ds.TABLE_PREFIX) == ("图", "表")
+
+
+# ── 正文段后距的产物面看守（s924-25）────────────────────────────────────────
+# 今天实测到的"常量说 0 / 产物给 10"这道缝，钉在这里而不是钉成 `w:after == 常量`。
+DOCX_BODY_AFTER_GAP_PT = 10.0  # = docDefaults 的 after=200 twips ÷ 20 － SPACE_AFTER_BODY_PT 现值
+
+_SYNTH_BODY = "合成正文段落（人造文案，不含任何研究或统计结论）"
+_SYNTH_HEADING = "合成一级标题"
+
+
+def _export_body_sample():
+    """跑一次真实导出，返回 (正文段的 w:spacing 元素, 一级标题段的 w:spacing 元素, styles.xml)。
+
+    走 `docx_exporter.build_review_docx`（纯代码生成，无模板）——它是 `docx_styles`
+    唯一的实际接线方，正文段落的产路是 `_add_paragraph_with_inline_format`。
+    """
+    payload = docx_exporter.build_review_docx(
+        title="合成综述",
+        markdown_body=f"# {_SYNTH_HEADING}\n\n{_SYNTH_BODY}",
+    )
+    doc = Document(io.BytesIO(payload))
+    spacing_of = {}
+    for p in doc.paragraphs:
+        ppr = p._p.find(qn("w:pPr"))
+        sp = None if ppr is None else ppr.find(qn("w:spacing"))
+        spacing_of[p.text.strip()] = sp
+    with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+        styles_xml = zf.read("word/styles.xml").decode("utf-8")
+    return spacing_of[_SYNTH_BODY], spacing_of[_SYNTH_HEADING], styles_xml
+
+
+def _docdefaults_after_twips(styles_xml: str) -> int:
+    """从产物包里读 docDefaults 的实际段后距（twips）——期望值不写死、跟模板走。"""
+    m = re.search(r"<w:docDefaults>.*?<w:spacing[^>]*w:after=\"(\d+)\"", styles_xml, re.S)
+    assert m, "产物 styles.xml 里找不到 docDefaults 的 w:after，本例前提失效"
+    return int(m.group(1))
+
+
+def test_docx_body_paragraph_after_spacing_gap_pinned():
+    """正文段后距**现状快照**（非规范）：谁改 `SPACE_AFTER_BODY_PT` 必须连本断言一起评审。
+
+    s923-18 的裁决材料指出、本班在本机 `.venv`（python-docx 1.2.0）复证：
+    正文段落这一路**没有** `w:pPr/w:spacing/@w:after` —— 导出器只在标题分支
+    （`level > 0`）写 `pf.space_after`，正文分支从头到尾没碰过段后距。于是正文实际
+    生效值由 `word/styles.xml` 的 `docDefaults after=200`（twips）继承来，是 **10pt**，
+    不是 `docx_styles.py` 里那个 `0`。全仓该常量的消费方为 **0 处**（`rg` 双轨见 result）。
+
+    ⇒ 本例不写 `w:after == SPACE_AFTER_BODY_PT`（那是**恒假**的，写上去当场红），
+    而是把"产物实际值与常量现值之间这道 10pt 的缝"钉成期望式：期望值从
+    `ds.SPACE_AFTER_BODY_PT` **动态取** ⇒ 常量一改，缝宽就变，本例立刻转红，逼一次评审。
+    现状快照非规范：本例不主张 10pt 是对的、也不主张 0 是对的。
+    """
+    body_sp, heading_sp, styles_xml = _export_body_sample()
+
+    # 先证明"探针不是恒真"：同一份产物里，接了线的标题段确实带 w:after，
+    # 正文段的不带 —— 二者对比才说明正文的 None 是"没接线"而不是"读不到属性"。
+    assert heading_sp is not None, "一级标题段没有 w:spacing，导出器版式分支与本例前提不符"
+    assert heading_sp.get(qn("w:after")) == str(int(ds.SPACE_AFTER_HEADING_PT * 20)), (
+        f"标题段后距读数异常：期望 {ds.SPACE_AFTER_HEADING_PT}pt（{ds.SPACE_AFTER_HEADING_PT * 20:.0f} twips），"
+        f"实得 w:after={heading_sp.get(qn('w:after'))!r}"
+    )
+
+    assert body_sp is not None, "正文段落连 w:pPr/w:spacing 都没有，产物版式与本例前提不符"
+    assert body_sp.get(qn("w:after")) is None, (
+        f"正文段落开始出现显式 w:after={body_sp.get(qn('w:after'))!r} —— "
+        f"说明 SPACE_AFTER_BODY_PT 已被接线，本例的'脱钩'快照需连同改值单一起重评"
+    )
+    assert body_sp.get(qn("w:line")) is not None, (
+        "正文段的 w:line 也消失了 —— 读的不是同一个 spacing 元素，本例失去意义"
+    )
+
+    inherited_pt = _docdefaults_after_twips(styles_xml) / 20.0
+    assert inherited_pt - ds.SPACE_AFTER_BODY_PT == DOCX_BODY_AFTER_GAP_PT, (
+        f"正文段后距脱钩缝宽变了：产物继承 {inherited_pt}pt、常量现值 {ds.SPACE_AFTER_BODY_PT}pt、"
+        f"缝宽期望 {DOCX_BODY_AFTER_GAP_PT}pt —— 改常量（或改版式）须连本断言一起评审"
+    )
+
