@@ -261,3 +261,101 @@ def test_clear_logs_is_quiet_when_the_dir_is_unavailable(monkeypatch):
     monkeypatch.setattr(ul, "_ensure_log_dir", lambda: (_ for _ in ()).throw(OSError("建不出来")))
 
     ul.clear_logs()                                # 不抛就是全部要求
+
+
+# ===========================================================================
+# s924-66：三处静默吞错接观测（写侧 / 读侧 / 清除侧）
+# ===========================================================================
+# 触发面探针（本机实测，原文见 outbox/s924-66.result.md「证据」）：
+#   ① `chmod 555` **目录** 后 append 写 → **写入成功**（Windows 语义下只读属性不拦创建），
+#      所以卷宗建议的"tmp 只读目录"在本机**造不出 OSError**；
+#   ② `chmod 444` **文件** 后 append 写 → `PermissionError`（真机触发，不是打桩）⇒ 本件按 ② 走。
+#   读侧用坏 JSONL 真触发，无需打桩。
+
+def test_write_failure_warns_once_with_path_and_never_the_payload(monkeypatch, caplog, tmp_path):
+    """写侧 OSError 不再静默：报**一条**带路径的 warning，且待写内容一个字都不许进日志。"""
+    import logging
+    import os
+    from datetime import date
+
+    secret = "SELF-SECRET-绝不该进日志-4d17"
+    monkeypatch.setattr(ul, "_LOG_DIR", tmp_path)
+    monkeypatch.setattr(ul, "_ALERTED", set())
+    log_file = tmp_path / f"usage_events_{date.today().strftime('%Y%m%d')}.jsonl"
+    log_file.write_text("", encoding="utf-8")
+    os.chmod(log_file, 0o444)                      # 只读文件 ⇒ open(..., "a") 真抛 PermissionError
+    try:
+        with caplog.at_level(logging.WARNING, logger=""):
+            for _ in range(5):
+                ul.log_event("page_visit", page_id=secret)   # 对外语义不变：照旧不抛
+    finally:
+        os.chmod(log_file, 0o644)                  # 还原，别让 tmp 留只读件
+
+    alerts = [r.getMessage() for r in caplog.records if "[usage-log-alert]" in r.getMessage()]
+    assert len(alerts) == 1, "要吱声（0 条＝静默回归），但按 kind 去重（5 次埋点刷 5 条会淹掉控制台）"
+    msg = alerts[0]
+    assert "write_failed" in msg and log_file.name in msg, f"警告里要有可定位的文件名：{msg}"
+    assert "PermissionError" in msg, f"要带异常类型：{msg}"
+    assert secret not in msg and "page_visit" not in msg, f"红线：事件正文不得进日志：{msg}"
+
+
+@pytest.mark.parametrize(
+    "reader, prefix, field, total_key",
+    [("get_usage_summary", "usage_events", "event", "total_events"),
+     ("get_error_summary", "error_events", "error", "total_errors")],
+)
+def test_read_side_aggregates_one_warning_per_degraded_file(monkeypatch, caplog, tmp_path,
+                                                           reader, prefix, field, total_key):
+    """读侧坏行：**按文件汇总一条** warning，报出"读到几行／已计几条"——坏行数量从不可知变可知。
+
+    顺带钉住现状行为零变：一条坏行会让该文件**余下的行不再计入**（本单是纯加观测，
+    没改成逐行容错——那会改返回值，属另一单）。warning 里的 3/2 就是这次"吞掉 1 条"的痕。
+    """
+    import logging
+    from datetime import date
+
+    d = tmp_path / "logs"
+    d.mkdir()
+    monkeypatch.setattr(ul, "_LOG_DIR", d)
+    day = date.today().strftime("%Y%m%d")
+    lines = [json.dumps({field: "ok1"}),
+             json.dumps({field: "ok2"}),
+             "{这一行不是JSON",
+             json.dumps({field: "ok3"})]
+    (d / f"{prefix}_{day}.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING, logger=""):
+        out = getattr(ul, reader)(days=7)
+
+    assert out[total_key] == 2                     # 对外返回值不变：坏行后那条没被计（钉现状）
+    assert out["period_days"] == 7
+    alerts = [r.getMessage() for r in caplog.records if "read_degraded" in r.getMessage()]
+    assert len(alerts) == 1, "按文件汇总，不是逐行刷屏"
+    assert "读到=3行" in alerts[0] and "已计=2条" in alerts[0], f"计数没报出来：{alerts[0]}"
+    assert "JSONDecodeError" in alerts[0]
+    assert "ok3" not in alerts[0] and "这一行不是JSON" not in alerts[0], \
+        f"红线：不回贴任何行内容：{alerts[0]}"
+
+
+def test_clear_logs_reports_undeletable_files(monkeypatch, caplog, tmp_path):
+    """`clear_logs` 的删除失败同样是裸 pass（实测第 5 个静默点，卷宗未列）：清不掉要留痕。"""
+    import logging
+    import os
+    from datetime import date
+
+    d = tmp_path / "logs"
+    d.mkdir()
+    monkeypatch.setattr(ul, "_LOG_DIR", d)
+    monkeypatch.setattr(ul, "_ALERTED", set())
+    day = date.today().strftime("%Y%m%d")
+    victim = d / f"usage_events_{day}.jsonl"
+    victim.write_text('{"event": "x"}\n', encoding="utf-8")
+    os.chmod(victim, 0o444)                        # 只读 ⇒ unlink 真抛（Windows 上成立）
+    try:
+        with caplog.at_level(logging.WARNING, logger=""):
+            ul.clear_logs()                        # 照旧不抛
+    finally:
+        os.chmod(victim, 0o644)
+    alerts = [r.getMessage() for r in caplog.records if "clear_failed" in r.getMessage()]
+    assert len(alerts) == 1 and victim.name in alerts[0]
+    assert "OSError" in alerts[0] or "PermissionError" in alerts[0]

@@ -20,6 +20,20 @@ from typing import Optional, Any
 
 from src.utils.app_paths import LOG_DIR
 
+logger = logging.getLogger(__name__)
+
+# 静默吞错的观测接线（s924-66）。**铁律：这些日志行里只允许出现路径、计数、
+# 异常类型与一行摘要**——绝不含待写内容、prompt/响应片段或任何用户文本
+# （本模块记的是用量事件，正文里可能有页面名/量表名，顺手带进日志就是泄露）。
+_ALERT_PREFIX = "[usage-log-alert]"      # 与 `_alert_once` 同一命名空间，运维侧一条 grep 收齐
+_EXC_SUMMARY_MAX = 160
+
+
+def _exc_summary(exc: BaseException) -> str:
+    """把异常压成「类型: 单行摘要」并截断——折叠换行，绝不让整段待写内容进日志。"""
+    return f"{type(exc).__name__}: {' '.join(str(exc).split())[:_EXC_SUMMARY_MAX]}"
+
+
 # 显式覆盖点（测试/嵌入部署用）；为 None 时**调用期**解析，不再吃 import 期的旧绑定。
 _LOG_DIR: Optional[Path] = None
 _ENABLED = True
@@ -44,6 +58,18 @@ def _alert_once(kind: str, message: str) -> None:
         return
     _ALERTED.add(kind)
     logging.warning("[usage-log-alert] %s %s", kind, message)
+
+
+def _warn_once(kind: str, message: str) -> None:
+    """`_alert_once` 的同纪律版本，但走**模块 logger**（`logger.warning`）。
+
+    写侧失败会被每个埋点撞上，所以同样按 kind 去重；kind 里带文件名，日志按天轮转 ⇒ 新的一天
+    会重新吱一声，不会永久哑掉。
+    """
+    if kind in _ALERTED:
+        return
+    _ALERTED.add(kind)
+    logger.warning("%s %s %s", _ALERT_PREFIX, kind, message)
 
 
 def _ensure_log_dir():
@@ -92,8 +118,10 @@ def log_event(event_type: str, **kwargs):
         _ensure_log_dir()
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
+    except OSError as exc:
+        # 原先是裸 pass：写侧失败完全无痕，线上用量丢了没人知道（签名与返回值不变，纯加观测）。
+        _warn_once(f"write_failed:{log_file.name}",
+                   f"写入用量日志失败 file={log_file} {_exc_summary(exc)}")
 
 
 def log_error(error_type: str, **kwargs):
@@ -116,8 +144,10 @@ def log_error(error_type: str, **kwargs):
         _ensure_log_dir()
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
+    except OSError as exc:
+        # 同上：`log_error` 的写侧原先也是裸 pass（卷宗把这处误记成"读侧同型"，实测它是写侧）。
+        _warn_once(f"write_failed:{log_file.name}",
+                   f"写入错误日志失败 file={log_file} {_exc_summary(exc)}")
 
 
 def get_usage_summary(days: int = 7) -> dict:
@@ -132,15 +162,21 @@ def get_usage_summary(days: int = 7) -> dict:
         files = []
 
     for log_file in files:
+        seen_lines = counted = 0
         try:
             for line in log_file.read_text(encoding="utf-8").splitlines():
+                seen_lines += 1
                 if line.strip():
                     entry = json.loads(line)
                     evt = entry.get("event", "unknown")
                     events_by_type[evt] = events_by_type.get(evt, 0) + 1
                     total_events += 1
-        except (OSError, json.JSONDecodeError):
-            pass
+                    counted += 1
+        except (OSError, json.JSONDecodeError) as exc:
+            # 读侧按**文件**汇总一条 warning（不逐行刷屏）：坏行数量原本完全不可知。
+            # 只报路径＋计数＋异常摘要，绝不回贴行内容——行里是事件字段，带进日志就是泄露。
+            logger.warning("%s read_degraded file=%s 读到=%d行 已计=%d条 %s",
+                           _ALERT_PREFIX, log_file, seen_lines, counted, _exc_summary(exc))
 
     return {
         "period_days": days,
@@ -161,15 +197,20 @@ def get_error_summary(days: int = 7) -> dict:
         files = []
 
     for log_file in files:
+        seen_lines = counted = 0
         try:
             for line in log_file.read_text(encoding="utf-8").splitlines():
+                seen_lines += 1
                 if line.strip():
                     entry = json.loads(line)
                     err = entry.get("error", "unknown")
                     errors_by_type[err] = errors_by_type.get(err, 0) + 1
                     total_errors += 1
-        except (OSError, json.JSONDecodeError):
-            pass
+                    counted += 1
+        except (OSError, json.JSONDecodeError) as exc:
+            # 与 `get_usage_summary` 同型（卷宗未列这处，实测它是第 4 个静默吞错点）。
+            logger.warning("%s read_degraded file=%s 读到=%d行 已计=%d条 %s",
+                           _ALERT_PREFIX, log_file, seen_lines, counted, _exc_summary(exc))
 
     return {
         "period_days": days,
@@ -237,5 +278,6 @@ def clear_logs():
     for f in files:
         try:
             f.unlink()
-        except OSError:
-            pass
+        except OSError as exc:
+            # 删不掉的日志文件要留痕（"清除"静默失败＝用户以为已清、实际还在盘上，属隐私面可观测性）。
+            _warn_once(f"clear_failed:{f.name}", f"清除日志失败 file={f} {_exc_summary(exc)}")
