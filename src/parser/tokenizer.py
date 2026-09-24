@@ -3,6 +3,9 @@
 import jieba
 from .keyword_dict import STOPWORDS
 
+# 纯标点过滤串：tokenize 与 tokenize_keep_numbers 共用这一份，任一侧单独改动即令两函数口径分叉
+_PUNCT_CHARS = "，。！？、；：""''（）【】《》…—·,.;:!?()[]{}\"' "
+
 # 添加心理学领域自定义词典
 PSYCH_TERMS = [
     "独立样本t检验", "配对样本t检验", "单样本t检验",
@@ -51,7 +54,7 @@ def tokenize(text: str) -> list:
         if w.isdigit():
             continue
         # 纯标点
-        if all(c in "，。！？、；：""''（）【】《》…—·,.;:!?()[]{}\"' " for c in w):
+        if all(c in _PUNCT_CHARS for c in w):
             continue
         result.append(w)
 
@@ -70,7 +73,7 @@ def tokenize_keep_numbers(text: str) -> list:
             continue
         if len(w) <= 1 and not w.isascii():
             continue
-        if all(c in "，。！？、；：""''（）【】《》…—·,.;:!?()[]{}\"' " for c in w):
+        if all(c in _PUNCT_CHARS for c in w):
             continue
         result.append(w)
     return result
