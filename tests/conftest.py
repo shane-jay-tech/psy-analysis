@@ -26,6 +26,7 @@ _APP_TEST_FILES = {
     "test_project_panel_ui.py",
     "test_playwright_e2e.py",
     "test_playwright_golden_research_flow.py",
+    "test_questionnaire_import_panel_render.py",  # s924-01: 本件升级为真 AppTest，未登记＝零隔离
 }
 
 

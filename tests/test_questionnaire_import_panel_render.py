@@ -21,6 +21,9 @@
 （见 `tests/test_items_upload_airview.py:28 FakeSt` ／ `tests/test_feed_panel_charac.py:146`）：
 `monkeypatch.setattr(panel, "st", fake)` ＋ `__getattr__` 对未预期调用直接判红。
 **后来人若要把本件升级成真 AppTest，必须同时改 `_APP_TEST_FILES`，否则等于零隔离。**
+→ s924-01 已按这句话把本文件名登记进 `tests/conftest.py::_APP_TEST_FILES`，并在下文第六节补真
+AppTest 双形态用例；**上面那段「为什么是会话桩」的说明属当时的口径，保留不回改**（一~五节的
+桩型用例一条没删，与六节的真运行时面互补：桩型能盯「未预期调用直接判红」，真运行时盯元素顺序）。
 
 追加（s924-02，2026-09-24）：下面第四、五节把 `_render_results` 的 **summary 缺键形态**钉进本件——
 来账 `zcode-bridge/done/s923-01.result.md` 自述「`:179-181` 是直接下标而非 `.get`，
@@ -28,10 +31,13 @@
 那三处直接下标**今天仍在位**（锚点复核见下文注释）。**钉的是现状，不是规范**：
 是否改成 `.get` ＋降级文案属生产行为改动，**待主班/人工裁决**，本单零 `src/` 改动。
 """
+import os
+import pathlib
 from dataclasses import replace
 
 import pandas as pd
 import pytest
+from streamlit.testing.v1 import AppTest
 
 import src.ui.questionnaire_import_panel as qip
 from src.questionnaire.import_cleaning import (
@@ -376,4 +382,180 @@ def test_missing_summary_keys_do_not_reach_the_deliverable_path(cleaned_state):
     out = qip.get_cleaning_log_for_deliverable(state)
     assert len(out) == len(result.log) == 4
     assert all(set(d) == FLATTEN_KEYS for d in out)
+
+
+# --------------------------------------------------------------------------- #
+# 六、真 AppTest 双形态（s924-01：本文件名同时登记进 conftest._APP_TEST_FILES）
+# --------------------------------------------------------------------------- #
+#
+# 一~五节跑的是 monkeypatch 掉的 `st` 桩；本节换成 streamlit 真运行时：`AppTest.from_string`
+# 起整枚 `render_questionnaire_import_panel`，`_render_results` 落在第 4 个 tab「结果与导出」里。
+# 桩型测不到的三件事由本节盯住：
+#   ① 真 `session_state` 里那份 CleaningResult 渲染出的元素**标签与顺序**；
+#   ② 「未清洗 → 已清洗」同一会话内提示语消失、摘要面出现的**形态切换**；
+#   ③ `df_scored is not None` 守卫在真 dataframe 元素计数上的读数。
+# 口径继承 `tests/test_e2e_qimport_upload.py` 顶部 s921-15／s922-10 两段的自约：清洗按钮点一次，
+# 断言面锁在「元素在不在／标签与顺序／与会话对象同源等式」三件事上，**不钉任何统计数值**
+# （valid_n、invalid_n、维度得分属统计结论红线域）。喂进去的是 1..6 递增斜坡这种一眼假的人造值。
+# 文献库守卫：`feed_sandbox` 夹具把 `LITERATURE_FEED_DATA_ROOT` 指进本用例独占沙盒（纪律档 §廿一／§九）。
+
+_ROOT = pathlib.Path(__file__).resolve().parents[1].as_posix()
+
+_PANEL_SCRIPT = """
+import sys
+if "__ROOT__" not in sys.path:
+    sys.path.insert(0, "__ROOT__")
+from src.ui.questionnaire_import_panel import render_questionnaire_import_panel
+
+render_questionnaire_import_panel()
+""".replace("__ROOT__", _ROOT)
+
+# 人造问卷：题项逐行不同（不触发同质作答），时长一律 > 60s（不触发时长过滤）
+_APPT_CSV = b"Q1,Q2,Q3,Q4,gender,duration_sec\n1,2,3,4,a,300\n2,3,4,5,b,400\n3,4,5,6,c,500\n"
+_KEY_RAW = "questionnaire_raw_df"
+_KEY_DIMS = "questionnaire_dimensions"
+_KEY_CLEANED = "questionnaire_cleaned_result"
+_HINT_EMPTY = "请先执行清洗"
+_HEAD_SUMMARY = "### 清洗摘要"
+_HEAD_PREVIEW = "### 维度得分预览"
+_HEAD_LOG = "### 清洗日志"
+_HEAD_NEXT = "### 下一步"
+_INFO_NEXT_STEP = "清洗完成后可进入: 信度分析 / 描述统计 / 方法推荐向导"
+_DL_LABEL = "📥 下载清洗日志"
+
+
+@pytest.fixture
+def feed_sandbox(monkeypatch, tmp_path):
+    """把文献库根指进本用例独占的空沙盒（`tmp_path/feed_root`）。
+
+    实测本件的导入链（`src.ui.questionnaire_import_panel` → `src.questionnaire.import_cleaning`）
+    不含任何 `src.literature_feed*` 模块，故**不需要** `copytree` 真副本；这道 setenv 是防
+    「将来有人把文献面板接进同一条渲染链」时拿 `data/literature_feed/` 当沙盒（那目录 git 无还原点）。
+    """
+    root = tmp_path / "feed_root"
+    monkeypatch.setenv("LITERATURE_FEED_DATA_ROOT", str(root))
+    return root
+
+
+def _aptest(feed_sandbox) -> AppTest:
+    """起一次真 AppTest 会话：未上传、未清洗＝`_render_results` 的空态。"""
+    at = AppTest.from_string(_PANEL_SCRIPT, default_timeout=60)
+    at.run()
+    assert not at.exception, f"主干渲染就抛异常：{[e.value for e in at.exception]}"
+    return at
+
+
+def _upload(at: AppTest) -> AppTest:
+    at.file_uploader[0].set_value(("synth.csv", _APPT_CSV, "text/csv")).run()
+    assert not at.exception, f"上传帧抛异常：{[e.value for e in at.exception]}"
+    return at
+
+
+def _click(at: AppTest, label: str) -> AppTest:
+    hits = [b for b in at.button if b.label == label]
+    assert len(hits) == 1, f"按钮「{label}」命中 {len(hits)} 枚 ⇒ 判据失去唯一锚点"
+    hits[0].click().run()
+    assert not at.exception, f"点「{label}」后抛异常：{[e.value for e in at.exception]}"
+    return at
+
+
+def _markdown(at: AppTest) -> list[str]:
+    return [m.value for m in at.markdown]
+
+
+def test_apptest_empty_state_renders_only_the_guard_hint(feed_sandbox):
+    """空态（真运行时）：只有那一枚守卫提示，摘要/预览/日志/下载四面一条都不出。
+
+    与同族 `test_e2e_qimport_upload.py::test_import_panel_smoke_...` 的分工：那条只断「提示在不在」，
+    本例钉的是**否证面**——空态下若摘要或下载口漏出来（守卫被摘、提前 return 被删）当场红。
+    """
+    at = _aptest(feed_sandbox)
+
+    infos = [i.value for i in at.info]
+    assert infos.count(_HINT_EMPTY) == 1, f"空态提示不是恰一枚：{infos}"
+    assert [m.label for m in at.metric] == []
+    assert len(at.dataframe) == 0
+    assert len(at.download_button) == 0
+    md = _markdown(at)
+    for head in (_HEAD_SUMMARY, _HEAD_PREVIEW, _HEAD_LOG, _HEAD_NEXT):
+        assert head not in md, f"空态下不该渲染出 {head}"
+    assert not any(v.startswith("- **") for v in md), "空态漏出了清洗日志行"
+    assert _KEY_CLEANED not in at.session_state       # 前置：空态确实「没有 result」，不是渲染没跑
+
+
+def test_apptest_success_state_renders_summary_log_and_download(feed_sandbox):
+    """成功态（真运行时）：三枚 metric 标签顺序、日志行、下载口全部与会话对象同源。
+
+    数值一律走 `str(result.summary[key])` 的**同源等式**而非字面量 ⇒ 本例不产出任何统计结论，
+    但「标签接错列」「顺序漂」「日志与屏面不同源」三种破法都会红。
+    """
+    at = _upload(_aptest(feed_sandbox))
+    at.text_input(key="dim_name_0").set_value("维度A").run()
+    at.text_input(key="dim_items_0").set_value("Q1,Q2,Q3,Q4").run()
+    at = _click(at, "保存维度配置")
+    assert _KEY_CLEANED not in at.session_state, "点「保存维度配置」就写清洗键＝越界"
+
+    at = _click(at, "执行清洗与计分")
+    result = at.session_state[_KEY_CLEANED]
+    assert set(SUMMARY_KEYS) <= set(result.summary)   # 缺键面由第四节钉，这里只作前置
+
+    assert [(m.label, m.value) for m in at.metric] == [
+        (label, str(result.summary[key])) for label, key in SUMMARY_METRIC_ORDER
+    ]
+    md = _markdown(at)
+    assert _HINT_EMPTY not in [i.value for i in at.info], "清洗完成后空态提示还赖在屏上"
+    for head in (_HEAD_SUMMARY, _HEAD_LOG, _HEAD_NEXT):
+        assert head in md, f"成功态漏了小标题 {head}"
+    assert _INFO_NEXT_STEP in [i.value for i in at.info]
+    assert [v for v in md if v.startswith("- **")] == [
+        f"- **{e.step}**: {e.action}" for e in result.log
+    ], "屏上日志区与 result.log 不同源（条数／顺序／文本任一漂）"
+    assert len(at.download_button) == 1
+    assert at.download_button[0].label == _DL_LABEL
+    # 存过维度 ⇒ df_scored 非空 ⇒ 预览区出，dataframe 恰两枚（上传预览 + 得分预览）
+    assert _HEAD_PREVIEW in md
+    assert len(at.dataframe) == 2
+
+
+def test_apptest_scoreless_branch_keeps_summary_but_drops_preview(feed_sandbox):
+    """第二条成功态分支：不存维度直接点清洗 ⇒ `df_scored is None` ⇒ 预览区一条都不出。
+
+    与上一条只差「存没存维度」这一步，其余断言同向 ⇒ `:183` 那枚守卫在真运行时上确实起作用。
+    """
+    at = _upload(_aptest(feed_sandbox))
+    assert _KEY_DIMS not in at.session_state, "前置：维度键压根没写，才有 dimensions=None 这条分支"
+
+    at = _click(at, "执行清洗与计分")
+    result = at.session_state[_KEY_CLEANED]
+    assert result.df_scored is None                    # 2026-09-24 实测读数，不是假设
+
+    md = _markdown(at)
+    assert _HEAD_PREVIEW not in md
+    assert len(at.dataframe) == 1                      # 只剩上传区那一枚
+    assert [m.label for m in at.metric] == [label for label, _ in SUMMARY_METRIC_ORDER]
+    assert _HEAD_SUMMARY in md and _HEAD_LOG in md
+    assert len(at.download_button) == 1 and at.download_button[0].label == _DL_LABEL
+
+
+def test_apptest_whitelist_row_is_live(feed_sandbox, tmp_path):
+    """钉 conftest 那一行**活着**：白名单的门是文件名，登记没生效（typo／漏登记）本例即红。
+
+    读数全取自 conftest 的 autouse 夹具真正写过的 env 与模块属性，测试自己一个字都没塞。
+    """
+    _aptest(feed_sandbox)                              # 先走一次夹具，确保 fixture 已命中本件
+
+    app_home = tmp_path / ".psy_analysis"
+    assert pathlib.Path(os.environ["PSY_ANALYSIS_HOME"]) == app_home
+    assert pathlib.Path(os.environ["PSY_ANALYSIS_LOG_DIR"]) == tmp_path / "logs"
+    assert pathlib.Path(os.environ["PSY_ANALYSIS_ARCHIVE_DIR"]) == tmp_path / "archive"
+
+    from src.utils import project_manager, usage_logger
+
+    assert project_manager.PROJECTS_DIR == app_home / "projects"
+    assert project_manager.INDEX_FILE == app_home / "projects" / "index.json"
+    assert pathlib.Path(str(usage_logger._LOG_DIR)) == tmp_path / "logs"
+
+    # 文献库守卫同样在位，且本件的沙盒根一个字节都没被写过（真库零触碰的反证面）
+    assert pathlib.Path(os.environ["LITERATURE_FEED_DATA_ROOT"]) == feed_sandbox
+    assert not feed_sandbox.exists() or list(feed_sandbox.iterdir()) == []
 
