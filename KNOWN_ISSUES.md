@@ -4,16 +4,16 @@
 
 > **2026-08-15 v5.8 性能收口**：启动自检免导入化（30s→740ms）+ 侧栏快照按需生成
 > + 后台预热线程 + Excel 上传必崩/大文件上传必失败两个数据入口 Bug 修复，详见
-> `UPGRADE_REPORT_V5.8.md`。#L5 已完成。
+> `docs/history/UPGRADE_REPORT_V5.8.md`。#L5 已完成。
 >
 > **2026-08-15 v5.9 交互深化**：关闭 magic AST 重写（rerun 0.31s→0.10s）、
 > 修独立 t 检验/配对检验图表必崩两个 P0、卡方新增列联表热力图、三处破坏性
-> 操作加两步确认、179 处 width 迁移，详见 `UPGRADE_REPORT_V5.9.md`。
+> 操作加两步确认、179 处 width 迁移，详见 `docs/history/UPGRADE_REPORT_V5.9.md`。
 >
 > **2026-08-24 v5.10 系统体验收口**：接通实验设计主路由、统一导航事实源、
 > “保存并开始新研究”隔离跨项目资产、恢复一次性新手引导、接入下一步提示、
 > 自动保存原子写盘、Kaleido 浏览器回退及版本/隐私声明统一，详见
-> `UPGRADE_REPORT_V5.10.md`。
+> `docs/history/UPGRADE_REPORT_V5.10.md`。
 >
 > 历史 v3.x 记录见 `UPGRADE_REPORT_V3.0.md` ~ `UPGRADE_REPORT_V3.9.md`，
 > v4.x 决策见 `docs/decisions/2026-05-23-*.md` 与 `2026-05-26-*.md`。
@@ -73,7 +73,7 @@
 - **修复**：`ask_socratic` / `ask_socratic_stream` 签名改 `Optional[Dict[str, Any]]`，
   None 早返回 fallback 模板（`_safe_chat` 同样加 None 双保险）。绕过 gate 直调永不 crash。
 - **测试**：`tests/test_upstream_socratic.py` 新增 2 个 None 降级测试。
-- **报告**：`UPGRADE_REPORT_V5.8.md` 三.3。
+- **报告**：`docs/history/UPGRADE_REPORT_V5.8.md` 三.3。
 
 ---
 

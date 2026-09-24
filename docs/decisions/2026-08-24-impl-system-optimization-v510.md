@@ -6,7 +6,7 @@
 
 用户随后确认“按推荐执行”：保留当前未提交改动作为基线；完成一轮有限、可验收的系统级优化；采用新手友好默认流程与专家进阶能力并存的体验。
 
-固化目标见仓库根目录 `SYSTEM_OPTIMIZATION_PLAN.md`。
+固化目标见仓库根目录 `SYSTEM_OPTIMIZATION_PLAN.md`。（**指针现值订正于 9/24**，信箱单 s923-49：该件已归档，实路径为 `docs/history/SYSTEM_OPTIMIZATION_PLAN.md`，仓库根目录现存 md 件仅 `KNOWN_ISSUES.md` 与 `README.md`；本句原措辞逐字保留、不删不改，仅在本行内追加订正。）
 
 ## 难度与路由
 
