@@ -210,11 +210,13 @@ def generate_design_summary(design: Dict) -> str:
         f"**题量**：{sc['n_items']} 题（{sc['n_dimensions']}个维度）",
         f"**反向题**：{sc['n_reverse']} 题",
         f"**预计用时**：约 {max(3, sc['n_items'] // 3)} 分钟\n",
-        "### 维度分配：",
     ]
 
-    for dim in dims:
-        n = dim.get("item_count", "?")
-        lines.append(f"- {dim['name']}：{n} 题")
+    # s924-41：dims 为空时整段小节不输出（原现状是标题挂尾＝空节）；非空时逐字行为不变
+    if dims:
+        lines.append("### 维度分配：")
+        for dim in dims:
+            n = dim.get("item_count", "?")
+            lines.append(f"- {dim['name']}：{n} 题")
 
     return "\n".join(lines)

@@ -241,13 +241,45 @@ class TestDesignSummaryPins:
             generate_design_report({})
         assert ri.value.args[0] == "research_question"
 
-    def test_empty_dimensions_leave_dangling_summary_section(self, matched_design):
-        """现状：dimensions_used 清空后摘要尾巴挂着空标题，报告只把维度数写成 0（钉缺陷不修）。"""
+    def test_empty_dimensions_summary_drops_heading(self, matched_design):
+        """s924-41 修复语义·空态：dimensions_used 为空 ⇒ 整段小节不输出，标题不再挂尾。
+
+        本例改写自 s922-15 钉的空挂尾**现状**断言（原 250/251 行钉的是
+        `endswith(...)` 与 `_empty_md_sections(summary) == [该标题]`），
+        按本单授权翻转为「空 → 无标题」。报告侧两条现状断言原样保留（本单未动 report）。
+        """
         design = copy.deepcopy(matched_design)
         design["dimensions_used"] = []
         summary = generate_design_summary(design)
         report = generate_design_report(design)
-        assert summary.rstrip("\n").endswith("### 维度分配：")
-        assert _empty_md_sections(summary) == ["### 维度分配："]
+        assert "### 维度分配：" not in summary
+        assert _empty_md_sections(summary) == []
         assert "本问卷包含 **0** 个理论维度：" in report
         assert _empty_md_sections(report) == []
+
+    def test_nonempty_dimensions_summary_keeps_heading(self, matched_design):
+        """s924-41 修复语义·非空态：标题在、逐维度各出一行、标题下有正文（不成空节）。"""
+        design = copy.deepcopy(matched_design)
+        dims = design["dimensions_used"]
+        assert dims, "fixture 若空维度，本例会退化成空跑"
+        summary = generate_design_summary(design)
+        assert summary.count("### 维度分配：") == 1
+        bullets = [l for l in summary.split("\n") if l.startswith("- ")]
+        assert len(bullets) == len(dims)
+        assert bullets == [f"- {d['name']}：{d['item_count']} 题" for d in dims]
+        assert summary.index("### 维度分配：") < summary.index(bullets[0])
+        assert _empty_md_sections(summary) == []
+
+    def test_empty_dimensions_summary_only_loses_the_section_tail(self, matched_design):
+        """守卫的边界：只吃小节尾巴，摘要其余事实行在两态下逐字相同。"""
+        full = generate_design_summary(matched_design)
+        design = copy.deepcopy(matched_design)
+        design["dimensions_used"] = []
+        empty = generate_design_summary(design)
+        heads = ("**构念**：", "**匹配方式**：", "**题型**：", "**题量**：", "**反向题**：", "**预计用时**：")
+        for h in heads:
+            assert [l for l in full.split("\n") if l.startswith(h)] == \
+                   [l for l in empty.split("\n") if l.startswith(h)], f"{h} 行被守卫波及"
+        assert empty.rstrip("\n").endswith("分钟")
+        assert full.startswith(empty.rstrip("\n"))
+
