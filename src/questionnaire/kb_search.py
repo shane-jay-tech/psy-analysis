@@ -8,12 +8,22 @@
 import time
 import json
 import hashlib
+import logging
 import re
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 
 CACHE_DIR = Path(__file__).parent / ".kb_cache"
 CACHE_DIR.mkdir(exist_ok=True)
+
+# clear_cache 的合法 source → 缓存文件 glob 模式（None＝全清）。
+# 盘上只有 api_*.json 与 llm_*.json 两种前缀（见 :52 / :82 的写入点），
+# CACHE_TTL 里的 "unknown" 只是 TTL 兜底标签、不对应任何缓存文件，故不入白名单。
+CACHE_CLEAR_PATTERNS: Dict[Optional[str], str] = {
+    "academic_api": "api_*.json",
+    "llm_generated": "llm_*.json",
+    None: "*.json",
+}
 
 # 不同来源的缓存TTL
 CACHE_TTL = {
@@ -333,17 +343,34 @@ def verify_by_doi(doi: str) -> Optional[Dict]:
 def clear_cache(source: str = None):
     """
     清除搜索缓存。
-    source: "academic_api", "llm_generated", 或 None（全部清除）
+
+    source 白名单（s923-41 收口）：
+      - "academic_api"  → 只清 api_*.json
+      - "llm_generated" → 只清 llm_*.json
+      - None            → 全清 *.json
+    其它取值（含空串、大小写变体、拼写错误）一律抛 ValueError——
+    原先的 else 兜底会把误传当成"全清"，一次笔误就抹掉整份缓存。
+
+    删除面：只删 CACHE_DIR 本层的普通文件（is_file 过滤，目录名撞上 *.json 时
+    unlink 必抛 OSError）；单个文件删不掉只告警跳过，不再中断整轮清理。
     """
-    if source == "academic_api":
-        pattern = "api_*.json"
-    elif source == "llm_generated":
-        pattern = "llm_*.json"
+    if source is None:
+        pattern = CACHE_CLEAR_PATTERNS[None]
+    elif isinstance(source, str) and source in CACHE_CLEAR_PATTERNS:
+        pattern = CACHE_CLEAR_PATTERNS[source]
     else:
-        pattern = "*.json"
+        raise ValueError(
+            f"未知的缓存来源 {source!r}；clear_cache 只接受 "
+            f"'academic_api'、'llm_generated' 或 None（全清）"
+        )
 
     for f in CACHE_DIR.glob(pattern):
-        f.unlink()
+        if not f.is_file():
+            continue
+        try:
+            f.unlink()
+        except OSError as exc:  # 占用/只读/竞态：跳过该件，保留其余清理
+            logging.getLogger(__name__).warning("缓存文件删除失败已跳过：%s（%s）", f, exc)
     return True
 
 

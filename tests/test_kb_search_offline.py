@@ -10,10 +10,12 @@
     -> inspect.signature 实测：clear_cache(source: str = None)
                                 _truncate(text: str, max_len: int) -> str
     -> 两者均无入参校验、无异常处理（见 TestClearCacheHazards 与 -1 边界用例）
+       ⚠️ s923-41 已把 clear_cache 这一侧收口（白名单 + is_file 过滤 + 逐文件 try），
+          上方两条"现状钉"随之翻正；_truncate 仍是无校验现状，-1 边界钉保留。
 
 钉住三块：
-1) clear_cache(source) 的定向两态、全清态，以及 else 兜底吞掉未知 source 的现状；
-2) clear_cache 只删文件、不递归、命中 *.json 之外一律不动；
+1) clear_cache(source) 的定向两态、全清态，以及未识别 source 的白名单拒绝（s923-41）；
+2) clear_cache 只删文件、不递归、命中 *.json 之外一律不动；目录/删不掉的件只跳过不中断；
 3) _truncate 的清洗（去 HTML / 折叠空白）与 len > max_len 时的截断形态。
 
 与既有测试的分工（开工前 grep 实测）：
@@ -24,10 +26,20 @@
 """
 import inspect
 import sys
+from pathlib import Path
 
 import pytest
 
 from src.questionnaire import kb_search as K
+
+# s923-41 补：夹具里 `monkeypatch.setattr(K, "CACHE_DIR", fake)` 之后，
+# 测试体内再取 K.CACHE_DIR 拿到的已经是**假目录** ⇒ 原先两条
+# "真实缓存目录不被触碰" 的钉其实是在跟自己比（假绿）。真实路径必须自行推出来。
+_REAL_CACHE_DIR = Path(K.__file__).resolve().parent / ".kb_cache"
+
+
+def _real_names():
+    return sorted(p.name for p in _REAL_CACHE_DIR.iterdir()) if _REAL_CACHE_DIR.exists() else []
 
 
 # ===========================================================================
@@ -117,11 +129,29 @@ class TestClearCacheModes:
         assert not (fake_cache_dir / "llm_1.json").exists()
 
     @pytest.mark.parametrize("source", ["unknown", "bogus_source", "", "ACADEMIC_API"])
-    def test_unknown_source_falls_back_to_full_clear(self, fake_cache_dir, source):
-        """现状钉：匹配不上就落 else 全清——传错 source 等于清空整个缓存。"""
+    def test_unknown_source_raises_and_deletes_nothing(self, fake_cache_dir, source):
+        """s923-41 翻正 s922-143 的现状钉：else 兜底「误传＝全清」已改成白名单校验。
+        未识别 source 必须先拒绝，一个文件都不许掉。"""
         _seed(fake_cache_dir, _MIXED)
-        assert K.clear_cache(source) is True
-        assert _names(fake_cache_dir) == ["api_1.txt", "notes.txt"]
+        with pytest.raises(ValueError, match="未知的缓存来源"):
+            K.clear_cache(source)
+        assert _names(fake_cache_dir) == sorted(_MIXED)
+
+    @pytest.mark.parametrize("source", [[], object(), 0, b"academic_api"])
+    def test_non_string_source_is_value_error_not_typeerror(self, fake_cache_dir, source):
+        """白名单查表前先挡非字符串：不可哈希的对象也不能冒出 TypeError，
+        更不能再走老的 else 分支（那等于全清）。"""
+        _seed(fake_cache_dir, _MIXED)
+        with pytest.raises(ValueError):
+            K.clear_cache(source)
+        assert _names(fake_cache_dir) == sorted(_MIXED)
+
+    def test_whitelist_covers_every_on_disk_cache_prefix(self):
+        """白名单必须覆盖盘上真实前缀：只写 api_*/llm_* 两种缓存文件，
+        漏一支就会留下清不掉的孤儿。CACHE_TTL 的 "unknown" 是 TTL 兜底标签、不落文件。"""
+        assert {K.CACHE_CLEAR_PATTERNS["academic_api"],
+                K.CACHE_CLEAR_PATTERNS["llm_generated"]} == {"api_*.json", "llm_*.json"}
+        assert K.CACHE_CLEAR_PATTERNS[None] == "*.json"
 
     def test_full_clear_leaves_non_json_files_alone(self, fake_cache_dir):
         """*.json 之外一律不动：证明 glob 不是 *.json* 也不是 *。"""
@@ -154,27 +184,63 @@ class TestClearCacheModes:
 
 
 class TestClearCacheHazards:
-    """现状钉：无异常处理 + 真实目录不被触碰。"""
+    """s923-41 收口后的守卫面：目录/删不掉的文件都不再中断整轮清理。"""
 
-    def test_directory_named_json_raises_and_aborts(self, fake_cache_dir):
-        """目录名撞上 *.json 时 unlink 失败：Windows 抛 PermissionError、
-        POSIX 抛 IsADirectoryError，两者都是 OSError；函数不吞异常。"""
+    def test_directory_named_json_is_skipped_not_fatal(self, fake_cache_dir, caplog):
+        """s923-41 翻正 s922-143 的现状钉：老实现无 is_file 过滤，
+        目录名撞上 *.json 时 unlink 直接抛 OSError 并中断（Windows PermissionError /
+        POSIX IsADirectoryError）。现改为 is_file 先跳过目录、其余照清、仍返回 True。
+        caplog 那两条是给 is_file 过滤本身留判别力的：只靠逐文件 try 也能"不抛"，
+        但目录会被当成一次删除失败而告警——目录不是缓存文件，不该进失败账。"""
+        import logging
+
         _seed(fake_cache_dir, ("a.json",))
         (fake_cache_dir / "zz_dir.json").mkdir()
-        with pytest.raises(OSError):
-            K.clear_cache()
-        # 中断式清理：出错前已删的不会回滚，出错后的条目仍在
-        assert (fake_cache_dir / "zz_dir.json").is_dir()
+        with caplog.at_level(logging.WARNING, logger="src.questionnaire.kb_search"):
+            assert K.clear_cache() is True
+        assert (fake_cache_dir / "zz_dir.json").is_dir(), "目录必须原地保留"
+        assert not (fake_cache_dir / "a.json").exists(), "同层真文件仍要被清掉"
+        assert "zz_dir.json" not in caplog.text, "目录须被识别为非缓存文件、不记删除失败"
+
+    def test_unlink_failure_only_skips_that_file_and_warns(self, fake_cache_dir, monkeypatch, caplog):
+        """逐文件 try 的覆盖：单个文件删不掉（占用/只读/竞态）不得带走整轮清理，
+        也不得静默——必须留一条 warning。"""
+        import logging
+
+        _seed(fake_cache_dir, ("a.json", "b.json"))
+        real_unlink = Path.unlink
+
+        def flaky(p):
+            if p.name == "a.json":
+                raise PermissionError("simulated locked cache file")
+            return real_unlink(p)
+
+        monkeypatch.setattr(Path, "unlink", flaky)
+        with caplog.at_level(logging.WARNING, logger="src.questionnaire.kb_search"):
+            assert K.clear_cache() is True
+        assert (fake_cache_dir / "a.json").exists(), "删不掉的件留在原地即可，不得抛"
+        assert not (fake_cache_dir / "b.json").exists(), "同轮其余件必须清干净"
+        assert "a.json" in caplog.text, "失败必须留痕，不许静默吞掉"
 
     def test_real_cache_dir_is_not_touched_by_full_clear(self, fake_cache_dir):
-        """本件最要紧的安全属性：全清只作用于被重定向的目录。"""
-        real = K.CACHE_DIR
-        before = set(_names(real)) if real.exists() else set()
+        """本件最要紧的安全属性：全清只作用于被重定向的目录。
+        （s923-41 修假绿：原先写 `real = K.CACHE_DIR` 拿到的是已被 monkeypatch 的
+        假目录，等于跟自己比；现按 _REAL_CACHE_DIR 取真实路径逐名核对。）"""
+        before = _real_names()
         _seed(fake_cache_dir, _MIXED)
         K.clear_cache()
         assert _names(fake_cache_dir) == ["api_1.txt", "notes.txt"]
-        assert real.exists()
-        assert before <= set(_names(real)), "真实缓存目录里原有文件被删了"
+        assert _REAL_CACHE_DIR.exists(), "导入即 mkdir(exist_ok=True)，目录应存在"
+        assert _real_names() == before, "真实缓存目录内容被本次全清改动了"
+
+    def test_real_cache_dir_is_not_touched_by_rejected_source(self, fake_cache_dir):
+        """白名单拒绝路径同样不许碰真实目录（ValueError 早于任何 unlink 发生）。"""
+        before = _real_names()
+        _seed(fake_cache_dir, _MIXED)
+        with pytest.raises(ValueError):
+            K.clear_cache("typo_academic")
+        assert _real_names() == before
+        assert _names(fake_cache_dir) == sorted(_MIXED)
 
 
 # ===========================================================================
