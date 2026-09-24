@@ -3,6 +3,8 @@
 - 班次：`qoder-executor-20260923-0022-psy1`（夜间 drain 子班）。取证时刻：2026-09-23 00:4x，HEAD `f6fc82d` ＋ 15 项脏工作树。
 - 上游登记：`docs/insights/psy-data-dirs-20260919.md` §一表 :17 与 §二表 **A4**（:38）；
   再证：`docs/insights/psy-litfeed-data-plane-probe-20260922.md` §四.2（:69-75）。本稿是 A4 的**处置设计出口**，两篇均已在本稿 §六被引用。
+> 勘误（2026-09-24）：本段判据已被 s923-10（zcode-bridge/done/s923-10.result.md）部分否证，成因以该 result 结论为准
+> 现状（2026-09-25 复核 · qoder-executor-20260925-0630-psy49）：A4 的「死目录」判定不变（`logs/` 仍 0 条目、mtime 2026-09-14 08:00:47，复算 `stat data/literature_feed/logs`）；本稿 §〇 表所引 .bat 锚点 :23 / :25-27 / :37 已随 `1657af8` 漂为 :45 / :47 ⇒ 复算 `rg -n "mkdir|LOG=|VENV_PY" scripts/run_daily_feed.bat` 现取行号；上游那句「那 28 次不是走 .bat 来的」已被 s923-10 否证，成因以该 result 为准。另：本 2 行插注本身把上一条 :5 引的 probe §四.2 行区间由 `:69-75` 顺延成 `:69-76`（纪律档 §十.4 那类"注释行号被本次编辑自己推走"的形态，原文不复改）⇒ 认区间请用 `rg -n "A4（logs/ 死目录）" docs/insights/psy-litfeed-data-plane-probe-20260922.md` 现取。本稿原文零删改。
 - 本机无 `rg`（不在 PATH）⇒ 凡任务书写 `rg` 的口径一律以 `git grep -n` / 定点 `grep -n` 复算，命令随附。
 
 ## 〇、锚点与前提复核（工单有两处要按磁盘实况改）

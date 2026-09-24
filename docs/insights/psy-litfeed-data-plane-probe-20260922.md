@@ -72,6 +72,8 @@ extracted_articles 0 | extracted_constructs 0 | error null | status completed
    与 `schtasks` 查无此任务互相印证。这也解释了为什么 28 次 `trigger='scheduler'` 却没有 .bat 日志——
    **那 28 次不是走 .bat 来的**（人或脚本直接 `python -m src.literature_feed.scheduler`，或一个已被删掉的任务）。
    这条归因尚未坐实，留给拍板的人。
+> 勘误（2026-09-24）：本段判据已被 s923-10（zcode-bridge/done/s923-10.result.md）部分否证，成因以该 result 结论为准
+> 现状（2026-09-25 复核 · qoder-executor-20260925-0630-psy49）：本段的**观测**仍在——`logs/` 现 0 条目、mtime 2026-09-14 08:00:47、目录 ctime 2026-05-30 09:00:00（复算 `stat data/literature_feed/logs`）；被否证的是「目录为空 ⇒ .bat 从未跑过」这一步**推论**（s923-10 归因到一个现已消失的计划任务）。另：本段所引 .bat 行号已随 `1657af8` 漂为 :45 mkdir / :47 LOG（§五 出口 1 的「先解决全局 python」前置也已由 :32/:38 的 `VENV_PY` 做掉）⇒ 复算一律 `rg -n "mkdir|LOG=|VENV_PY" scripts/run_daily_feed.bat` 现取。第三处同错判据在 `zcode-bridge/done/s922-17-psy-litfeed-probe.result.md`（该 result 只有五节、**无 §七**：派单沿用的"s922-17 result §七.1"是 s923-10 遗留 3 里的假锚点，实指其「证据」节 `:43` 那行「`ls data/literature_feed/logs/` → 空目录（.bat 一旦跑过必先写 daily_runner.log 头）」，复算 `rg -n "daily_runner.log 头" zcode-bridge/done/s922-17-psy-litfeed-probe.result.md`），属历史件不回改；本段原文零删改。
 
 ## 五、给 A3 拍板的可执行出口（本档一律未执行）
 
