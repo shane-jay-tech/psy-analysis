@@ -33,6 +33,13 @@ s922-13 已钉过的两条**本件刻意不重复**：
   而函数文档写死「不是关键功能」⇒ 把一个刻意设计成无关紧要的失败抬成"看起来像出错"，
   属行为/UX 改动，**需主班裁决**，不在执行手授权内。
 
+**追记（2026-09-25，s924-08 落地）**：口径 **A 已上线** —— 模块顶补 `logger = logging.getLogger(__name__)`，
+`except` 里改 `logger.debug("docx 字体 %s 设置失败（回退默认）: %s", font_name, exc)`；
+**不抬级别、不改控制流、不改返回值**。故上文预言的那次改写已执行：本件 1/2/3 号例
+从「零记录」改成「零返回值 ＋ 零告警 ＋ 有且只有 DEBUG 记录」，独立新断言见
+`tests/test_exporters_cjk_font_fallback_observability.py`。口径 B（warning 级）**未启用**：
+2 号例逐字断言生产码里 `logger.warning/error/exception/critical` 与 `warnings.warn` 一个都不许出现。
+
 **口径 C（记一笔，不建议）**：把 `-> None` 改成返回 `bool` 让调用方决定。
 签名扩散到 3 个调用点与 UI 层，改动面最大、收益不比 B 高。
 
@@ -117,8 +124,13 @@ def failing_cjk_lookup():
 
 
 # ═══════════════ 1. 单点失败：除了"不抛"，什么都没有 ═══════════════
-def test_structural_failure_leaves_no_log_record_and_no_return_signal(caplog):
-    """核心钉桩：真失败时**零日志记录、零返回值、零告警** —— 「观测面为零」的可执行版本。"""
+def test_structural_failure_still_has_no_return_signal_and_records_only_at_debug(caplog):
+    """核心钉桩（s924-08 改写）：真失败时**零返回值、零告警、有且只有 DEBUG 记录**。
+
+    改写理由见文件头「追记」：口径 A 上线后「零记录」不再是契约，但契约的**要害**没变 ——
+    调用方仍拿不到任何成败信号（返回 None），用户可见面（warning 及以上）仍必须为零。
+    故本例把断言换成这三件，而不是删例。
+    """
     style = Document().styles["Normal"]
 
     with caplog.at_level(logging.DEBUG):                    # 放到最低门限，任何级别都得录到
@@ -130,38 +142,53 @@ def test_structural_failure_leaves_no_log_record_and_no_return_signal(caplog):
     assert stats["hits"] >= 1                               # except 真的被走到（防空转的判别实验）
 
     assert result is None                                   # 返回 None：调用方无从判断成败
-    assert caplog.records == []                             # 一条记录都没有
-    assert caught == []                                     # 连 warnings 都不发
+    assert caught == []                                     # 连 warnings 都不发（口径 B 未启用）
     assert _east_asia_of(style.element) == "<无 rPr>"        # 失败后不留半成品节点（不会"写一半"）
 
+    recs = caplog.records
+    assert recs, "口径 A 下失败必须留痕；零记录＝debug 那行被摘掉了"
+    assert all(r.levelno == logging.DEBUG for r in recs), \
+        [f"{r.name}/{r.levelname}" for r in recs]           # 观测面被限制在 debug
+    assert all(r.name == exporters.__name__ for r in recs)   # 只许本模块发声
 
-def test_exporters_module_itself_has_no_observability_surface() -> None:
-    """守卫：`exporters.py` 里根本没有 logging 面 ⇒ 上面那条"零记录"不是巧合而是结构性的。
 
-    哪天补了 logger（建议稿口径 A/B），本例会红——那是**预期的提醒**，
-    届时请把断言改成「有且只有一条 debug/warning」并连同生产码一起评审，别只摘用例。
+def test_exporters_observability_surface_is_debug_only_and_never_escalates() -> None:
+    """守卫（s924-08 改写）：`exporters.py` 的观测面**有且只有 debug 一档**。
+
+    上文那条守卫原本断言「模块里根本没有 logging 面」。口径 A 上线后它必然红，
+    按文件头「追记」把断言换成**同样强**的新契约：
+      ① 模块确实有 logger（否则又回到"事后查不到"）；
+      ② 生产码里只有 `logger.debug(`，warning/error/exception/critical 与 `warnings.warn`
+         **一个都不许出现**（口径 B 未授权；哪天抬级，这里当场红）；
+      ③ `except Exception:` 吞点仍在 ⇒ 控制流契约未变（该函数仍然不抛）。
     """
-    assert not hasattr(exporters, "logging")
-    assert not hasattr(exporters, "logger")
-    assert not hasattr(exporters, "getLogger")
+    assert hasattr(exporters, "logging") and hasattr(exporters, "logger")
+    assert exporters.logger.name == exporters.__name__       # 本仓既有约定（autosave/pm/recent_files 同型）
 
     with open(exporters.__file__, encoding="utf-8") as fh:
         body = fh.read()
-    assert "import logging" not in body and "logger." not in body
-    assert "except Exception:" in body                      # :250 就是那个吞点，行号会漂、文本不会
-    assert "\n        pass\n" in body                        # :251 的裸 pass（缩进含在内）
+    assert "import logging" in body
+    assert "logger.debug(" in body                          # 唯一的观测出口
+    for escalated in ("logger.warning(", "logger.error(", "logger.exception(", "logger.critical(",
+                      "warnings.warn("):
+        assert escalated not in body, f"观测被抬到用户可见面：{escalated}（属口径 B，需主班裁决）"
+    assert "except Exception as exc:" in body               # 吞点仍在（行号会漂、文本不会）
+    assert 'logger.debug("docx 字体 %s 设置失败' in body     # 消息前缀可 grep（与观测件同一串）
 
 
 # ═══════════════ 2. 生产面：整篇导出成功，但 CJK 映射其实没写上 ═══════════════
-def test_docx_ships_normally_while_cjk_mapping_silently_missing(caplog) -> None:
+def test_docx_ships_normally_while_cjk_mapping_missing_and_only_debug_records(caplog) -> None:
     """s922-13 说的「生产里可能一直在悄悄失败而无人知」——本例把它**演出来**并钉住判据。
 
     强制 `_set_east_asian_font` 全程失败后：
-    ① `export_to_docx` 照样出稿、不抛、零日志；
+    ① `export_to_docx` 照样出稿、不抛，**只在 DEBUG 面留 5 条记录**（s924-08 口径 A）；
     ② 回读文档里 Normal 样式的 `w:ascii` **仍是「宋体」**（`:33` 设的），
        所以任何只看 `style.font.name` 的检查都会**误判为"字体配好了"**；
     ③ 而 `w:eastAsia` 压根不存在 ⇒ 中文实际没拿到东亚字体映射。
     ②③ 之差就是"常量说谎"的现场，也是本件存在的理由。
+
+    ① 的「只在 DEBUG 面」是要害：抬到 warning 会直接出现在 Streamlit 导出按钮的用户可见面
+    （属口径 B，未授权）⇒ 本例同时钉住"有记录"与"不许抬级"。
     """
     caplog.set_level(logging.DEBUG)
     blob, hits = export_under_cjk_failure()                 # 全程失败态出稿，见文件尾 helper
@@ -172,7 +199,11 @@ def test_docx_ships_normally_while_cjk_mapping_silently_missing(caplog) -> None:
     assert normal.font.name == "宋体"                       # ② 看着是对的（这是 latin 槽）
     assert _east_asia_of(normal.element) is None            # ③ eastAsia 真的没写
     assert "Q1. 合成题干一" in "\n".join(p.text for p in doc.paragraphs)   # ① 正文照常
-    assert caplog.records == []                             # 全程零记录
+
+    recs = [r for r in caplog.records if r.name == exporters.__name__]
+    assert len(recs) == 5, f"一次导出恰好 5 条 debug（实得 {len(recs)}）"   # ① 全留痕
+    assert all(r.levelno == logging.DEBUG for r in caplog.records), \
+        [(r.name, r.levelname) for r in caplog.records]                     # 全程只有 debug，无抬级
 
 
 # ═══════════════ 3. 任务书前提否证：非法字体名**不会**触发 except ═══════════

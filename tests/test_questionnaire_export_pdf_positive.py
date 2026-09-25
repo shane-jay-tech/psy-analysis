@@ -100,19 +100,21 @@ def test_positive_branch_actually_embeds_a_cjk_font_program() -> None:
 
 
 @requires_cjk_renderer
-def test_positive_branch_currently_returns_a_bytearray_not_bytes() -> None:
-    """**在册现状钉桩**（不是修）：`-> bytes` 的签名在正向分支上并不成立。
+def test_positive_branch_returns_real_bytes_matching_the_declared_contract() -> None:
+    """契约归一后的正向断言（s924-06）：`-> bytes` 现在真的成立。
 
-    `:435` 直接 `return pdf.output()` 而未做类型归一；同文件的
-    `build_questionnaire_pdf:569-572` 却显式 `bytes(out)` 并注释「fpdf2 新版本返回 bytearray」。
-    fpdf2 2.8.7（本仓 .venv 实测）确实返 `bytearray` ⇒ 两个 PDF 出口**返回类型不一致**。
-    本例把「不一致」钉成断言：哪天 fpdf 升级改返 bytes，或有人给 :435 补了归一，这条会红，
-    届时**连生产码一起回看**，别只摘用例。改 `:435` 属行为改动，本单未授权。
+    历史：s923-04 曾在同一位置钉过 `type(blob) is bytearray`，用来登记
+    「签名说 bytes、实返 bytearray」这条不一致（归一当时未授权）。
+    s924-06 拿到归一授权 ⇒ 按「两笔一体」口径把断言**反过来钉成 bytes**，
+    而不是删用例：删掉就再没人能证明这条契约曾经漂过、现在钉住了。
+    同文件的 `build_questionnaire_pdf` 尾部一直是归一写法，本例把两个 PDF
+    出口的容器类型钉成同一种，防止哪天又分叉。
     """
     blob = export_to_pdf(_design())
 
-    assert type(blob) is bytearray                          # 不是 bytes；只 isinstance 就测不到这件事
-    assert isinstance(blob, (bytes, bytearray))             # 但仍是可缓冲对象，调用方 st.download_button 能吃下
+    assert type(blob) is bytes                              # 精确类型，不是"可缓冲"就算过
+    assert isinstance(blob, bytes) is True                  # 完成标准③：显式 isinstance 断言
+    assert not isinstance(blob, bytearray)                  # 归一没退化成"仍带着旧容器"
 
 
 @requires_cjk_renderer

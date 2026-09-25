@@ -1,8 +1,11 @@
 """问卷设计报告导出：Word (DOCX) / PDF"""
 
 import io
+import logging
 import os
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ================================================================
@@ -236,7 +239,8 @@ def export_to_docx(design: Dict) -> bytes:
 
 
 def _set_east_asian_font(style, font_name: str) -> None:
-    """设置样式的东亚字体（CJK fallback）。不是关键功能，失败时静默回退。"""
+    """设置样式的东亚字体（CJK fallback）。不是关键功能，失败时静默回退（回退语义未变，
+    但自 s924-08 起在 debug 级别留一条记录，见下）。"""
     try:
         from docx.oxml.ns import qn
         from lxml import etree
@@ -247,8 +251,8 @@ def _set_east_asian_font(style, font_name: str) -> None:
         if rFonts is None:
             rFonts = etree.SubElement(rPr, qn("w:rFonts"))
         rFonts.set(qn("w:eastAsia"), font_name)
-    except Exception:
-        pass
+    except Exception as exc:                    # 口径 A：不抬级别、不改控制流，只把"悄悄失败"变可见
+        logger.debug("docx 字体 %s 设置失败（回退默认）: %s", font_name, exc)
 
 
 # ================================================================
@@ -270,9 +274,11 @@ def export_to_pdf(design: Dict) -> bytes:
     pdf.add_page()
 
     # 注册中文字体
+    # 尾部的旧弃用实参已删（s924-07）：fpdf2 自 v2.5.1 起用 @deprecated_parameter 吞掉它并打
+    # DeprecationWarning，字体是否按 Unicode 处理早由文件本身决定 ⇒ 删除对产物字节零影响。
     font_name = "CJK"
-    pdf.add_font(font_name, "", font_path, uni=True)
-    pdf.add_font(font_name, "B", font_path, uni=True)
+    pdf.add_font(font_name, "", font_path)
+    pdf.add_font(font_name, "B", font_path)
 
     def write(text, size=12, bold=False, align="L", new_line=True):
         style = "B" if bold else ""
@@ -432,7 +438,9 @@ def export_to_pdf(design: Dict) -> bytes:
     for i, ref in enumerate(all_refs):
         write_multi(f"{i+1}. {ref}", size=10)
 
-    return pdf.output()
+    # fpdf2 2.8.x 的 output() 返 bytearray，与本函数 `-> bytes` 声明不符；
+    # 与同件 build_questionnaire_pdf 尾部的归一写法对齐（s924-06），让两个 PDF 出口容器类型一致。
+    return bytes(pdf.output())
 
 
 # ================================================================
