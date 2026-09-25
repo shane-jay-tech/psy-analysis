@@ -384,8 +384,18 @@ def _add_figure(doc, fig: FigureItem, number: int = 1):
 # --------------------------------------------------------------------------- #
 
 def _setup_page(doc):
-    """页边距 + 默认样式。"""
+    """页边距 + 纸张尺寸 + 默认样式。
+
+    纸张尺寸显式钉 A4：`Cm(21) × Cm(29.7)` 落盘即 `w:pgSz w=11906 h=16838`（twips）。
+    改版前本函数只写 `pgMar` 不写 `pgSz` ⇒ 走这条路的文档全部继承捆绑模板的
+    **US Letter（12240×15840）**，印给被试的空白施测卷因此落在 Letter 上。
+    放行依据＝**s924-26**（用户可见改版 Letter→A4，由 s923-19 结论 3 提出；
+    与路 C `src/questionnaire/exporters.py` 的 `Cm(21)/Cm(29.7)` 同值收口）。
+    另路 `build_thesis_with_custom_cover` 按其原注释不调用本函数，封面模板页尺寸不变。
+    """
     for section in doc.sections:
+        section.page_width = Cm(21)
+        section.page_height = Cm(29.7)
         section.top_margin = Cm(S.MARGIN_TOP_CM)
         section.bottom_margin = Cm(S.MARGIN_BOTTOM_CM)
         section.left_margin = Cm(S.MARGIN_LEFT_CM)

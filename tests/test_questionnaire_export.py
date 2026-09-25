@@ -5,6 +5,7 @@
 - build_questionnaire_pdf 输出非空且 %PDF magic
 - 中文 / 反向题 / 自定义锚点 烟雾测试
 - 入参校验：scale_points / anchors 长度
+- 空白施测卷页尺寸钉桩（s924-26：Letter→A4，按 twips 整数钉产物面）
 """
 
 from __future__ import annotations
@@ -73,6 +74,26 @@ class TestQuestionnaireDocx:
             },
         )
         assert out[:4] == b"PK\x03\x04"
+
+    def test_blank_paper_is_a4_not_letter(self, sample_doc):
+        """空白施测卷页尺寸＝**A4**（s924-26 放行的用户可见改版；改版前实测继承模板的 US Letter）。
+
+        口径同 `tests/test_exporters_docx_geometry.py`（s923-06）：十进制意图值经 OOXML 的
+        twips 量化后不可能逐位相等 ⇒ **按 twips 整数钉产物面**。
+        别写成 `section.page_width.cm == 21`，那在本仓口径下当场是红的（真实读回 21.000861）。
+        """
+        import io
+
+        from docx import Document
+
+        from src.output.docx_exporter import build_questionnaire_docx
+
+        out = build_questionnaire_docx(sample_doc, scale_points=5)
+        doc = Document(io.BytesIO(out))
+        assert len(doc.sections) == 1
+        section = doc.sections[0]
+        assert section.page_width.twips == 11906    # A4 宽；改版前实测 12240（US Letter）
+        assert section.page_height.twips == 16838   # A4 高；改版前实测 15840（US Letter）
 
     def test_invalid_scale_points(self, sample_doc):
         from src.output.docx_exporter import build_questionnaire_docx
