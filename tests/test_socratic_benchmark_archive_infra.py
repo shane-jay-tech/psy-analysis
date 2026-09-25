@@ -5,7 +5,7 @@
 autouse 夹具给真实历史目录做"名字＋字节数＋mtime_ns"面簿，用例跑完逐位比对 ⇒ 判据 2 自证。
 
 🔴 派单前提否证（按实况收窄，未改 src/ 一个字节）
-1. 「断言 `_last_history_entry` 取 mtime 最新」方向反了：`evaluate_socratic_benchmark.py:128-133`
+1. 「断言 `_last_history_entry` 取 mtime 最新」方向反了：`evaluate_socratic_benchmark.py:128-142`
    实测是 **按文件名字典序** 取末位（注释自己写明"UTC 时间戳保证字典序＝时间序"），
    mtime 只用于姊妹函数 `_latest_report`（`:120-126`）。⇒ 本件用"名字晚、mtime 反而旧"的
    交叉样本把两面的差别钉死（哪天有人把读取改成按 mtime 排，这条立刻红）。
@@ -16,8 +16,14 @@ autouse 夹具给真实历史目录做"名字＋字节数＋mtime_ns"面簿，�
      （实测 `10 skipped`）⇒ 默认全量里等效没跑；
    - `_last_history_entry`：全仓 `tests/` **零引用** ⇒ 这才是真空缺。
    ⇒ 本件**不打 benchmark 标记**（基建与 LLM 无关，不该被基准门禁挡着），并把上面三条现状各钉一处。
-3. 顺带钉出两个现状风险（只登记不修，见结果件遗留）：同秒两次归档会撞同一个文件名（时间戳只到秒），
-   Windows 侧 `glob("*.json")` 大小写不敏感会把 `UPPER.JSON` 认成历史项。
+3. 顺带钉出两个现状风险（s922-125 只登记；**s924-65 已修，生产码与本件同笔**）：
+   ① 同秒两次归档会撞同一个文件名（时间戳只到秒）⇒ `_archive_to_history` 现在在目标已存在时
+   追加定宽序号 `_001`；② Windows 侧 `glob("*.json")` 大小写不敏感会把 `UPPER.JSON` 认成历史项
+   ⇒ `_last_history_entry` 现在改用 `iterdir()` ＋ 区分大小写的 `.json` 后缀过滤 ＋ 排除下划线前缀件。
+   下面两处原先"登记现状"的用例已按修复后的语义改写（见 `test_two_archives_inside_the_same_second_do_not_collide`
+   与 `test_uppercase_json_suffix_is_not_claimed_on_windows`），并补两条新钉：
+   `test_underscore_prefixed_json_sidecar_is_not_claimed_as_history_entry`（修②的 sidecar 面）与
+   `test_ten_same_second_archives_stay_lexically_monotonic`（修①的序号定宽面）。
 """
 from __future__ import annotations
 
@@ -36,7 +42,10 @@ from scripts import evaluate_socratic_benchmark as evaluate
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REAL_HISTORY_DIR = REPO_ROOT / "data" / "benchmark_history"
-ARCHIVE_NAME_PATTERN = r"socratic_benchmark_\d{8}T\d{6}Z\.json"
+# s924-65 修①之后，同秒撞名的追加件形如 `..._001.json` —— `(_\d{3})?` 是**新增形态**而非放宽：
+# 时间戳部分仍逐位锁死，且 `test_same_second_archives_stay_isomorphic_with_the_archive_pattern`
+# 会把基础名与追加名两头都塞进这条正则验一遍。
+ARCHIVE_NAME_PATTERN = r"socratic_benchmark_\d{8}T\d{6}Z(_\d{3})?\.json"
 FROZEN_UTC = datetime(2026, 3, 4, 5, 6, 7, tzinfo=timezone.utc)
 
 
@@ -130,16 +139,45 @@ def test_last_history_entry_does_not_recurse_into_subdirectories(history_dir):
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows 侧 glob 大小写不敏感，POSIX 不成立")
-def test_uppercase_json_suffix_is_claimed_on_windows(history_dir):
-    """登记现状：`glob("*.json")` 在 win32 把 `UPPER.JSON` 也认成归档项并按字典序排前。
+def test_uppercase_json_suffix_is_not_claimed_on_windows(history_dir):
+    """s924-65 修②：误命名的大写后缀件不得进入末次归档候选。
 
-    这不是"应该"，是"现在如此"——它会让一次误命名的文件盖掉末次归档读数，属日间复核项。
+    原用例（s922-125）钉的是**反方向**的现状（`.name == "UPPER.JSON"`，即"它确实会盖掉末次读数"），
+    随修复一并改写；登记语义见模块 docstring 前提 3。判别力：把 `_last_history_entry` 的收集面
+    换回 `glob("*.json")` 本条当场红 —— win32 上 `Path` 比较走 casefold，`UPPER.JSON` 会排到
+    真实归档**之后**。
     """
     history_dir.mkdir()
-    (history_dir / "socratic_benchmark_20260101T000000Z.json").write_text(_report("A"), encoding="utf-8")
+    real = history_dir / "socratic_benchmark_20260101T000000Z.json"
+    real.write_text(_report("A"), encoding="utf-8")
     (history_dir / "UPPER.JSON").write_text(_report("noise"), encoding="utf-8")
 
-    assert evaluate._last_history_entry(history_dir).name == "UPPER.JSON"
+    assert evaluate._last_history_entry(history_dir) == real
+    assert (history_dir / "UPPER.JSON").exists(), "过滤只许发生在读取面，不许顺手删别人的文件"
+
+    upper_only = history_dir.parent / "upper_only"
+    upper_only.mkdir()
+    (upper_only / "UPPER.JSON").write_text(_report("noise"), encoding="utf-8")
+    assert evaluate._last_history_entry(upper_only) is None, "目录里只剩误命名件时宁缺毋滥"
+
+
+def test_underscore_prefixed_json_sidecar_is_not_claimed_as_history_entry(history_dir):
+    """修②的另一面：`_` 前缀的 sidecar 哪怕后缀是 `.json` 也不算归档（跨平台都成立）。
+
+    只有一枚 `_latest_drift_backup.json` 时**必须读成 None** —— 修复前 `glob("*.json")` 会把它
+    当成末次归档，`_track_drift` 就拿 sidecar 当 previous 去比了。同名**目录**那半验的是 `is_file()`：
+    修复前 `glob` 会把它取中，而它的时间戳字段比真归档新。
+    """
+    history_dir.mkdir()
+    (history_dir / "_latest_drift_backup.json").write_text(_report("sidecar"), encoding="utf-8")
+    assert evaluate._last_history_entry(history_dir) is None
+
+    real = history_dir / "socratic_benchmark_20260101T000000Z.json"
+    real.write_text(_report("A"), encoding="utf-8")
+    assert evaluate._last_history_entry(history_dir) == real
+
+    (history_dir / "socratic_benchmark_20260201T000000Z.json").mkdir()
+    assert evaluate._last_history_entry(history_dir) == real, "目录不是归档"
 
 
 # ══════════════════ 二、归档动作 _archive_to_history ══════════════════
@@ -198,11 +236,12 @@ def test_archive_creates_the_history_dir_when_missing(tmp_path, report_dir):
     assert target_dir.is_dir() and archived.parent == target_dir
 
 
-def test_two_archives_inside_the_same_second_collide_registered(history_dir, report_dir, monkeypatch):
-    """🔴 登记现状（时间戳精度只到秒）：同秒两次归档得到同一个路径，第一份内容被静默覆盖。
+def test_two_archives_inside_the_same_second_do_not_collide(history_dir, report_dir, monkeypatch):
+    """s924-65 修①：同秒两次归档产出**两个不同路径**，首份不再被静默覆盖。
 
-    一次 `--track-drift` 只归档一份，所以现在打不到；但"连续观测"若改成批量补跑就会踩。
-    本条把风险钉成可读断言，修不修属日间决策（本单不改 src/）。
+    原用例（s922-125）钉的是"同秒必撞名、历史目录只留一份"的现状，随修复改写；
+    登记表见模块 docstring 前提 3。判别力：把 `_archive_to_history` 的 `while target.exists()`
+    那一圈去掉，本条在 `path_a != path_b` 上当场红。
     """
     monkeypatch.setattr(evaluate, "datetime", _FrozenDatetime(FROZEN_UTC))
     first = report_dir / "benchmark_A.json"
@@ -213,9 +252,36 @@ def test_two_archives_inside_the_same_second_collide_registered(history_dir, rep
     path_a = evaluate._archive_to_history(first, history_dir)
     path_b = evaluate._archive_to_history(second, history_dir)
 
-    assert path_a == path_b, "同秒撞名这条现状变了，登记表要更正"
+    assert path_a != path_b, "同秒撞名这条现状又回来了：首份会被静默覆盖"
+    assert json.loads(path_a.read_text(encoding="utf-8"))["tag"] == "first", "第二份盖掉了第一份"
     assert json.loads(path_b.read_text(encoding="utf-8"))["tag"] == "second"
-    assert len(list(history_dir.glob("*.json"))) == 1, "历史目录里只留下一份 ⇒ 首份已不可恢复"
+    assert sorted(p.name for p in history_dir.iterdir()) == sorted([path_a.name, path_b.name])
+    assert evaluate._last_history_entry(history_dir) == path_b, "追加件必须排在被追加件之后"
+    assert re.fullmatch(ARCHIVE_NAME_PATTERN, path_b.name), path_b.name
+
+
+def test_ten_same_second_archives_stay_lexically_monotonic(history_dir, report_dir, monkeypatch):
+    """修①的边界面：序号**定宽**才守得住"字典序＝时间序"这条模块级不变量。
+
+    若后缀写成不定宽的 `_1`…`_10`，第 10 次的名字会字典序回退到第 2 次之前 ⇒
+    `_last_history_entry` 读到的是九份之前的旧归档，漂移对比静默错位。
+    """
+    monkeypatch.setattr(evaluate, "datetime", _FrozenDatetime(FROZEN_UTC))
+    source = report_dir / "benchmark_A.json"
+    names = []
+    for run in range(10):
+        source.write_text(_report(f"run{run}"), encoding="utf-8")
+        names.append(evaluate._archive_to_history(source, history_dir).name)
+
+    assert len(set(names)) == 10, f"同秒 10 次归档只产出 {len(set(names))} 个名字"
+    assert names == sorted(names), f"落盘序与字典序不再一致：{names}"
+    assert [p.name for p in sorted(history_dir.iterdir())] == names
+    assert evaluate._last_history_entry(history_dir).name == names[-1]
+    assert names[0] == "socratic_benchmark_20260304T050607Z.json"
+    assert names[1] == "socratic_benchmark_20260304T050607Z_001.json"
+    assert names[-1] == "socratic_benchmark_20260304T050607Z_009.json"
+    for name in names:
+        assert re.fullmatch(ARCHIVE_NAME_PATTERN, name), name
 
 
 def test_next_second_produces_a_distinct_entry(history_dir, report_dir, monkeypatch):
@@ -233,7 +299,7 @@ def test_next_second_produces_a_distinct_entry(history_dir, report_dir, monkeypa
 
 
 def test_the_read_then_archive_pair_chains_as_track_drift_expects(history_dir, report_dir, monkeypatch):
-    """把"先读末次、再归档"的调用序（`_track_drift` 的 `:191-192`）在 tmp 里复演一遍：
+    """把"先读末次、再归档"的调用序（`_track_drift` 的 `:211-212`）在 tmp 里复演一遍：
     第二次跑时 previous 必须正是第一次的归档。"""
     monkeypatch.setattr(evaluate, "datetime", _FrozenDatetime(FROZEN_UTC))
     assert evaluate._last_history_entry(history_dir) is None

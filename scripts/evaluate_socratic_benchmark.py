@@ -126,18 +126,38 @@ def _latest_report(report_dir: Path) -> Optional[Path]:
 
 
 def _last_history_entry(history_dir: Path) -> Optional[Path]:
-    """返回 data/benchmark_history/ 里上一次的归档（按文件名排序，UTC 时间戳保证字典序＝时间序）。"""
+    """返回 data/benchmark_history/ 里上一次的归档（按文件名排序，UTC 时间戳保证字典序＝时间序）。
+
+    收集面只认**区分大小写的 `.json` 后缀**且**不以下划线开头**的普通文件：
+    win32 的 `glob("*.json")` 大小写不敏感，会把误命名的 `UPPER.JSON` 收进来，而 Windows 侧
+    `Path` 比较走 casefold ⇒ 它排在真实归档之后，一次误命名就能盖掉末次归档读数；
+    下划线前缀件（`_latest_drift.md`、`_relay_calls.jsonl` 那一族 sidecar）同样不是归档。
+    """
     if not history_dir.exists():
         return None
-    cands = sorted(history_dir.glob("*.json"))
+    cands = sorted(
+        p for p in history_dir.iterdir()
+        if p.is_file() and not p.name.startswith("_") and p.name.endswith(".json")
+    )
     return cands[-1] if cands else None
 
 
 def _archive_to_history(latest_report: Path, history_dir: Path) -> Path:
-    """把最新报告复制到 history，文件名带 UTC 时间戳。"""
+    """把最新报告复制到 history，文件名带 UTC 时间戳。
+
+    时间戳只到秒 ⇒ 同秒两次归档会撞到同一个路径、把首份静默覆盖，所以目标已存在时
+    在 `.json` 前追加定宽序号另存一份。分隔符取 `_`、序号取 `%03d` 是为了守住
+    `_last_history_entry` 的"字典序＝时间序"不变量：`_`(0x5F) > `.`(0x2E) 让追加件
+    排在被追加件之后，定宽则让 `_010` 不会反过来排在 `_002` 之前。
+    """
     history_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    target = history_dir / f"socratic_benchmark_{ts}.json"
+    stem = f"socratic_benchmark_{ts}"
+    target = history_dir / f"{stem}.json"
+    seq = 1
+    while target.exists():
+        target = history_dir / f"{stem}_{seq:03d}.json"
+        seq += 1
     shutil.copy2(latest_report, target)
     return target
 
