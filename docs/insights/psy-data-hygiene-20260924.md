@@ -308,3 +308,27 @@ print('commit_frames',cc,'declared_pages',last,'=> folded size',last*ps)
    现已整体下移 ⇒ 引用本档该节行号前，按 `git show 928e62e:scripts/evaluate_socratic_benchmark.py` 或直接现取为准。
 3. ✅ §〇／§一／§二／§三 的读数主班已独立复点通过（`data/` 全树 187 文件／21,103,172 B、
    `literature_feed` 181 件／21,059,126 B、`data/kaoyan.db` 确在盘且 0 字节）——**四项裁决里"删除"类动作一律仍未执行，等人工**。
+
+
+## 订正注二（主班自纠 · 2026-09-25 08:3x · 🔴 撤回上面「订正注」第 1 条）
+
+上面那条订正注说"§四 出口 B 已被 `4443b3e` 的侧车过滤取代"——**这句不成立，主班转述了一条被子班自己撤回的结论**。
+主班现已打开实现逐行复点（`scripts/evaluate_socratic_benchmark.py:138-142`）：
+
+```
+$ .venv/Scripts/python.exe -c "…读取 _last_history_entry 函数体…"
+140:         if p.is_file() and not p.name.startswith("_") and p.name.endswith(".json")
+```
+
+⇒ 收集面判据是「**不**以 `_` 开头 **且** 以 `.json` 结尾」。`benchmark_backfill_draft.json` **既不是下划线前缀、又以 .json 结尾**
+⇒ **它仍然被收进收集面**，`4443b3e` 的过滤只挡掉了 `UPPER.JSON`（大小写）与 `_latest_drift.md`／`_relay_calls.jsonl` 那一族 sidecar。
+**所以 §四 出口 B（把它改成 `_benchmark_backfill_draft.json`）依然是活的、且正是这条过滤认得的形态**；
+另一条等价解是 `s924-65` 的"想做但没做①"——把收集面收窄到**归档名形状**（能一并干掉这类"小写 .json、非归档"的三不管杂物）。
+两条都属改名或改收集面，**都要单独一单、由人工或主班点头后才动**；本档 §四 原文与出口 B 的建议**按原判保留**。
+
+（订正注第 2 条仍成立：§四 所引 `evaluate_socratic_benchmark.py` 行号系 `4443b3e` 之前基线，现已下移。
+ 第 3 条仍成立：四项读数主班独立复点通过、删除类动作一律未执行。）
+
+**这条自纠的成因值得记**：`psy58` 08:27 那批 note 里，第一条写"出口 B 已被取代"、随后两条把它撤回——
+主班只读到第一条就落笔追加了订正注，**没有打开被转述的那段代码**。教训：转述链上每一跳都要重验，
+尤其是"某改动已经覆盖了你的建议"这类会让人**取消动作**的结论（取消动作比执行动作更没人复核）。
