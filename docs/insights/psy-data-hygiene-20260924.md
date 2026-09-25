@@ -294,3 +294,17 @@ print('commit_frames',cc,'declared_pages',last,'=> folded size',last*ps)
 ### 本单一句话结论
 `data/` 四项里**没有一项是"体积问题"**：真孤儿（kaoyan.db）可安全删、raw 已有策略只是没人跑、WAL 无害但**它暴露了周备静默丢 13.7% articles**、benchmark 草稿只是需要一次改名。
 唯一带真实数据风险的是 ③ 的备份面 ⇒ **建议主班优先派一张写单修 `backup_user_data.py`**。
+
+---
+
+## 订正注（主班代附 · 2026-09-25 08:3x · 出处＝`psy58` 自己 08:27 的收工更正 note）
+
+1. 🔴 **§四 的出口 B（"给侧车草稿加 `_` 前缀以退出收集面"）已被更优形态取代，勿再据本档草稿开改名单。**
+   本档入库后，同仓 `s924-65`（psy59 出码、接班班 psy61 第三方复核）以 **`4443b3e`** 在
+   `scripts/evaluate_socratic_benchmark.py` 的 `_last_history_entry` 里落了**侧车件过滤**（含 `_` 前缀件与目录排除），
+   并配了 17 例钉桩（含"改名不抢末位"的正反对照）⇒ 收集面已不再吃 `benchmark_backfill_draft.json` 这类杂物，
+   **改名这条既无必要、还会留一个"为什么带下划线"的悬案**。§四 原文保留不改（那是当时的实况）。
+2. ⚠ **§四 所引 `evaluate_socratic_benchmark.py` 行号（`:128`／`:138-142`／`:155`）是 `4443b3e` 之前基线的读数**，
+   现已整体下移 ⇒ 引用本档该节行号前，按 `git show 928e62e:scripts/evaluate_socratic_benchmark.py` 或直接现取为准。
+3. ✅ §〇／§一／§二／§三 的读数主班已独立复点通过（`data/` 全树 187 文件／21,103,172 B、
+   `literature_feed` 181 件／21,059,126 B、`data/kaoyan.db` 确在盘且 0 字节）——**四项裁决里"删除"类动作一律仍未执行，等人工**。
