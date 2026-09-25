@@ -995,3 +995,148 @@ class TestAsyncStreamObservability:
         assert cb, "callback 异常仍须留痕"
         assert all(r.levelno == logging.DEBUG for r in cb)  # 但级别不上抬
         assert not [r for r in recs2 if r.levelno >= logging.WARNING]
+
+
+# ---------------------------------------------------------------------------
+# s924-69：trace 字段契约三层钉桩
+#   层① LLMTrace.as_dict() → 层② get_trace_summary() 读键 → 层③ app.py 侧栏消费
+# 任何一层改名，另一层都会**静默**读空 ⇒ 这里把三层的键名形状各钉一条集合相等。
+#
+# 纯测试单：`src/llm_gateway/gateway.py` 与 `app.py` 一个字节未改（gateway 上刚并过三单合笔，
+# 同仓另有在途件；本班只加判据，不改生产面）。
+#
+# 🔴 卷宗前提否证（按盘上实证收窄，见结果件「证据」1./2.）：卷宗写「summary 返回键集恰为 **7** 键」，
+# 盘上实满是 **8** 键 —— 卷宗那份清单漏了 `total_elapsed_ms`（gateway 产出、全仓零消费）；
+# 空会话分支另只有 **6** 键（少 `total_elapsed_ms` 与 `avg_elapsed_ms`）。
+# ⇒ 本件把**两个分支各钉一条集合相等**（多键少键同样红），7→8 不是放宽断言。
+# 🔴 凭据红线：本件只断**键集形状与必存在键**，不断任何值；trace 全程手工构造塞进
+# `st.session_state`，不打上游、不读配置、日志零新增。
+# ---------------------------------------------------------------------------
+
+import ast
+from pathlib import Path as _TracePath
+
+from src.llm_gateway import LLMTrace
+
+APP_PY = _TracePath(__file__).resolve().parents[1] / "app.py"
+
+# 层①：`LLMTrace.as_dict()` 落进 session_state 的字典形状（dataclass 字段名逐位锁死）
+TRACE_DICT_KEYS = frozenset({
+    "timestamp", "module", "model", "backend", "streaming", "elapsed_ms",
+    "prompt_tokens_estimate", "completion_tokens_estimate", "cost_cny",
+    "success", "cancelled", "cached", "error",
+})
+# 层②：`get_trace_summary()` 满会话分支的键集
+SUMMARY_KEYS = frozenset({
+    "total_calls", "total_tokens", "total_cost_cny", "total_elapsed_ms",
+    "avg_elapsed_ms", "by_module", "by_status", "by_model_cost",
+})
+# 层②'：空会话分支（少两枚耗时键，见上面前提否证）
+SUMMARY_KEYS_EMPTY_SESSION = frozenset({
+    "total_calls", "total_tokens", "total_cost_cny",
+    "by_module", "by_status", "by_model_cost",
+})
+# 层③：app.py 侧栏声明消费的键（卷宗点名的那 7 枚）
+APP_SIDEBAR_KEYS = frozenset({
+    "total_calls", "total_tokens", "total_cost_cny", "avg_elapsed_ms",
+    "by_module", "by_status", "by_model_cost",
+})
+# 侧栏靠它在 6 键分支上挡开 8 键分支的耗时项 ⇒ 它必须两分支都在
+GUARD_KEY = "total_calls"
+_CREDENTIAL_SHAPES = frozenset({
+    "api_key", "apikey", "key", "token", "tokens", "secret", "password",
+    "base_url", "headers", "authorization",
+})
+
+
+def _full_trace_dict() -> dict:
+    """"全字段"trace：字段名走真实 `as_dict()`，本班不自己抄一份。"""
+    return LLMTrace(
+        timestamp="2026-09-25T08:00:00+08:00", module="ai_tutor", model="deepseek-chat",
+        backend="relay", streaming=True, elapsed_ms=1234.5,
+        prompt_tokens_estimate=100, completion_tokens_estimate=50,
+        cost_cny=0.5, success=True, cancelled=False, cached=False, error="",
+    ).as_dict()
+
+
+def _summary_keys_consumed(source_text: str) -> tuple[frozenset, frozenset]:
+    """AST 扫「由 `get_trace_summary()` 赋值来的那个变量」的取键面，分直接下标 / 软取两族。
+
+    选 AST 而不是文本扫的理由：app.py 里另有 `_diag.summary`（属性，非本契约）与
+    `summary = format_result_summary(output)`（同名异源）两族无辜变量，文本扫会把它们一起收进来。
+    """
+    tree = ast.parse(source_text)
+    names = {
+        target.id
+        for node in ast.walk(tree) if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name) and isinstance(node.value, ast.Call)
+        and getattr(node.value.func, "id", None) == "get_trace_summary"
+    }
+    assert names, "app.py 里再没有 `x = get_trace_summary()`：侧栏消费面已改名或搬家，本契约失去对象"
+    indexed: set = set()
+    soft: set = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) \
+                and node.value.id in names:
+            if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                indexed.add(node.slice.value)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                and node.func.attr == "get" and isinstance(node.func.value, ast.Name) \
+                and node.func.value.id in names and node.args \
+                and isinstance(node.args[0], ast.Constant):
+            soft.add(node.args[0].value)
+    return frozenset(indexed), frozenset(soft)
+
+
+class TestTraceFieldContract:
+    """s924-69 判据 ①：三层键集形状各钉一条集合相等。"""
+
+    def test_trace_to_summary_key_sets_are_exactly_the_contract(self):
+        import streamlit as st
+        st.session_state.clear()
+        clear_traces()
+        try:
+            empty = get_trace_summary()
+            assert set(empty) == SUMMARY_KEYS_EMPTY_SESSION, "空会话分支的键集形状变了"
+            assert GUARD_KEY in empty, "侧栏用来挡空会话的那枚键不再存在"
+
+            trace = _full_trace_dict()
+            # 凭据护栏放在形状判定**之前**：红线要的是"先拦住凭据键"，不是"顺带被形状差异抓到"
+            assert not (set(trace) & _CREDENTIAL_SHAPES), \
+                f"落进 session_state 的 trace 里混进了凭据形态的键：{set(trace) & _CREDENTIAL_SHAPES}"
+            assert set(trace) == TRACE_DICT_KEYS, "as_dict 的字段形状与契约不再同构"
+
+            st.session_state["llm_traces"] = [trace]
+            summary = get_trace_summary()
+            assert set(summary) == SUMMARY_KEYS, (
+                f"summary 键集与契约不符 多：{set(summary) - SUMMARY_KEYS} 少：{SUMMARY_KEYS - set(summary)}")
+            assert APP_SIDEBAR_KEYS <= set(summary), \
+                f"侧栏必存在键缺失：{APP_SIDEBAR_KEYS - set(summary)}"
+            # 嵌套面的"必存在键"：层①的 module/cached/cancelled/success 改名 ⇒ 这里立刻分叉
+            assert set(summary["by_status"]) == {"success", "cancelled", "error", "cached"}
+            assert set(summary["by_module"]) == {trace["module"]}, \
+                "层②读不到层①的 module 键（改名了）"
+        finally:
+            # 手工塞进去的合成 trace 不许漏给同进程后来的件（`tests/test_llm_gateway_streams.py`
+            # 同样读 `llm_traces`，不清就是给邻件埋一条顺序性假红）
+            clear_traces()
+            st.session_state.clear()
+
+    def test_app_sidebar_consumes_only_declared_summary_keys(self):
+        """s924-69 判据 ②：静态扫 app.py 侧栏取键面 ⊆ summary 键集。"""
+        indexed, soft = _summary_keys_consumed(APP_PY.read_text(encoding="utf-8"))
+        consumed = indexed | soft
+        assert consumed, "静态扫收到空集 ⇒ 判据失去对象，红"
+        assert consumed <= SUMMARY_KEYS, f"侧栏取了契约外的键：{consumed - SUMMARY_KEYS}"
+        assert GUARD_KEY in indexed, \
+            "侧栏不再直接下标 total_calls 挡空会话 ⇒ 6/8 键分叉失去护栏"
+
+        # 对照刀（内存副本，盘上 app.py 零改动）：人为改一枚消费侧键名必须被抓
+        renamed = APP_PY.read_text(encoding="utf-8").replace(
+            "summary['avg_elapsed_ms']", "summary['avg_elapsed_ms_typo']", 1)
+        assert renamed != APP_PY.read_text(encoding="utf-8"), \
+            "app.py 里这枚键的取法形态变了，对照刀失去对象 ⇒ 按实况更正上面两处"
+        r_indexed, r_soft = _summary_keys_consumed(renamed)
+        assert "avg_elapsed_ms_typo" in (r_indexed | r_soft)
+        assert not (r_indexed | r_soft) <= SUMMARY_KEYS, "改名没被抓到 ⇒ 本条判据不承重"
