@@ -181,7 +181,8 @@ def test_docx_ships_normally_while_cjk_mapping_missing_and_only_debug_records(ca
     """s922-13 说的「生产里可能一直在悄悄失败而无人知」——本例把它**演出来**并钉住判据。
 
     强制 `_set_east_asian_font` 全程失败后：
-    ① `export_to_docx` 照样出稿、不抛，**只在 DEBUG 面留 5 条记录**（s924-08 口径 A）；
+    ① `export_to_docx` 照样出稿、不抛，**只在 DEBUG 面留 6 条记录**（s924-08 口径 A；
+       条数＝调用次数，s924-09 补副标题楷体后由 5 变 6）；
     ② 回读文档里 Normal 样式的 `w:ascii` **仍是「宋体」**（`:33` 设的），
        所以任何只看 `style.font.name` 的检查都会**误判为"字体配好了"**；
     ③ 而 `w:eastAsia` 压根不存在 ⇒ 中文实际没拿到东亚字体映射。
@@ -192,7 +193,7 @@ def test_docx_ships_normally_while_cjk_mapping_missing_and_only_debug_records(ca
     """
     caplog.set_level(logging.DEBUG)
     blob, hits = export_under_cjk_failure()                 # 全程失败态出稿，见文件尾 helper
-    assert hits == 5                                        # 5 个调用点**全部**悄悄失败（判别实验）
+    assert hits == 6                                        # 6 次调用**全部**悄悄失败（判别实验）
 
     doc = Document(io.BytesIO(blob))
     normal = doc.styles["Normal"]
@@ -201,7 +202,7 @@ def test_docx_ships_normally_while_cjk_mapping_missing_and_only_debug_records(ca
     assert "Q1. 合成题干一" in "\n".join(p.text for p in doc.paragraphs)   # ① 正文照常
 
     recs = [r for r in caplog.records if r.name == exporters.__name__]
-    assert len(recs) == 5, f"一次导出恰好 5 条 debug（实得 {len(recs)}）"   # ① 全留痕
+    assert len(recs) == 6, f"一次导出恰好 6 条 debug（实得 {len(recs)}）"   # ① 全留痕
     assert all(r.levelno == logging.DEBUG for r in caplog.records), \
         [(r.name, r.levelname) for r in caplog.records]                     # 全程只有 debug，无抬级
 
@@ -222,12 +223,16 @@ def test_invalid_font_name_is_not_a_failure_at_all_and_lands_verbatim() -> None:
     assert _east_asia_of(style.element) == junk             # 错值逐字落盘，无人拦
 
 
-# ═══════════════ 4. 「静默」不等于「压根没跑」：三个调用点五次调用 ═══════════
-def test_three_call_sites_fire_five_times_per_export(monkeypatch) -> None:
+# ═══════════════ 4. 「静默」不等于「压根没跑」：四个调用点六次调用 ═══════════
+def test_four_call_sites_fire_six_times_per_export(monkeypatch) -> None:
     """判别实验：证明上面的"零信号"不是因为函数没被调用。
 
-    `:36` Normal（1 次）＋ `:44` Heading 1/2/3 循环（3 次）＋ `:54` 封面标题 run（1 次）
-    ⇒ 一次导出共 5 次。任务书"三处调用"指**调用点 3 个**，实际**调用 5 次**（口径收窄，见 result 证据节）。
+    按唯一文本锚点（不写行号，见纪律档 §十三.4）数调用点：
+    `_set_east_asian_font(style, "宋体")` Normal（1 次）
+    ＋ `_set_east_asian_font(h_style, "黑体")` Heading 1/2/3 循环（3 次）
+    ＋ `_set_east_asian_font(run, "黑体")` 封面主标题 run（1 次）
+    ＋ `_set_east_asian_font(run, "楷体")` 封面副标题 run（1 次，s924-09 P1 补）
+    ⇒ 一次导出共 **6** 次。任务书"三处调用"指调用点个数、且是改前口径，实际**调用 6 次**（口径收窄）。
     """
     seen: list[str] = []
     real = exporters._set_east_asian_font
@@ -239,24 +244,28 @@ def test_three_call_sites_fire_five_times_per_export(monkeypatch) -> None:
     monkeypatch.setattr(exporters, "_set_east_asian_font", spy)
     export_to_docx(_design())
 
-    assert seen == ["宋体", "黑体", "黑体", "黑体", "黑体"]
-    assert len(seen) == 5
+    assert seen == ["宋体", "黑体", "黑体", "黑体", "黑体", "楷体"]
+    assert len(seen) == 6
 
 
-# ═══════════════ 5. 附带在册现状（超出钉桩主体，只登记不改） ═══════════
-def test_subtitle_kaiti_run_has_latin_slot_only_no_eastasia_mapping() -> None:
-    """**附带发现**：封面副标题的「楷体」（`:60`）只设 latin 字体名，**没有**对应调用点 ⇒ 覆盖不对称。
+# ═══════════════ 5. 楷体东亚映射（s923-19 预言的「两笔一体」改写位） ═══════════
+def test_subtitle_kaiti_run_carries_eastasia_mapping() -> None:
+    """**已修**（s924-09 ＝ P1 授权）：封面副标题 run 现在 latin 槽与 `w:eastAsia` 双槽都是「楷体」。
 
-    5 次调用覆盖了 Normal / Heading 1-3 / 封面主标题 run，副标题 run 被漏掉。
-    后果与"悄悄失败"同类：正文里唯一的楷体行在 Word 中拿不到东亚映射，
-    而 `run.font.name == "楷体"` 会让任何只看名字的检查误判为已配好。
-    属现状钉桩，**本单不补调用**（补它＝改版式/改行为）。
+    本例原形是 s923-05 的附带现状钉桩（第二条断言东亚槽为空）。s923-19 的
+    「两条"钉 bug 现状"断言挡路」条目预言了这次改写，并裁定「修楷体必须同时改写这两处断言」
+    ⇒ 生产码补调用 ＋ 本断言翻转，**两笔一体**，缺一即回退。
+
+    覆盖面自证（改写后仍有牙，不为绿而放宽）：两条断言**成对**钉 latin 槽与东亚槽，只补其一即红。
+    · 把 `exporters` 里副标题那次补写删掉（＝改前产物形态）⇒ 第二条读回 `None`；
+    · 只改 latin 名不改东亚名、或东亚名写成别的字体 ⇒ 两条值不等。
+    合成反例见 result「证据」节（未临时改生产码自证，遵纪律档 §十三.7）。
     """
     doc = Document(io.BytesIO(export_to_docx(_design())))
     subtitle_run = doc.paragraphs[1].runs[0]
 
-    assert subtitle_run.font.name == "楷体"                 # 看着配了
-    assert _east_asia_of(subtitle_run.element) is None      # 实际没有 eastAsia
+    assert subtitle_run.font.name == "楷体"                    # latin 槽（改前改后同值）
+    assert _east_asia_of(subtitle_run.element) == "楷体"       # 东亚槽（本单补上的那一半）
 
 
 def test_run_fallback_append_would_land_rpr_after_text_and_stays_silent() -> None:

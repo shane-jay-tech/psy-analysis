@@ -21,9 +21,12 @@
 本件的口径：**四个十进制值用容差钉（意图面），真实快照用 twips 整数钉（产物面）**，
 两层都留，谁漂了都能立刻看出来。**只钉现状，不改版式**（改任何一个数都属版式回归决定）。
 
-同族第三处说谎点见 `:38-41` 的 Heading 字号：`font.size` 只写 `w:sz`，
-模板自带的 `w:szCs`（复杂文种字号）**留在原值** ⇒ 只看 `style.font.size.pt` 会以为 22pt 全线生效
-（本件第 5 例钉这件事）。
+同族第三处说谎点曾是 Heading 字号：`font.size` 只写 `w:sz`，模板自带的 `w:szCs`（复杂文种字号）
+留在原值 ⇒ 只看 `style.font.size.pt` 会以为 22pt 全线生效。**该条已由 s924-10 一致化**
+（`_sync_complex_script_size` 在 Heading 循环里让 `w:szCs` 跟随 `w:sz`），本件第 5 例现在钉的是
+"三档两值成对相等"，并**继续钉住样式层的未收口面**：Normal 仍只有 `w:sz`、没有 `szCs`。
+另有一处**本件并未断言、只在 result 里登记的实测残留**：封面三个带显式字号的 run 仍无 `w:szCs`
+⇒ 那两处要不要一起收，属主班裁（见 s924-10 result 遗留问题）。
 
 红线自约：design 全为「合成构念/合成题干」人造文案；本件**不含任何统计/研究结论数值**，
 `scale_config` 里的 5/1/0 只是让导出能跑通的结构参数，不参与任何断言。
@@ -170,14 +173,21 @@ def test_normal_and_heading_size_and_line_spacing_family(artifact) -> None:
         assert '<w:color w:val="2C3E50"/>' in style                                # RGBColor(0x2C,0x3E,0x50)
 
 
-# ═══════ 5. 本单挖到的"常量说谎"实例：sz 跟了，szCs 没跟 ═══════
-def test_heading_szcs_still_carries_the_template_size(artifact) -> None:
-    """**在册现状**（只钉不修）：`font.size` 只写 `w:sz`，模板的 `w:szCs` 留在原值 ⇒ 两值不等。
+# ═══════ 5. 曾经的"常量说谎"实例：sz 跟了、szCs 没跟 —— s924-10 已一致化 ═══════
+def test_heading_szcs_follows_sz_after_s92410(artifact) -> None:
+    """**已修**（s924-10 ＝ 入册授权）：Heading 1/2/3 的 `w:szCs` 现在与 `w:sz` 同值。
 
-    Heading 1：`sz=44`(22pt) 而 `szCs=28`(14pt)；Heading 2：`sz=32`(16pt) 而 `szCs=26`(13pt)；
-    Heading 3：`sz=28`(14pt) 而 `szCs` 不存在（Normal 也没有）。
-    ⇒ 谁只看 `style.font.size.pt` 得到 22，就以为该样式所有文字都是 22pt —— 复杂文种（阿拉伯文等）
-    其实按 14pt 走。本例把"两个字号不一致"钉住，避免有人拿 `font.size` 当版式全量证据。
+    本例原形是 s923-06 的"只钉不修"现状例。改前实测快照（本机 .venv，值随本断言内联）：
+    Heading 1 `sz=44`(22pt) / `szCs=28`(14pt)；Heading 2 `sz=32`(16pt) / `szCs=26`(13pt)；
+    Heading 3 `sz=28`(14pt) / **无** `szCs`。⇒ 只看 `style.font.size.pt` 得到 22 会以为全线 22pt，
+    复杂文种（阿拉伯文等）其实按 14pt 走 —— 这就是当初钉它的原因。
+    现由 `_sync_complex_script_size` 在 Heading 循环里补第三字号槽，三档全跟：44/44、32/32、28/28。
+
+    覆盖面自证（改写后仍有牙，非为绿放宽）：断言的是**成对相等**，不是"存在即可"。
+    · 撤掉那次同步 ⇒ H1 回到 `szCs=28`、H3 回到无 `szCs`，三行断言全红；
+    · 只同步一档（漏 H3）或写错值 ⇒ 对应那行红。
+    **本例同时继续钉住两处未纳入本单的范围**：Normal 仍无 `szCs`、H1 的显式字体名与 theme 属性仍并存
+    （后者按卷宗只落 result 裁决注记、不改）。
     """
     styles_xml = artifact["styles_xml"]
 
@@ -186,11 +196,12 @@ def test_heading_szcs_still_carries_the_template_size(artifact) -> None:
         return (re.findall(r'<w:sz w:val="(\d+)"/>', body),
                 re.findall(r'<w:szCs w:val="(\d+)"/>', body))
 
-    assert szs("Heading1") == (["44"], ["28"])
-    assert szs("Heading2") == (["32"], ["26"])
-    assert szs("Heading3") == (["28"], [])                      # H3 的 szCs 被模板/继承链吃掉
-    assert szs("Normal") == (["24"], [])
-    # 显式字体名与 theme 属性并存（同为"看着配了"一族）：
+    # 完成标准 ①：两值一致，且值就是改前那条 `w:sz`（不是随便相等就算过）
+    assert szs("Heading1") == (["44"], ["44"])
+    assert szs("Heading2") == (["32"], ["32"])
+    assert szs("Heading3") == (["28"], ["28"])                     # 改前该档根本没有 szCs
+    assert szs("Normal") == (["24"], [])                           # 本单范围外，仍只钉现状
+    # 显式字体名与 theme 属性并存（同为"看着配了"一族）：**本单不动**，仅落 result 裁决注记
     h1 = _style_xml(styles_xml, "Heading1")
     assert 'w:asciiTheme="majorHAnsi"' in h1 and 'w:ascii="黑体"' in h1
     assert 'w:eastAsiaTheme="majorEastAsia"' in h1 and 'w:eastAsia="黑体"' in h1
@@ -216,7 +227,10 @@ def test_cover_paragraph_and_indent_family_numbers(artifact) -> None:
 
     subtitle = re.findall(r"<w:p\b.*?</w:p>", xml, re.S)[1]
     assert '<w:sz w:val="32"/>' in subtitle                      # 副标题 Pt(16)
-    assert 'w:eastAsia' not in subtitle                          # 与 s923-05 附带发现同一条：楷体无东亚映射
+    # s923-05 附带发现（东亚映射缺失）的「两笔一体」改写位，见 s923-19 挡路条目 ＋ s924-09：
+    # 生产码补 `_set_east_asian_font(run, "楷体")` 后，本行从 `'w:eastAsia' not in subtitle`
+    # 翻成正向钉 —— 撤掉那次补写本例即红（东亚槽读不到 ⇒ 断言落空）。
+    assert 'w:eastAsia="楷体"' in subtitle                        # 完成标准 ①：副标题段 XML 含东亚映射
 
     # 10 = 6 行 info_lines(:87) + 1 段定义(:100) + 1 段维度描述(:110) + 2 道题干(:162)
     assert len(re.findall(r'<w:ind w:firstLine="420"/>', xml)) == 10   # :115 那条本件 design 不触发（无 example）

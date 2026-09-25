@@ -39,7 +39,10 @@ _LOGGER_NAME = "src.questionnaire.exporters"
 _RPR_TAGS = ("w:rPr", "w:rFonts")
 # 一次成功导出里 `_set_east_asian_font` 的**实际调用次数**（不是调用点个数）。
 # 与 s923-05 的 5 号例同一口径：Normal 1 ＋ Heading 1/2/3 共 3 ＋ 封面主标题 run 1。
-_CALLS_PER_EXPORT = 5
+# s924-09（P1 楷体修复）追加封面副标题 run「楷体」1 次 ⇒ 5 变 6。
+# 这条计数器是"零漏记"判据的分母：**新增任何调用点都必须同步它**，否则本件会把
+# "新调用点没留下 debug 记录"读成通过。
+_CALLS_PER_EXPORT = 6
 
 
 def _design() -> dict:
@@ -107,7 +110,8 @@ def test_debug_record_written_and_fallback_stays_silent_after_export(caplog) -> 
 
     断言分三段，缺一都不算接线到位：
     ① 单点失败 ⇒ 恰好 1 条、级别 DEBUG、logger 名与消息载荷（字体名 ＋ 异常文本）都在；
-    ② 整篇导出 ⇒ `hits == 5` 且记录数 `== 5` ⇒ **零漏记**（"新的静默路径"若存在，这个等式必破）；
+    ② 整篇导出 ⇒ `hits == 6` 且记录数 `== 6` ⇒ **零漏记**（"新的静默路径"若存在，这个等式必破；
+      次数随调用点增减，改 `exporters` 时记得同步 `_CALLS_PER_EXPORT`）；
     ③ 导出产物仍可读、正文仍在、`w:eastAsia` 仍缺（失败语义未改），且不抛、不发 warnings。
     """
     # ── ① 单点：留痕 ────────────────────────────────────────────────────────

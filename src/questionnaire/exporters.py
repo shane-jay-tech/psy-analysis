@@ -42,6 +42,9 @@ def export_to_docx(design: Dict) -> bytes:
         h_style = doc.styles[f"Heading {level}"]
         h_style.font.name = "黑体"
         h_style.font.size = Pt(size)
+        # s924-10：Heading 1/2/3 全跟 —— szCs 与上面这条 font.size 写的 w:sz 取同值。
+        # Normal 与三个显式字号 run（封面主/副标题、研究问题）本单未扩面，见 result 遗留问题。
+        _sync_complex_script_size(h_style)
         h_style.font.bold = bold
         h_style.font.color.rgb = RGBColor(0x2C, 0x3E, 0x50)
         _set_east_asian_font(h_style, "黑体")
@@ -61,6 +64,10 @@ def export_to_docx(design: Dict) -> bytes:
     run = subtitle.add_run(f"—— {design['construct_name']}问卷")
     run.font.size = Pt(16)
     run.font.name = "楷体"
+    # s924-09（P1 楷体修复）：latin 槽单设「楷体」时 Word 侧中文仍按 Normal 的宋体走，
+    # 故与封面主标题那次 `_set_east_asian_font(run, "黑体")` 同型补东亚映射；依据见
+    # zcode-bridge/done/s923-19.result.md「两笔一体」条目。
+    _set_east_asian_font(run, "楷体")
 
     doc.add_paragraph()
 
@@ -253,6 +260,39 @@ def _set_east_asian_font(style, font_name: str) -> None:
         rFonts.set(qn("w:eastAsia"), font_name)
     except Exception as exc:                    # 口径 A：不抬级别、不改控制流，只把"悄悄失败"变可见
         logger.debug("docx 字体 %s 设置失败（回退默认）: %s", font_name, exc)
+
+
+def _sync_complex_script_size(target) -> None:
+    """让复杂文种字号 `w:szCs` 跟随 `w:sz`（s924-10：两值一致化）。
+
+    `font.size` 只写 `w:sz`，模板自带的 `w:szCs` 留在原值（H1 `sz=44`/`szCs=28`、
+    H2 `sz=32`/`szCs=26`）⇒ 只看 `style.font.size.pt` 会以为全线 22pt，复杂文种其实按 14pt 走。
+    本 helper 把东亚/拉丁之外的第三个字号槽补齐，读回同一条 `w:sz` 的值写进 `w:szCs`。
+
+    两处刻意的设计约束（别在后续维护里改掉）：
+    1. **rPr 走属性取、不用 `qn("w:rPr")`** —— 同件的 CJK 失败桩只拦 `w:rPr`/`w:rFonts` 两个标签，
+       用它就等于把本 helper 混进那条"零漏记"计数器的分母里（观测桩会凭空多记）。
+    2. **`w:szCs` 插在 `w:sz` 之后**，不是尾插 —— `w:rPr` 的子元素有固定次序，
+       `_set_east_asian_font` 那条"没有 rPr 就 `SubElement` 尾插"的形态在 run 上会插到 `w:t` 之后
+       （s923-05 已把该隐患钉成在册现状），这里不复用它。
+    失败口径与 `_set_east_asian_font` 一致：不抬级别、不改控制流，只在 debug 留痕。
+    """
+    try:
+        from docx.oxml.ns import qn
+        from lxml import etree
+        rPr = target.element.rPr
+        if rPr is None:
+            return
+        sz = rPr.find(qn("w:sz"))
+        if sz is None:
+            return
+        szCs = rPr.find(qn("w:szCs"))
+        if szCs is None:
+            szCs = etree.Element(qn("w:szCs"))
+            sz.addnext(szCs)                    # 紧跟 w:sz，符合 rPr 子元素次序
+        szCs.set(qn("w:val"), sz.get(qn("w:val")))
+    except Exception as exc:
+        logger.debug("docx 复杂文种字号同步失败（回退默认）: %s", exc)
 
 
 # ================================================================
