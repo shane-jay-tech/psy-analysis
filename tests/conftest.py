@@ -27,6 +27,7 @@ _APP_TEST_FILES = {
     "test_playwright_e2e.py",
     "test_playwright_golden_research_flow.py",
     "test_questionnaire_import_panel_render.py",  # s924-01: 本件升级为真 AppTest，未登记＝零隔离
+    "test_lr_rerun_apptest.py",  # s924-59: LR 漏斗修订 `_lr_pending_rescore` 真 AppTest 端到端
 }
 
 
