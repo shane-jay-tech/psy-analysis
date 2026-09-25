@@ -71,7 +71,8 @@ def plotly_figs_to_figure_items(
         width_cm: 嵌入 Word 时的宽度（厘米）
 
     Returns:
-        FigureItem 列表；kaleido 缺失时静默跳过该图，返回部分结果。
+        FigureItem 列表；图形依赖不可用时记一次警告并返回空列表（partial），
+        论文正文与统计表格由 build_thesis_docx 独立写入，不受这里影响。
     """
     from src.visualization.paper_export import (
         KaleidoMissingError, to_paper_png,
@@ -84,8 +85,14 @@ def plotly_figs_to_figure_items(
                 width_px=width_px, height_px=height_px,
             )
             items.append(FigureItem(caption=caption, png_bytes=png, width_cm=width_cm))
-        except KaleidoMissingError:
-            break  # kaleido 不可用，停止后续生成
+        except KaleidoMissingError as exc:
+            logger.warning(
+                "docx_exporter: 论文版图表生成中止（图形依赖 kaleido 或其浏览器运行时不可用），"
+                "正文与统计表格不受影响；出路：pip install -U kaleido 后重新导出，"
+                "或改用 HTML 导出。原因：%s",
+                exc,
+            )
+            break  # 图形依赖不可用，停止后续生成
         except Exception:
             logger.debug("docx_exporter: 图表导出失败", exc_info=True)
             continue
