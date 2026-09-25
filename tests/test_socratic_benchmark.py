@@ -1,11 +1,17 @@
-"""LLM-as-judge 反问质量评估测试（v3.5）。"""
+"""LLM-as-judge 反问质量评估测试（v3.5）。
+
+标记口径（s924 收口，与 `tests/test_socratic_drift_tracker.py` 的 s923-34 口径对齐）：
+本件 21 例**全部离线** —— LLM 通道一律走 `requests_module=MagicMock(...)` 注入
+或 `llm_config={"api_key": ""}` 的 rule 降级，不碰网络、不需 `BENCHMARK_LLM_API_KEY`。
+⇒ 原先的**文件级** benchmark 标记把整件挡在默认跑法之外（`21 skipped / 0 failed`，
+看起来健康、实际零覆盖），已摘除；需要真 LLM 的那例在
+`tests/test_socratic_quality.py::test_socratic_quality_benchmark`，它自带函数级标记。
+若日后往本文件加**打真 LLM/带网**的用例，必须**逐例**补 `@pytest.mark.benchmark`，
+不要退回文件级标记（那会让离线例再次静默失明）。
+"""
 
 import json
 from unittest.mock import MagicMock
-
-import pytest
-
-pytestmark = pytest.mark.benchmark
 
 from src.upstream.socratic_benchmark import (
     JudgeScore,

@@ -19,7 +19,10 @@ from typing import Any, Dict, List
 
 import pytest
 
-pytestmark = pytest.mark.benchmark
+# 标记口径（s924 收口）：原先这里是**文件级** `pytestmark = pytest.mark.benchmark`，
+# 会把本件所有用例（含 `test_benchmark_fixture_loadable`，其 docstring 自称"常规测试"）
+# 一起挡在默认跑法之外 ⇒ "整套质量测试被静默跳过"。
+# 现在只在**真打 LLM** 的用例上逐例挂 `@pytest.mark.benchmark`（见下面两处函数级标记）。
 
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "socratic_benchmark.json"

@@ -6,8 +6,10 @@
 标记口径（s923-34 拆分，原为文件级 `pytestmark = pytest.mark.benchmark`）：
 本件 10 例**全部是纯离线用例** —— 每条都走 `isolated_paths` 夹具，把 `REPORT_DIR` /
 `HISTORY_DIR` 重定向到 `tmp_path`，因此不再受 benchmark 门禁挡着，默认即收集执行。
-真正需要 `--run-benchmark`（会打 LLM）的用例在 `tests/test_socratic_benchmark.py` 与
-`tests/test_socratic_quality.py`，那两件仍是文件级 `pytestmark`，本件不代为门禁。
+真正需要 `--run-benchmark`（会打 LLM）的用例在 `tests/test_socratic_quality.py::test_socratic_quality_benchmark`
+（同件另有函数级标记的离线回放例 `test_socratic_quality_replay_offline`）。
+s924 收口后，`tests/test_socratic_benchmark.py` 与 `tests/test_socratic_quality.py` 的
+**文件级** `pytestmark` 已摘除、改为逐例标记 ⇒ 本件的口径与它们一致。
 ⇒ 若日后往本文件加**需要 LLM/带网**的用例，必须**逐例**补
 `@pytest.mark.benchmark`，不要退回文件级标记（那会让离线例再次静默失明）。
 """
