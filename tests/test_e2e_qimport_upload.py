@@ -157,7 +157,11 @@ _CLEANED = "questionnaire_cleaned_result"
 
 # 纯人造问卷：题项是 1..6 的递增斜坡（不含任何真实被试反应形态），时长全部 > 60s
 _CSV_SYNTH = b"Q1,Q2,Q3,Q4,gender,duration_sec\n1,2,3,4,a,300\n2,3,4,5,b,400\n3,4,5,6,c,500\n"
-_SUMMARY_KEYS = {"original_n", "valid_n", "invalid_n", "item_columns", "dimensions_scored"}
+# r5 B1：summary 增三键（越界口径）——键集是契约面，故在此显式登记：
+# out_of_range_cells（原始越界单元格）／out_of_range_rows（涉及行数）／
+# out_of_range_cells_after_filter（计分阶段残留；与前者**不相加**，是单一口径的两栏）
+_SUMMARY_KEYS = {"original_n", "valid_n", "invalid_n", "item_columns", "dimensions_scored",
+                 "out_of_range_cells", "out_of_range_rows", "out_of_range_cells_after_filter"}
 
 
 def _uploaded_with_one_dimension() -> AppTest:

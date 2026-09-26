@@ -247,7 +247,8 @@ def test_deliverable_flattens_every_entry_in_order(cleaned_state):
     # 逐字锚一条真实读数，防止上面那个「与源对账」式断言两边一起漂
     assert out[1] == {"step": "无效样本检测", "action": "标记 1 个无效样本",
                       "affected_rows": 1, "affected_cols": 0,
-                      "detail": "作答时长过短或同质作答比例过高"}
+                      # r5 B1：该条 detail 随越界口径在末尾补了指向下一步的说明（逐字锚，故同批更新）
+                      "detail": "作答时长过短、同质作答比例过高，或量表越界（越界详解见下一步）"}
 
 
 def test_deliverable_defaults_materialize_for_bare_entry():
