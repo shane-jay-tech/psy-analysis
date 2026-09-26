@@ -161,34 +161,37 @@ def test_reverse_on_missing_item_stays_missing():
 # ---------------------------------------------------------------------------
 
 
-def test_out_of_range_value_flows_into_dimension_score_现网实况_在册缺陷未修():
-    """现网实况（钉）：非法值 99 在 1-5 尺上被反向成 -93，再被均分吸收，全程无人标记。
+def test_out_of_range_value_is_not_scored_越界不再变成有效分数():
+    """**r5 B1 已修**（2026-09-27 用户裁决）：99 在 1-5 尺上是越界 ⇒ 置空，不进反向计分。
 
-    Q1=99（非法）、Q2=5 ⇒ 反向 Q1 后 (1+5)-99 = -93；均分 (-93+5)/2 = -44.0。
-    detect_invalid_responses 只看时长／同质作答，不看量尺越界 ⇒ invalid=False。
-    这条断言钉的是**实况**，不是期望；判据"非法值不会静默变成有效分数"在此**不成立**，
-    已作为在册缺陷交人工（见 result 遗留问题）。修复后本用例应转红。
+    改前 `(1+5)-99 = -93` 被吸收进均分（-44.0）；现在 Q1 先置 NaN ⇒ 均分只由 Q2(=5) 贡献。
+    越界单元格按列回传（`out_of_range_counts`）⇒ 清洗日志与报告可显式播报，不静默吞掉。
     """
 
     df = pd.DataFrame({"Q1": [99.0], "Q2": [5.0]})
     dims = [ScaleDimension(name="s", items=["Q1", "Q2"], reverse_items=["Q1"],
                            max_score=5, min_score=1)]
-    scored = compute_dimension_scores(df, dims)
-    assert scored["s_mean"].iloc[0] == -44.0
+    counts: dict = {}
+    scored = compute_dimension_scores(df, dims, out_of_range_counts=counts)
+    assert scored["s_mean"].iloc[0] == 5.0
+    assert scored["s_sum"].iloc[0] == 5.0
+    assert counts == {"Q1": 1}
+    # 行级：带越界作答的行现被标无效（只在显式给逐题项范围时生效）
+    assert bool(detect_invalid_responses(
+        df, ["Q1", "Q2"], item_ranges={"Q1": (1, 5), "Q2": (1, 5)}).iloc[0]) is True
+    # 向后兼容：不传 item_ranges 时行级判据与改前逐位一致
     assert bool(detect_invalid_responses(df, ["Q1", "Q2"]).iloc[0]) is False
 
 
-def test_illegal_zero_below_scale_min_is_scored_现网实况_在册缺陷未修():
-    """现网实况（钉）：1-5 尺上的 0（非法）被当合法分数吃进均分 ⇒ 预期 2.0。
-
-    与上条同族：越界值既不报错、也不进 invalid 标记。
-    """
+def test_below_scale_min_is_dropped_not_scored():
+    """**r5 B1 已修**：1-5 尺上的 0（非法）不再被当合法分数吃进均分（改前预期 2.0）。"""
 
     df = pd.DataFrame({"Q1": [0.0], "Q2": [4.0]})
     dims = [ScaleDimension(name="s", items=["Q1", "Q2"], max_score=5, min_score=1)]
-    scored = compute_dimension_scores(df, dims)
-    assert scored["s_mean"].iloc[0] == 2.0
-    assert bool(detect_invalid_responses(df, ["Q1", "Q2"]).iloc[0]) is False
+    counts: dict = {}
+    scored = compute_dimension_scores(df, dims, out_of_range_counts=counts)
+    assert scored["s_mean"].iloc[0] == 4.0
+    assert counts == {"Q1": 1}
 
 
 def test_non_numeric_text_never_becomes_zero_score():
@@ -200,12 +203,18 @@ def test_non_numeric_text_never_becomes_zero_score():
     assert scored["s_sum"].iloc[0] == 4.0
 
 
-def test_scientific_notation_illegal_value_is_accepted_as_number():
-    """现网实况（钉）："1e5" 被 `to_numeric` 认成 100000，在 1-5 尺上是非法大字面但无拦截。"""
+def test_scientific_notation_value_is_out_of_range_and_dropped():
+    """**r5 B1 已修**："1e5" 仍被 `to_numeric` 认成 100000，但它在 1-5 尺上越界 ⇒ 置空不计分。
+
+    改前它会被直接平均进维度分（50002.0）——"越界静默变成有效分数"的第二种形态。
+    """
 
     df = pd.DataFrame({"Q1": ["1e5"], "Q2": [4.0]})
-    scored = compute_dimension_scores(df, [ScaleDimension(name="s", items=["Q1", "Q2"])])
-    assert scored["s_mean"].iloc[0] == 50002.0
+    counts: dict = {}
+    scored = compute_dimension_scores(
+        df, [ScaleDimension(name="s", items=["Q1", "Q2"])], out_of_range_counts=counts)
+    assert scored["s_mean"].iloc[0] == 4.0
+    assert counts == {"Q1": 1}
 
 
 def test_out_of_range_column_is_silently_reclassified_as_demographic():
