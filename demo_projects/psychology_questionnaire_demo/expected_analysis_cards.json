@@ -7,17 +7,17 @@
       "n_items": 5,
       "n_cases": 27
     },
-    "note": "r5 B4（2026-09-27）：改前写 [0.70,0.95] 与本 demo 真算不符（现网实测未回计 α=0.396／按 schema 回计 α=0.972，两种口径都不落原区间）。现按 questionnaire_schema.json 声明的反向计分口径（Q3 反向）钉真值：α=0.9720、95% CI 0.9510–0.9860 ⇒ 区间取 [0.95,0.99]。"
+    "note": "r5 B4 甲案（2026-09-27 用户选甲：重造 data.csv 使负相关成立；生成器 scripts/gen_demo_questionnaire_data.py，seed=20260927）。本卡真值＝按 questionnaire_schema.json 的反向计分口径（Q3 反向）自跑实测：α=0.9700、95% CI 0.9480–0.9850 ⇒ 区间取 [0.95,0.99]。"
   },
   {
     "method_id": "cronbach_alpha",
     "description": "自尊分量表信度分析",
     "expected": {
-      "alpha_range": [0.96, 0.99],
+      "alpha_range": [0.85, 0.96],
       "n_items": 5,
       "n_cases": 27
     },
-    "note": "r5 B4：改前 [0.70,0.95] 同样不成立（未回计 α=-4.087／回计 α=0.980）。按 schema 反向题口径（Q8、Q9 反向）钉真值：α=0.9800、95% CI 0.9650–0.9900 ⇒ 区间取 [0.96,0.99]。"
+    "note": "r5 B4 甲案：反向题 Q8、Q9 回计口径实测 α=0.9170、95% CI 0.8550–0.9580 ⇒ 区间取 [0.85,0.96]。"
   },
   {
     "method_id": "descriptive",
@@ -26,7 +26,7 @@
       "columns_include": ["变量", "N", "M", "SD"],
       "rows": 4
     },
-    "note": "r5 B4：改前写 has_mean/has_std——那是**键名口径**差异，不是数值差异（src 侧对这两个键零消费者）。现改为钉 descriptive_stats 的真实产出口径：列含 变量/N/M/SD，4 行（焦虑_mean、焦虑_sum、自尊_mean、自尊_sum）。"
+    "note": "r5 B4：改前写 has_mean/has_std——那是**键名口径**差异、不是数值差异（src 侧对这两个键零消费者）。现改为钉 descriptive_stats 的真实产出口径：列含 变量/N/M/SD，4 行（焦虑_mean、焦虑_sum、自尊_mean、自尊_sum）。"
   },
   {
     "method_id": "pearson_corr",
@@ -35,7 +35,7 @@
       "direction": "negative",
       "significant": true
     },
-    "known_mismatch": "r5 B4 未按'改期望卡'默认处置，理由：本 demo 真算 r=+0.986（回计/不回计两种口径都为正），而 WALKTHROUGH.md:69 与 literature_seed.json 的 wang2023（负相关）都写负相关 ⇒ 这是**数据侧构造缺陷**，不是期望写错。把期望改成 positive 会让 demo 与自己的叙事和种子文献打架。待人工一句话选：甲=重造 data.csv 使相关为负（建议）；乙=接受正相关并同步改叙事与文献说明。在这之前本卡保持'应为负'的期望，即缺口**显式留着**、不伪装成通过。"
+    "note": "r5 B4 甲案已落地：重造后的 data.csv 真算 r=**-0.7160**、p<0.001（显著标记 ***），与 WALKTHROUGH.md「焦虑与自尊呈负相关」及 literature_seed 的 wang2023 一致。改前该卡与叙事正面冲突（旧数据真算 r=+0.986），当时以 known_mismatch 字段显式留缺口；现缺口已消、字段撤除。"
   },
   {
     "method_id": "independent_ttest",
@@ -43,6 +43,6 @@
     "expected": {
       "groups": ["女", "男"]
     },
-    "note": "r5 B4：改前写 [\"男\",\"女\"]——集合层相同、顺序不同。顺序由 data.csv 首个有效行的 gender 决定（实测 ['女','男']，女 15／男 12），故按产出口径钉顺序；若消费侧只做集合比较，本字段的顺序不构成判据。"
+    "note": "r5 B4：groups 顺序由 data.csv 首个有效行的 gender 决定（实测 ['女','男']；清洗后 女 14／男 13）。生成器给焦虑加了中等性别效应（组内去均值后 ±0.45），实测 t=1.876（趋势，未达显著）——本卡只钉分组集合与顺序，不钉显著性。"
   }
 ]

@@ -12,7 +12,7 @@
 
 | 文件 | 内容 |
 |------|------|
-| `data.csv` | 30 行原始数据，含 Q1-Q10 + 人口学 + 时长 |
+| `data.csv` | 30 行原始数据，含 Q1-Q10 + 人口学 + 时长。**由 `scripts/gen_demo_questionnaire_data.py` 以 seed=20260927 生成（可复算）**——r5 B4 甲案重造：改前真算 r=+0.986 与本指引「负相关」打架，现 r=-0.716 与叙事一致；无效样本 id 也回到本指引写的 5／12／28 |
 | `questionnaire_schema.json` | 维度结构、反向题、计分规则 |
 | `literature_seed.json` | 3 篇种子文献信息 |
 | `expected_analysis_cards.json` | 预期分析结果 |
