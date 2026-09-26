@@ -22,14 +22,12 @@ usage_logger，**不含 `LITERATURE_FEED_DATA_ROOT`**。故本件自带 `feed_sa
 每例独占的 `tmp_path`，并在 `test_feed_guard_is_live` 里正面证它生效（纪律档 §九.2／§廿一）。
 打分器（`rescore_existing_items`）由离线桩替代 ⇒ 全程零 LLM、零网络。
 
-⚠ 施工障碍与处置（s924-59 实测，**非本件引入**）：`_render_export_tab`（`:647`）里有**两枚同名
-`key="_lr_dl_review"` 的 `st.download_button`**（`:670` 在 `try` 内、`:727` 在 `try` 外），
-文献列表非空时后一枚必抛**未被捕获**的 `StreamlitDuplicateElementKey`，把整帧渲染打断。
-本件的对象是 `:121→:123` 那条标志消费链，它在 `:147` 之前执行 ⇒ 主用例用 `quiet_export_tab`
-夹具把那一枚 tab 换成 no-op，**不会**影响被钉的调用计数（顺序见上）。
-缺陷本身由 `test_export_tab_duplicate_key_defect_is_live` 单独钉住现状（不修、不改判据数值、
-不给下载口挂白名单——那是导出/下载门禁域，超出执行手授权，见 `test_export_gate_global_scan.py`
-与纪律档 §八）。修复后该钉桩应翻红并被复核。
+✅ 已修（s927-A2，2026-09-27 用户授权后由 DSH 主会话施工）：`_render_export_tab` 里原有两枚
+同名 `key="_lr_dl_review"` 的 `st.download_button`（`:670` 在 `try` 内、`:727` 在 `try` 外），
+文献列表非空时后一枚抛**未被捕获**的 `StreamlitDuplicateElementKey` 把整帧渲染打断。
+现草稿口改用 `key="_lr_dl_summary"`，两枚 key 互异 ⇒ `quiet_export_tab` 夹具与
+`test_export_tab_duplicate_key_defect_is_live` 钉桩**同批撤除**，改为正向回归
+`test_export_tab_renders_with_distinct_download_keys`（真渲染 + 断言无异常 + 源侧 key 唯一）。
 """
 import pathlib
 import sys
@@ -164,16 +162,6 @@ def rescore_spy(monkeypatch):
     return seen
 
 
-@pytest.fixture
-def quiet_export_tab(monkeypatch):
-    """把 `_render_export_tab` 换成 no-op，绕开 HEAD 上那对同名 download key（见文件头）。
-
-    被钉的标志消费链在 `render_literature_review` 的 `:121-123`，早于 tab 区的 `:147`
-    ⇒ 本桩只屏蔽「渲染打断」，不屏蔽「打分器有没有被调」。
-    """
-    monkeypatch.setattr(panel, "_render_export_tab", lambda items, lr_state: None)
-
-
 def _launch(feed_sandbox, seed_pending: bool, strict: bool = True) -> AppTest:
     """起一次真 AppTest 会话，会话里预置 upstream＋文献状态（可选预置 pending 标志）。"""
     at = AppTest.from_string(_PANEL_SCRIPT, default_timeout=90)
@@ -232,7 +220,7 @@ def _ss(at: AppTest, key: str, default=_MISSING):
 
 
 def test_pending_flag_makes_rerun_call_rescore_once_and_clear_it(
-    feed_sandbox, quiet_export_tab, offline_scorer, rescore_spy
+    feed_sandbox, offline_scorer, rescore_spy
 ):
     """置 `_lr_pending_rescore=True` → 首次渲染即调 `_do_relevance_rescore` 恰好 1 次，且标志被清为 False。
 
@@ -255,7 +243,7 @@ def test_pending_flag_makes_rerun_call_rescore_once_and_clear_it(
 
 
 def test_second_rerun_does_not_rescore_again_no_permanent_retry(
-    feed_sandbox, offline_scorer, rescore_spy, quiet_export_tab
+    feed_sandbox, offline_scorer, rescore_spy
 ):
     """二次 rerun 不再重调＝无永久重试（s922-105 出口点名的「用户可见后果」那一面）。
 
@@ -275,7 +263,7 @@ def test_second_rerun_does_not_rescore_again_no_permanent_retry(
 
 
 def test_no_pending_flag_means_zero_rescore_calls(
-    feed_sandbox, quiet_export_tab, offline_scorer, rescore_spy
+    feed_sandbox, offline_scorer, rescore_spy
 ):
     """对照刀（否证面）：不置标志时 `_do_relevance_rescore` 一次都不该被调。
 
@@ -300,7 +288,7 @@ def test_no_pending_flag_means_zero_rescore_calls(
     ids=["finetune_stage5", "restart_stage1"],
 )
 def test_revise_dialog_sets_pending_rescore(
-    feed_sandbox, quiet_export_tab, offline_scorer, rescore_spy, label, expect_stage
+    feed_sandbox, offline_scorer, rescore_spy, label, expect_stage
 ):
     """从文献综述页点「修订研究问题」→ 选案，标志被置起且下一帧重打分恰好一次。
 
@@ -330,7 +318,7 @@ def test_revise_dialog_sets_pending_rescore(
 
 
 def test_cancel_leaves_no_pending_flag_and_no_rescore(
-    feed_sandbox, quiet_export_tab, offline_scorer, rescore_spy
+    feed_sandbox, offline_scorer, rescore_spy
 ):
     """「取消」案：对话框关掉但不置标志 ⇒ 零重打分（置位侧的否证对照）。"""
     at = _launch(feed_sandbox, seed_pending=False)
@@ -348,7 +336,7 @@ def test_cancel_leaves_no_pending_flag_and_no_rescore(
 # ---------------------------------------------------------------------------
 
 
-def test_feed_guard_is_live(feed_sandbox, quiet_export_tab, offline_scorer, rescore_spy):
+def test_feed_guard_is_live(feed_sandbox, offline_scorer, rescore_spy):
     """证 `LITERATURE_FEED_DATA_ROOT` 在本例会话里真生效：库根＝沙盒、生产根未被指。
 
     两条正面读数：① `paths.DATA_ROOT`/`DB_PATH` 落在本例 `tmp_path`；
@@ -365,30 +353,26 @@ def test_feed_guard_is_live(feed_sandbox, quiet_export_tab, offline_scorer, resc
 
 
 # ---------------------------------------------------------------------------
-# 4. 钉住 HEAD 既有缺陷（现状钉桩，不是规范背书）
+# 4. 导出 tab 的下载口（s927-A2 修复后的正向回归）
 # ---------------------------------------------------------------------------
 
 
-def test_export_tab_duplicate_key_defect_is_live(feed_sandbox, offline_scorer, rescore_spy):
-    """**钉现状**：不 stub 导出 tab 时，文献列表非空会因同名 key 打断整帧渲染。
+def test_export_tab_renders_with_distinct_download_keys(feed_sandbox, offline_scorer, rescore_spy):
+    """**回归钉**（s927-A2，2026-09-27 用户授权后施工）：导出 tab 必须整帧渲染。
 
-    两枚 `key="_lr_dl_review"`（`:670` 在 `try` 内、`:727` 在 `try` 外）⇒ 后一枚抛出的
-    `StreamlitDuplicateElementKey` 不在 `try` 保护范围内，直接向上传播。
-    本例同时确认「即便整帧被打断，`:121-123` 的标志消费仍然先跑完了」——
-    这正是 `quiet_export_tab` 那批用例的合法性来源（桩没挡在被钉的链路上）。
-
-    🔴 修复该缺陷（给两枚 key 改名）后**本例应翻红**，届时请连同
-    `quiet_export_tab` 一起撤掉，并把 strict 恢复为默认。
-    本班不改生产码、不给下载口挂白名单（导出/下载门禁域超出执行手授权）。
+    改前 `_render_export_tab` 里两枚 `st.download_button` 共用 `key="_lr_dl_review"`
+    （`:670` 在 `try` 内、`:727` 在 `try` 外）⇒ 文献列表非空时后一枚抛
+    `StreamlitDuplicateElementKey` 且不在 `try` 保护内，整帧被打断。
+    旧钉桩 `test_export_tab_duplicate_key_defect_is_live` 与 `quiet_export_tab` 夹具随修复撤除
+    （本件现按真渲染跑，不再 stub 导出 tab）。
     """
-    at = _launch(feed_sandbox, seed_pending=True, strict=False)
+    at = _launch(feed_sandbox, seed_pending=True)
 
-    # ⚠ 实测 `at.exception[i].value` 是**消息字符串**而非异常对象（`type(...).__name__` 读出 'str'）
-    #    ⇒ 判别只能按消息文本匹配。
-    msgs = " | ".join(str(e.value) for e in at.exception)
-    assert at.exception, "未复现同名 key 打断：HEAD 缺陷可能已被修，请撤掉本钉桩与 quiet_export_tab"
-    assert "multiple elements with the same `key='_lr_dl_review'`" in msgs, (
-        f"消息里没找到同名 key 打断，实得：{msgs}"
-    )
-    # 标志消费链在 tab 之前，故虽整帧被打断，打分器仍已被调 1 次
+    assert not at.exception, f"导出 tab 仍抛异常：{[e.value for e in at.exception]}"
+    # 标志消费链在 tab 之前；真渲染下它仍必须恰好跑一次（沿用旧钉桩的覆盖）
     assert len(rescore_spy) == 1
+    # 源侧 key 唯一性：两枚下载口各执一把，避免回退成同名（该形态无异常也会静默覆盖组件状态）
+    src = (pathlib.Path(__file__).resolve().parents[1] / "src" / "ui"
+           / "literature_review_panel.py").read_text(encoding="utf-8")
+    assert src.count('key="_lr_dl_review"') == 1, "自审版导出口的 key 数量变了"
+    assert src.count('key="_lr_dl_summary"') == 1, "草稿导出口必须有自己的 key"

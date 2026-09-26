@@ -724,7 +724,7 @@ def _render_export_tab(items: List[LiteratureItem], lr_state: Dict[str, Any]) ->
         file_name=_efn("文献综述草稿", "md"),
         mime="text/markdown",
         type="primary",
-        key="_lr_dl_review",
+        key="_lr_dl_summary",
     )
 
 
