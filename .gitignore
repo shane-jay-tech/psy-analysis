@@ -43,3 +43,6 @@ data/
 
 # Local academic cache (user query history, privacy) — never track
 src/questionnaire/.academic_cache/
+
+# JS 工具链缓存（纯 Python 仓：无 package.json/package-lock.json；s927-70 登记 09-19 vitest 缓存孤儿）
+node_modules/
