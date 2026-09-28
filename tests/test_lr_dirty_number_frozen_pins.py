@@ -14,6 +14,11 @@
 每条用例 docstring 都写明「修复落地后应翻红成什么样」——A 案（助手侧跳过并告警）或 B 案
 （主入口 try + finally 落开关）合入时，本档**必须主动变红**并按注释逐条翻正，禁止悄悄删桩。
 本档只钉现状，不背书任何一种修法。零网络、零 LLM、零真实 session_state、零写盘。
+
+✅ **s927-29（2026-09-28 写位施工单）已落 A＋B** ⇒ 上面点名的四条已按各自注释逐条翻正、**零删例**：
+② 两条（整表弃 / 抛出前不污染入参）、③ 两条（真实语句读到开关 True / 结构冻结「0 个 try」）。
+① `models.py` 的六处裸强转**没动**（那是 C 案，属改数据统计口径＝红线，仍未拍板）⇒ ① 全部保持原状绿，
+其中「分界护栏」`test_from_dict_blank_values_are_absorbed_not_raised` 与两条「防恒红」对照继续生效。
 """
 
 from __future__ import annotations
@@ -74,31 +79,40 @@ def test_from_dict_numeric_strings_still_coerce_cleanly(field, text, expected):
 
 
 # ─────────────────────────── ② _materialize_items 整表弃（现状钉桩） ───────────────────────────
-def test_materialize_one_dirty_row_drops_the_entire_table_including_leading_good_rows():
-    """现状：[好, 脏, 好] ⇒ 抛 ValueError 且**零条产出**，前置好条目一起被弃（不是「跳过坏条」）。
+def test_materialize_one_dirty_row_drops_the_entire_table_including_leading_good_rows(monkeypatch):
+    """s927-29 放行 A 案后按本档注释翻正（原状：抛 ValueError 且零条产出，前置好条目一并被弃）。
 
-    修复后应翻红：A 案会产出 2 条好条目 ＋ 1 条告警；C 案会产出 3 条（脏年变 0）。
-    两种修法下本用例都不该再绿 —— 见到它红了就说明 §五 冻结项已有人施工。
+    翻正依据＝本档文件头「A 案合入时本档必须主动变红并按注释逐条翻正，禁止悄悄删桩」＋
+    `psy-dirtynum-rescore-material-20260921.md` §五 测试点 1。
+    现判据：产出 2 条好条目（顺序不变）＋恰好 1 条告警；**用例不删，只改断言**。
     """
+    recorder = _RecordingSt()
+    monkeypatch.setattr(lrp, "st", recorder)
     rows = [
         {"key": "good-1", "title": "前置好条目", "year": "2019"},
         {"key": "dirty", "title": "脏年", "year": "约 2019"},
         {"key": "good-2", "title": "后置好条目", "year": "2020"},
     ]
-    with pytest.raises(ValueError):
-        lrp._materialize_items(rows)
+    items = lrp._materialize_items(rows)
+
+    assert [i.key for i in items] == ["good-1", "good-2"], "A 案应只弃坏条、保住好条目"
+    assert len(recorder.warnings) == 1 and "脏年" in recorder.warnings[0]
 
 
-def test_materialize_does_not_partially_mutate_the_session_list_when_it_raises():
-    """现状：抛出是「整表弃」而非「写坏一半」—— 入参 dict 列表不被就地改写。
+def test_materialize_does_not_partially_mutate_the_session_list_when_it_raises(monkeypatch):
+    """本档原注释说「修复后仍应绿」——**实况不成立**：旧断言用的是 `pytest.raises`，A 案后不再抛 ⇒ 会红。
 
-    这条修复后**仍应绿**（A/B/C 三案都不该在抛出前污染 session 列表），故不标翻正。
+    s927-29 按实况翻正：判据核心（入参 dict 列表不被就地改写）保留并加强，去掉「抛」这一形状。
+    用例名留着 `raises` 字样是为台账断链可见，不改名。
     """
+    monkeypatch.setattr(lrp, "st", _RecordingSt())
     rows = [{"key": "a", "year": "2019"}, {"key": "b", "year": "约 2019"}]
     snapshot = [dict(r) for r in rows]
-    with pytest.raises(ValueError):
-        lrp._materialize_items(rows)
-    assert rows == snapshot
+
+    items = lrp._materialize_items(rows)
+
+    assert rows == snapshot, "A 案只读不写：session 列表被就地改坏＝新病灶"
+    assert [i.key for i in items] == ["a"], "好条目留下、脏条目被跳过"
 
 
 def test_materialize_all_clean_rows_still_yields_every_item():
@@ -144,11 +158,11 @@ def _pending_rescore_block() -> ast.If:
 
 
 def test_main_entry_block_flag_stays_true_when_real_rescore_raises(monkeypatch):
-    """现状：跑**真实源码语句**（ast 取 :121-123 后 exec），打分器抛错 ⇒ 开关仍为 True。
+    """s927-29 放行 B 案后按本档出口翻正：断言由 `is True` 改成 `is False`（放行单号 s927-29）。
 
-    这条就是 s922-05 对 s920-13 的订正点：不是「一次失败永久静默」，而是「每次 rerun 重新调用打分器」。
-    修复后应翻红：B 案（try + finally 落 False）会让本用例读到 False。
-    出口：翻正时把断言改成 `is False` 并注明放行单号，不要删用例。
+    原状（s922-05 对 s920-13 的订正点）：开关留 True ⇒ 每次 rerun 重新调用打分器＝**永久重试**。
+    现判据：跑磁盘上的真实语句，异常被主入口兜住不再外逃，开关**必定**落回 False。
+    仍然 exec 真源码而非复刻逻辑 ⇒ 改的是断言，取证强度没降。用例不删。
     """
     def boom(items, rq, vars_):
         raise RuntimeError("打分器炸了（模拟 LLM/网络失败）")
@@ -164,38 +178,65 @@ def test_main_entry_block_flag_stays_true_when_real_rescore_raises(monkeypatch):
         "upstream": {"research_question": "新研究问题"},
         "lr_state": {"literature_items": [{"key": "a", "year": "2019"}]},
     }
-    with pytest.raises(RuntimeError):
-        exec(compile(ast.get_source_segment(_PANEL.read_text(encoding="utf-8"), node),
-                     f"{_PANEL.name}:pending-rescore-block", "exec"), globals_)
+    exec(compile(ast.get_source_segment(_PANEL.read_text(encoding="utf-8"), node),
+                 f"{_PANEL.name}:pending-rescore-block", "exec"), globals_)  # 不再外逃＝B 案的降级面
 
-    assert session["_lr_pending_rescore"] is True, "开关被落了 False ⇒ §五 冻结项已被施工，本用例应翻正"
-    assert fake_st.calls == [], "现状不该有 st.success（抛出发生在写回之前）"
+    assert fake_st.session_state["_lr_pending_rescore"] is False, (
+        "开关没落回 False ⇒ 会逐帧重烧打分器（永久重试复活）")
+    # ⚠ 读 `fake_st.session_state` 而不是外面那份 `session`：`_SessionSt.__init__` 是 `dict(initial)` **拷贝**，
+    #   旧钉桩断言的是拷贝前的 `session` ⇒ 那条「开关仍为 True」其实恒真（本班翻正时才发现，登记不扩大改动）。
+    assert fake_st.calls == ["error"], f"应恰好一条用户可见的失败提示，实为 {fake_st.calls}"
+    assert "打分器炸了" in fake_st.messages[0], "提示要带异常摘要，否则用户无从排查"
 
 
 def test_pending_flag_reset_is_second_statement_with_no_try_guard():
-    """现状（结构冻结）：if 体 = [调用, 落 False]，两条**平铺**且外层 0 个 try ⇒ 抛出即跳过落开关。
+    """结构冻结已随 s927-29 B 案失效 ⇒ 按本档注释翻正成「调用在 try 体、落开关在 finally」。
 
-    修复后应翻红：B 案会把两条包进 try/finally，本结构断言即失效。
+    结构断言的作用**没降级**：只加 `try` 不加 `finally` 的半修写法（s922-05 §一 点名的失败形态）
+    在这里照样红 —— 落开关那条必须落在 `finalbody`，落在 try/except 体内都算没修。
     """
-    node = _pending_rescore_block()
-    assert [type(s).__name__ for s in node.body] == ["Expr", "Assign"], (
-        "if 体结构漂移：现状是「调用 + 同体下一行落 False」，改动即说明 §五 冻结项已有人施工")
-    assert isinstance(node.body[0].value, ast.Call)
-    assert node.body[0].value.func.id == "_do_relevance_rescore"
-    assert node.body[1].targets[0].slice.value == "_lr_pending_rescore"
-
     src = _PANEL.read_text(encoding="utf-8")
+    node = _pending_rescore_block()
+    assert [type(s).__name__ for s in node.body] == ["Try"], (
+        "if 体结构漂移：s927-29 之后应是单条 try/except/finally")
+
+    block = node.body[0]
+    assert [type(s).__name__ for s in block.body] == ["Expr"], "try 体只该有那一条调用"
+    assert isinstance(block.body[0].value, ast.Call)
+    assert block.body[0].value.func.id == "_do_relevance_rescore"
+    assert len(block.handlers) == 1 and isinstance(block.handlers[0].type, ast.Name), (
+        "兜异常的面漂移：打分器是 LLM/网络外部调用面，兜的不该只到 ValueError")
+    assert block.handlers[0].type.id == "Exception"
+    assert [type(s).__name__ for s in block.finalbody] == ["Assign"], "开关必须落在 finally 里"
+    assert block.finalbody[0].targets[0].slice.value == "_lr_pending_rescore"
+    for stmt in list(block.body) + list(block.handlers[0].body):
+        seg = ast.get_source_segment(src, stmt) or ""
+        assert "_lr_pending_rescore" not in seg, "落开关出现在 try/except 体内 ⇒ 抛出时仍会跳过，等于没修"
+
     fn = next(n for n in ast.walk(ast.parse(src))
               if isinstance(n, ast.FunctionDef) and n.name == "render_literature_review")
-    # 落开关这条语句外层没有任何 try/finally —— 这正是「异常逃逸 ⇒ 开关留 True」的结构原因。
-    guarded = [t for t in ast.walk(fn) if isinstance(t, ast.Try) and node in t.body]
-    assert guarded == [], "主入口已加 try ⇒ 本结构钉桩应随修复单翻正"
-    assert sum(1 for n in ast.walk(fn) if isinstance(n, ast.Try)) == 0, (
-        "render_literature_review 内 try 块数不再是 0（s922-05 证据 3 的现状读数）")
+    assert sum(1 for n in ast.walk(fn) if isinstance(n, ast.Try)) == 1, (
+        "s922-05 证据 3 的现状读数「主入口 0 个 try」已翻正为 1；多于 1 枚说明有人加戏")
+
+
+class _RecordingSt:
+    """s927-29 翻正时补的最小假 st：记 warning（A 案的告警面），其余调用一律当场红。"""
+
+    def __init__(self):
+        self.warnings: list[str] = []
+
+    def warning(self, msg, **k):
+        self.warnings.append(msg)
+
+    def __getattr__(self, name):
+        raise AssertionError(f"未预期调用 st.{name}")
 
 
 class _SessionSt:
-    """最小假 st：只提供 session_state 读写，其余调用一律当场红（现状主入口这段不该触到别的 st API）。"""
+    """最小假 st：session_state 读写 ＋ success/error 两枚提示口（s927-29 后主入口这段会触 st.error）。
+
+    success 在现状与 B 案后都**不该**出现（抛出发生在写回之前），故仍记进 `calls` 供断言逐字比对。
+    """
 
     class _State(dict):
         def get(self, key, default=None):
@@ -204,9 +245,15 @@ class _SessionSt:
     def __init__(self, initial):
         self.session_state = dict(initial)
         self.calls: list[str] = []
+        self.messages: list[str] = []
 
     def success(self, msg, **k):
         self.calls.append("success")
+        self.messages.append(msg)
+
+    def error(self, msg, **k):
+        self.calls.append("error")
+        self.messages.append(msg)
 
     def __getattr__(self, name):
         raise AssertionError(f"未预期调用 st.{name}")

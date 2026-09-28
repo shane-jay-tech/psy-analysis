@@ -23,6 +23,13 @@ ZeroDivision、编码错误……统统降成一条 WARNING，函数照常返回
 本测试锁住部分成功语义不被静默改成全成/全败，但**不代替**那层回显；
 若 R2 落地时只改了回显没改本函数，本件仍应全绿（回显在 UI 层）。
 
+✅ **s927-30（2026-09-28）已把回显与服务层计数透出补上**：新增
+`review_service.bulk_review_candidates_detailed()`（回 `BulkReviewOutcome`：total/succeeded/failed/
+failures/echo()），`bulk_review_candidates()` 保持 int 门面不变 ⇒ 上面 9 条在册钉桩**一条没改、一条没删**，
+本件末尾另补 5 条新用例（部分失败两数都对／门面不变／全成功无尾巴／全失败 vs 空入参／汇总只走 INFO）。
+生产调用方现状：`bulk_review_candidates` 在 `src/` 里**零调用**（只有 `src/ui/literature_review_queue_panel.py:29`
+一枚 import-not-called），故本班没动 UI；把回显接进按钮属 s922-07 R1/R2 两段式（另有闸）。
+
 零 sqlite：全程内存假 store（``FakeStore``），并在关键用例里把
 ``sqlite3.connect`` 现场改成「一调就炸」，用来自证这条路径根本不碰库文件。
 """
@@ -279,3 +286,94 @@ def test_zero_sqlite_on_disk_is_a_real_constraint():
     with _no_sqlite_on_disk():
         with pytest.raises(AssertionError):
             sqlite3.connect(":memory:")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# s927-30：把「成功 x/N」回显 ＋ 异常计数透出（本文件头点名的那一格）
+# 语义前提不变：部分成功仍部分成功、异常仍只降一条 WARNING、审计仍只为成功条目写。
+# 下面全部用例都**不删不改**上面 9 条在册钉桩，只补新面。
+# ══════════════════════════════════════════════════════════════════════════
+def test_partial_failure_outcome_reports_both_counts():
+    """任务书点名的「部分失败用例」：成功数与失败数**同时**对，且失败条目可点名到 cid＋异常类型。
+
+    改前必红：`bulk_review_candidates_detailed` 现在不存在（AttributeError）。
+    这条补的正是本文件头 §3「调用方拿到 0 无法区分两种 0」那一格的另一半——
+    拿到 2 同样分不清是「2 成 1 败」还是「只给了 2 条入参」。
+    """
+    store = FakeStore(poison={POISONED})
+
+    outcome = rs.bulk_review_candidates_detailed(store, CIDS, "approved", "reviewer-x")
+
+    assert (outcome.total, outcome.succeeded, outcome.failed) == (3, 2, 1)
+    assert outcome.failures == ((POISONED, "RuntimeError: database is locked"),)
+    echo = outcome.echo()
+    assert "成功 2/3" in echo and "失败 1 条" in echo and str(POISONED) in echo
+    # 回显不许把失败算进成功：成功数仍等于 UPDATE 数、等于审计数
+    assert outcome.succeeded == len(store.updates) == len(store.audit) == 2
+
+
+def test_int_facade_still_returns_success_count_only():
+    """向后兼容：`bulk_review_candidates` 的返回值**仍是成功条数 int**（在册 9 条钉桩的前提）。
+
+    若有人嫌「两个函数」啰嗦、把门面改成直接回显 Outcome，本文件多条 `count == 2` 会连带红——
+    这条把「门面不变」本身钉住。
+    """
+    store = FakeStore(poison={POISONED})
+
+    count = _bulk(store)
+
+    assert count == 2 and isinstance(count, int)
+    assert count == rs.bulk_review_candidates_detailed(
+        FakeStore(poison={POISONED}), CIDS, "approved", "reviewer-x").succeeded
+
+
+def test_all_success_echo_has_no_failure_tail():
+    """全成功：`成功 3/3` 且**不带**「失败 …」尾巴，`failures` 为空元组。
+
+    没有这条，回显可能永远拖着「失败 0 条」的噪声，或在真有失败时反而不吭声。
+    """
+    outcome = rs.bulk_review_candidates_detailed(
+        FakeStore(poison=set()), CIDS, "approved", "reviewer-x")
+
+    assert (outcome.total, outcome.succeeded, outcome.failed) == (3, 3, 0)
+    assert outcome.failures == ()
+    echo = outcome.echo()
+    assert echo.startswith("成功 3/3") and "失败" not in echo
+
+
+def test_all_failure_echo_distinguishes_zero_from_empty_input():
+    """全失败那一格（本文件 `test_all_three_failing_returns_zero_without_raising` 的补面）：
+    回显要同时给出 `成功 0/3` ＋ `失败 3 条` ⇒ 调用方从此分得清「0 成功」与「0 入参」。
+    """
+    outcome = rs.bulk_review_candidates_detailed(
+        FakeStore(poison=set(CIDS)), CIDS, "approved", "reviewer-x")
+
+    assert (outcome.total, outcome.succeeded, outcome.failed) == (3, 0, 3)
+    assert "成功 0/3" in outcome.echo() and "失败 3 条" in outcome.echo()
+
+    empty = rs.bulk_review_candidates_detailed(FakeStore(), [], "approved", "reviewer-x")
+    assert (empty.total, empty.succeeded, empty.failed) == (0, 0, 0)
+    assert empty.echo() == "成功 0/0" and "失败" not in empty.echo()
+
+
+def test_echo_adds_no_second_warning_and_keeps_one_per_failure(caplog):
+    """可观测性不搬家：每条失败仍**恰好一条 WARNING**（文案骨架不许动），汇总只走 INFO。
+
+    这条同时否证两种改坏：① 把汇总也打成 WARNING ⇒ 本文件 §2 的「len(mine)==1」被顶掉；
+    ② 用汇总取代逐条 WARNING ⇒ 这里先红。
+    """
+    store = FakeStore(poison={POISONED, 103})
+
+    with caplog.at_level(logging.WARNING, logger=rs.logger.name):
+        outcome = rs.bulk_review_candidates_detailed(store, CIDS, "approved", "reviewer-x")
+
+    warns = [r for r in caplog.records if r.name == rs.logger.name and r.levelno == logging.WARNING]
+    assert len(warns) == outcome.failed == 2
+    assert [r.msg for r in warns] == ["bulk_review skip candidate %d: %s"] * 2
+    assert [r.args[0] for r in warns] == [POISONED, 103]
+    assert (outcome.succeeded, outcome.total) == (1, 3)
+
+    with caplog.at_level(logging.INFO, logger=rs.logger.name):
+        caplog.clear()   # 上一帧的两条 WARNING 还在 caplog 里，不清就成了假阳性
+        rs.bulk_review_candidates_detailed(FakeStore(poison=set()), CIDS, "approved", "reviewer-x")
+    assert [r for r in caplog.records if r.name == rs.logger.name] == [], "全成功不该产生汇总日志"

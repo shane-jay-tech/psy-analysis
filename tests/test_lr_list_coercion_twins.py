@@ -18,6 +18,10 @@
   （`LiteratureItem.from_dict` 的 :69/:73/:78）。本单按实况钉桩并把这条不对称写进真值表，
   **不擅自把 notes 侧改成抛错**（那属对用户可见的数据取舍，且 s922-05 的 A/B/C 方案尚未拍板）。
 
+**s927-29（2026-09-28）后续**：A/B 案已由该单放行并落码 ⇒ 真值表 panel 行的 dirty 格按注释翻正为 False
+（非 dict 格仍 True，A 案只兜 ValueError/TypeError）。**search:230 与 notes:157 本班未动**（不在 s927-29 范围），
+故本档登记的「三侧不一致」变成「panel 已收敛、search 仍整表弃」——漂移未闭合，仍留后续单。
+
 同单登记（任务书完成标准 4）·本族**未测点**：
 - `src/literature_review/review_import.py` 的批注写回面 `apply_review_comments_to_state`
   （函数体实测 **:134-177**；任务书锚点写的 :138-145 只覆盖到 docstring 与循环开头，按磁盘实况放宽）。
@@ -134,8 +138,10 @@ def test_search_rescore_non_dict_element_raises_too():
 @pytest.mark.parametrize(
     "face,call_non_dict,expect_non_dict_raises,call_dirty,expect_dirty_raises",
     [
+        # panel 行的 dirty 格由 True 翻成 False＝s927-29 落 A 案（跳过并告警，不整表弃）；
+        # 非 dict 格仍 True —— A 案只兜 ValueError/TypeError，编程错误照旧抛（本行即 A 的边界）。
         ("panel.py:757 _materialize_items", lambda: lrp._materialize_items(["非dict"]), True,
-         lambda: lrp._materialize_items([_good_lit(1), _good_lit(2, "约 2019")]), True),
+         lambda: lrp._materialize_items([_good_lit(1), _good_lit(2, "约 2019")]), False),
         ("search.py:230 rescore_existing_items", lambda: rescore_existing_items(["非dict"], "", None), True,
          lambda: rescore_existing_items([_good_lit(1), _good_lit(2, "约 2019")], "", None), True),
         ("notes.py:157 notes_from_dict_list", lambda: notes_from_dict_list(["非dict"]), False,
@@ -148,6 +154,10 @@ def test_twin_faces_are_not_yet_consistent(face, call_non_dict, expect_non_dict_
 
     合并（例如给文献两侧也加 isinstance，或给笔记侧也加数值强转）都会改变用户可见的数据取舍，
     属 s922-05 A/B/C 方案范围＝人工裁决。本用例的意义是：**任何人单方面统一其中一侧，这里立刻红**。
+
+    s927-29 实况翻正（改期望格、不删用例）：panel 侧拿到 A 案放行 ⇒ dirty 格 True→False；
+    search:230 与 notes:157 **未施工**，三格照旧 ⇒ 漂移仍在，只是从「三侧各异」变成「panel 已收敛、
+    search 仍整表弃」。若有人把 search:230 也一并收敛，这里会再红一次（那时才叫三侧一致）。
     """
     def raises(fn) -> bool:
         try:

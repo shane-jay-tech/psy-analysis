@@ -118,9 +118,14 @@ def render_literature_review(tier: str = "beginner") -> None:
     _render_search_bar(upstream, lr_state)
 
     # v3.5: 漏斗修订后回到此页时触发 relevance rescore
+    # s927-29 B 案：打分器是 LLM/网络外部调用面 ⇒ 兜住异常并把开关落在 finally（只加 try 会逐帧重烧）
     if st.session_state.get("_lr_pending_rescore"):
-        _do_relevance_rescore(upstream, lr_state)
-        st.session_state["_lr_pending_rescore"] = False
+        try:
+            _do_relevance_rescore(upstream, lr_state)
+        except Exception as exc:
+            st.error(f"文献相关性重算失败：{exc}。已保留原有打分，可稍后再试。")
+        finally:
+            st.session_state["_lr_pending_rescore"] = False
 
     # 三栏布局
     items = _materialize_items(lr_state.get("literature_items") or [])
@@ -753,8 +758,18 @@ def _render_finish_tab() -> None:
 # ---------------------------------------------------------------------------
 
 def _materialize_items(items_dict_list: List[Dict[str, Any]]) -> List[LiteratureItem]:
-    """从 session_state 的 dict 列表实例化 LiteratureItem。"""
-    return [LiteratureItem.from_dict(d) for d in (items_dict_list or [])]
+    """从 session_state 的 dict 列表实例化 LiteratureItem；单条脏值不再拖垮整表（s927-29 A 案）。"""
+    out, bad = [], []
+    for d in items_dict_list or []:
+        try:
+            out.append(LiteratureItem.from_dict(d))
+        except (ValueError, TypeError) as exc:  # 只兜脏数字；非 dict 等编程错误照旧抛
+            name = (d.get("title") or d.get("key") or "?") if isinstance(d, dict) else "?"
+            bad.append(f"「{name}」{exc}")
+    if bad:
+        st.warning(f"⚠️ {len(bad)} 条文献的年份/引用数/相关度字段无法解析，本次已跳过："
+                   + "、".join(bad[:3]) + ("…" if len(bad) > 3 else "") + "。把该字段改成纯数字后可恢复。")
+    return out
 
 
 def _persist_items(items: List[LiteratureItem]) -> None:
