@@ -44,6 +44,12 @@ class ExperimentDesign:
 
     # 效力分析
     power_result: Optional[PowerResult] = None
+    # s927-72 A′ 调用方识别（台账 215①）：引擎侧显式记账「本次样本量是不是求解出来的」。
+    # 求解器返回 solved=False 的哨兵时，它的数值字段一律不可引用 ⇒ 引擎不出数，
+    # 由这两个字段把「拒答」状态带到下游出口（报告／程序随机化／预算），
+    # 而不是把哨兵的 0 当成一个真实的样本量。
+    power_solved: bool = True               # False ⇒ 本次未拿到可引用的样本量（A′ 拒答）
+    power_failure_reason: str = ""          # power_solved=False 时的诊断文本（透传自哨兵）
 
     # 材料
     materials: List[Dict] = field(default_factory=list)
@@ -152,14 +158,27 @@ class ExperimentDesignEngine:
             design.n_per_group = n_subjects_hint // max(n_groups_hint, 2) if n_groups_hint > 0 else n_subjects_hint
             design.n_groups = max(n_groups_hint, 2) if n_groups_hint > 0 else 2
             design.power_result = None
+            design.power_solved = True
+            design.power_failure_reason = ""
             self._log(f"使用用户指定样本量: N={n_subjects_hint}")
         else:
             power_result = _auto_power_analysis(template, es_expected, power, alpha)
             design.power_result = power_result
-            design.n_subjects = power_result.required_n
-            design.n_per_group = power_result.required_per_group
+            # A′ 调用方识别：哨兵（solved=False）的 required_n / required_per_group /
+            # actual_power 一律不取——它们不是算出来的数，取了就等于把「无法求解」
+            # 重新写成「N=0」这种可见假数（台账 215① 点名的正是这一格）。
+            design.power_solved = bool(getattr(power_result, "solved", True))
+            design.power_failure_reason = str(getattr(power_result, "failure_reason", "") or "")
+            # n_groups 是设计结构（模板决定的组数），不随求解失败而失效 ⇒ 照取。
             design.n_groups = power_result.n_groups
-            self._log(f"效力分析完成: N={power_result.required_n}, 效力={power_result.actual_power:.3f}")
+            if design.power_solved:
+                design.n_subjects = power_result.required_n
+                design.n_per_group = power_result.required_per_group
+                self._log(f"效力分析完成: N={power_result.required_n}, 效力={power_result.actual_power:.3f}")
+            else:
+                design.n_subjects = 0
+                design.n_per_group = 0
+                self._log("效力分析未求解：按 A′ 口径拒答，不输出样本量（详见设计稿「无法给出样本量建议」段）")
 
         # 8. 材料
         design.materials = materials_hint or self._suggest_materials(topic, template)
@@ -177,6 +196,10 @@ class ExperimentDesignEngine:
             materials=design.materials,
         )
         self._log(f"构建程序: {len(design.procedure.phases)}个阶段, 总时长{design.procedure.total_duration_min}分钟")
+
+        # A′ 调用方识别（程序出口）：未求解时把随机化文案里由 0 充数的每组人数换成拒答文案。
+        if not design.power_solved:
+            self._suppress_unsolved_subject_counts(design)
 
         # 10. 数据分析计划
         design.analysis_plan = template.analysis_plan.copy()
@@ -478,8 +501,46 @@ class ExperimentDesignEngine:
             notes.append("**IAT的信度：** IAT的重测信度通常在r=0.50-0.60之间，解释结果时需考虑测量误差。")
         return notes
 
+    def _suppress_unsolved_subject_counts(self, design: "ExperimentDesign") -> None:
+        """A′ 调用方识别（程序出口）：未求解时清掉随机化文案里由 0 充数的每组人数。
+
+        `build_full_procedure` 按传入的 `n_subjects` 生成「每组N人（剩余M人随机分配）」，
+        哨兵态下引擎给的 n_subjects 恒为 0 ⇒ 文案会写成「每组0人」——同样是不可引用的假数。
+        本函数**只改出口文案**（不动 procedure_builder、不动任何公式与求解调用），
+        把它换成显式拒答；方法／拉丁方／种子建议等非数值字段原样保留。
+        """
+        rand = (design.procedure.randomization or {}) if design.procedure else {}
+        if not rand:
+            return
+        refusal = (
+            "将被试随机分配至各实验条件（均衡分组）。"
+            "⛔ 每组人数未给出：效力分析在搜索区间内无法求解样本量，"
+            "引擎按 A′ 口径拒答，不把区间上界或 0 当成计划量。"
+            "求解成功（或放宽目标效力／显著性水平）后重跑本设计即可获得分配方案。"
+        )
+        if rand.get("description"):
+            rand["description"] = refusal
+        if rand.get("note"):
+            rand["note"] = "每组顺序建议分配的人数待样本量求解后确定；本次未求解，故不给数字。"
+        # assignments 由 n_subjects 循环生成，哨兵态下本就为空——显式钉住，防未来改动带进 0。
+        rand["assignments"] = []
+
+    def _budget_refusal(self) -> str:
+        """A′ 调用方识别（预算出口）：没有可引用的样本量就不编造费用表。"""
+        return "\n".join([
+            "## 实验预算估算",
+            "",
+            "⛔ 本次无法估算：样本量未求解（效力分析在搜索区间内无解，系统按 A′ 口径拒答）。",
+            "各项费用都按人数线性换算，用 0 人或搜索区间上界充数只会产出错的合计，故整表不出。",
+            "",
+            "*求解成功后重跑设计（或先手工指定样本量 n_subjects_hint）即可获得预算。*",
+        ])
+
     def _estimate_budget(self, design: ExperimentDesign) -> str:
         """估算实验预算"""
+        if not design.power_solved:
+            # A′ 调用方识别：哨兵态下 n_subjects 不是数，预算不得据其换算（台账 215①）。
+            return self._budget_refusal()
         n = design.n_subjects
         per_subject = 30  # 心理学实验被试费大致标准（元）
         total_fee = n * per_subject
@@ -552,9 +613,18 @@ class ExperimentDesignEngine:
         # 被试
         lines.append(f"## 6. 被试")
         lines.append(f"**目标人群：** {d.target_population}")
-        lines.append(f"**计划样本量：** N = {d.n_subjects}")
-        if d.n_groups > 1:
-            lines.append(f"**分组：** 共{d.n_groups}组，每组{d.n_per_group}人")
+        # A′ 调用方识别（报告出口）：哨兵态下 n_subjects/n_per_group 不是数，不能写成 N=0。
+        if d.power_solved:
+            lines.append(f"**计划样本量：** N = {d.n_subjects}")
+            if d.n_groups > 1:
+                lines.append(f"**分组：** 共{d.n_groups}组，每组{d.n_per_group}人")
+        else:
+            lines.append(
+                "**计划样本量：** 未给出 ⛔ 效力分析在搜索区间内无法求解，"
+                "系统按 A′ 口径拒答（不以 0 或区间上界充当计划样本量），详见「统计效力分析」一节。"
+            )
+            if d.power_failure_reason:
+                lines.append(f"- 求解失败原因：{d.power_failure_reason}")
         lines.append(f"")
         lines.append(f"### 纳入标准")
         for c in d.inclusion_criteria:
