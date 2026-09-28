@@ -21,7 +21,14 @@ SIZE_TABLE = 10.5
 LINE_SPACING = 1.5
 SPACE_BEFORE_HEADING_PT = 12
 SPACE_AFTER_HEADING_PT = 6
-SPACE_AFTER_BODY_PT = 0
+# s928-01 案 B′（s927-51 拍板，用户 2026-09-28 授权）：0 → 10。
+# 改前两值：常量 0、消费方 0 处 ⇒ 正文段生效值一直由捆绑模板的
+# `docDefaults after=200`（twips＝10pt）继承而来，常量本身从未生效。
+# 本行把「正文段后距」由“跟随模板 docDefaults”改判为“本仓显式锁定 10pt”——
+# 今天与模板同格（零版式变化），模板若变更即分叉（风险已并入 s923-18 在册条目，台账 241ⓒ）。
+# 单位仍是 pt 裸数（与 SPACE_AFTER_HEADING_PT 同族形状）；`Pt()` 换算只在消费方做，
+# 本文件不 import docx，写 `Pt(10)` 会 NameError。
+SPACE_AFTER_BODY_PT = 10
 FIRST_LINE_INDENT_CM = 0.74  # 中文论文首行缩进 2 字符
 
 # 页边距 (cm) — APA7 标准

@@ -147,15 +147,17 @@ def test_docx_size_and_spacing_constants_pinned():
     assert (ds.SIZE_BODY, ds.SIZE_CAPTION, ds.SIZE_TABLE) == (12, 10.5, 10.5)
     assert ds.LINE_SPACING == 1.5
     # s924-24：原为一条三元组断言，拆成三条独立断言以便单点定位（s923-18 三案共同前置）。
-    # 期望值零变化，仍是 12 / 6 / 0。
+    # 期望值零变化，仍是 12 / 6。
     assert ds.SPACE_BEFORE_HEADING_PT == 12, (
         f"标题段前距常量现值漂移：期望 12，实得 {ds.SPACE_BEFORE_HEADING_PT}"
     )
     assert ds.SPACE_AFTER_HEADING_PT == 6, (
         f"标题段后距常量现值漂移：期望 6，实得 {ds.SPACE_AFTER_HEADING_PT}"
     )
-    assert ds.SPACE_AFTER_BODY_PT == 0, (
-        f"正文段后距常量现值漂移：期望 0，实得 {ds.SPACE_AFTER_BODY_PT}"
+    # s928-01 第一笔（案 B′ 改值）：期望值 0 → 10，与 `docx_styles.py:24` **同批**入库。
+    # 本例只钉常量现值；产物面那一格看下面 `test_docx_body_paragraph_after_spacing_*`。
+    assert ds.SPACE_AFTER_BODY_PT == 10, (
+        f"正文段后距常量现值漂移：期望 10（B′ 本仓锁定），实得 {ds.SPACE_AFTER_BODY_PT}"
     )
     assert ds.FIRST_LINE_INDENT_CM == 0.74
 
@@ -169,9 +171,17 @@ def test_docx_apa7_margins_and_table_style_pinned():
     assert (ds.FIG_PREFIX, ds.TABLE_PREFIX) == ("图", "表")
 
 
-# ── 正文段后距的产物面看守（s924-25）────────────────────────────────────────
-# 今天实测到的"常量说 0 / 产物给 10"这道缝，钉在这里而不是钉成 `w:after == 常量`。
-DOCX_BODY_AFTER_GAP_PT = 10.0  # = docDefaults 的 after=200 twips ÷ 20 － SPACE_AFTER_BODY_PT 现值
+# ── 正文段后距的产物面看守（s924-25 建例，s928-01 两笔重评为 B′ 态）───────────────
+# 建例时钉的是「常量说 0 / 产物给 10」这道**脱钩缝**（缝宽＝产物继承值 − 常量现值）。
+# B′（s927-51 拍板、用户 2026-09-28 授权）＝ 第一笔把常量改 10 ＋ 第二笔接线 ⇒ 脱钩消失，
+# 本例因此改钉三件**互相独立**的事实（而不是把 `10.0` 划成 `0.0`——那会退化成恒真式）：
+# ①（臂一）正文段带**显式** `w:after`，值为整数字面量 "200"（＝10pt，本仓锁定值）；
+# ②（臂二）产物 `docDefaults` 的 after 仍是 200 twips ⇒ direct 与继承同格 ⇒ **零版式变化**；
+#    模板一旦变了（docDefaults ≠ 200）本臂即红——正是台账 241ⓒ 记的「未来不等价」那一条；
+# ③（臂三）direct 读数与常量现值同格（容差＝半网格 0.025pt）⇒ 接线的因果链成立。
+# 档二口径取自 docs/insights/s927-45-format-caliber-note.md §4-B：钉**整数字面量与属性名**，
+# 不得用 `Pt(常量)` 派生期望值（否则退化成「两侧同过一个换算函数」的恒真式）。
+DOCX_BODY_AFTER_EFFECTIVE_TWIPS = "200"   # 正文段 direct 与模板 docDefaults 共同的 w:after（twips 字面量）
 
 _SYNTH_BODY = "合成正文段落（人造文案，不含任何研究或统计结论）"
 _SYNTH_HEADING = "合成一级标题"
@@ -205,24 +215,28 @@ def _docdefaults_after_twips(styles_xml: str) -> int:
     return int(m.group(1))
 
 
-def test_docx_body_paragraph_after_spacing_gap_pinned():
-    """正文段后距**现状快照**（非规范）：谁改 `SPACE_AFTER_BODY_PT` 必须连本断言一起评审。
+def test_docx_body_paragraph_after_spacing_effective_value_pinned():
+    """正文段后距**产物生效值**快照（s928-01 两笔后的 B′ 态）。
 
-    s923-18 的裁决材料指出、本班在本机 `.venv`（python-docx 1.2.0）复证：
-    正文段落这一路**没有** `w:pPr/w:spacing/@w:after` —— 导出器只在标题分支
-    （`level > 0`）写 `pf.space_after`，正文分支从头到尾没碰过段后距。于是正文实际
-    生效值由 `word/styles.xml` 的 `docDefaults after=200`（twips）继承来，是 **10pt**，
-    不是 `docx_styles.py` 里那个 `0`。全仓该常量的消费方为 **0 处**（`rg` 双轨见 result）。
+    建例原委（s924-25）：导出器只在标题分支（`level > 0`）写 `pf.space_after`，正文分支
+    从头到尾没碰过段后距 ⇒ 正文生效值由 `word/styles.xml` 的 `docDefaults after=200`（twips）
+    继承而来是 **10pt**，而 `docx_styles.py` 里那个常量当时写 `0`、全仓消费方 **0 处**。
+    当时两侧确实脱钩，所以 s924-25 把期望式写成「缝宽＝继承值 − 常量」。
 
-    ⇒ 本例不写 `w:after == SPACE_AFTER_BODY_PT`（那是**恒假**的，写上去当场红），
-    而是把"产物实际值与常量现值之间这道 10pt 的缝"钉成期望式：期望值从
-    `ds.SPACE_AFTER_BODY_PT` **动态取** ⇒ 常量一改，缝宽就变，本例立刻转红，逼一次评审。
-    现状快照非规范：本例不主张 10pt 是对的、也不主张 0 是对的。
+    B′（s927-51 拍板、用户 2026-09-28 授权）落地后本例整例重评（卷宗口径：
+    「谁改本常量必须连本断言一起评审」），且**不能**只把 `10.0` 划成 `0.0`——那样它就退化成
+    s927-45 §4-B 禁的「两侧同过一个换算函数」的恒真式。三臂各自独立、可单点定位：
+    ①（臂一）正文段现在**必须**带显式 `w:after == "200"`（整数字面量＝本仓锁定 10pt 已接线）；
+    ②（臂二）模板 `docDefaults` 仍是 200 twips ⇒ direct 与继承同格 ⇒ **零版式变化**；
+       模板变更时本臂红，正是「本仓锁定 vs 跟随模板」分叉的哨兵（台账 241ⓒ）；
+    ③（臂三）direct 读数与常量现值同格（容差半网格 0.025pt）⇒ 接线的因果链成立。
+
+    现状快照非规范：本例不主张 10pt 比 0pt 好，只主张「产物生效值可查、三处同格、来源明白」。
     """
     body_sp, heading_sp, styles_xml = _export_body_sample()
 
     # 先证明"探针不是恒真"：同一份产物里，接了线的标题段确实带 w:after，
-    # 正文段的不带 —— 二者对比才说明正文的 None 是"没接线"而不是"读不到属性"。
+    # 正文段的读数与之**分属两个元素**——二者对比才说明正文的读数是接线来的而不是读不到属性。
     assert heading_sp is not None, "一级标题段没有 w:spacing，导出器版式分支与本例前提不符"
     assert heading_sp.get(qn("w:after")) == str(int(ds.SPACE_AFTER_HEADING_PT * 20)), (
         f"标题段后距读数异常：期望 {ds.SPACE_AFTER_HEADING_PT}pt（{ds.SPACE_AFTER_HEADING_PT * 20:.0f} twips），"
@@ -230,17 +244,32 @@ def test_docx_body_paragraph_after_spacing_gap_pinned():
     )
 
     assert body_sp is not None, "正文段落连 w:pPr/w:spacing 都没有，产物版式与本例前提不符"
-    assert body_sp.get(qn("w:after")) is None, (
-        f"正文段落开始出现显式 w:after={body_sp.get(qn('w:after'))!r} —— "
-        f"说明 SPACE_AFTER_BODY_PT 已被接线，本例的'脱钩'快照需连同改值单一起重评"
+    # 臂一·档二（s927-45 §4-B：整数字面量＋属性名，不由常量派生）
+    assert body_sp.get(qn("w:after")) == DOCX_BODY_AFTER_EFFECTIVE_TWIPS, (
+        f"正文段的显式 w:after 现值 {body_sp.get(qn('w:after'))!r} ≠ 字面量 "
+        f"{DOCX_BODY_AFTER_EFFECTIVE_TWIPS} —— B′ 接线（docx_exporter.py 两处正文分支）被改动或退回脱钩态；"
+        f"若确要改正文段后距，连本断言与 docx_styles.py:24 一起评审"
     )
     assert body_sp.get(qn("w:line")) is not None, (
         "正文段的 w:line 也消失了 —— 读的不是同一个 spacing 元素，本例失去意义"
     )
 
-    inherited_pt = _docdefaults_after_twips(styles_xml) / 20.0
-    assert inherited_pt - ds.SPACE_AFTER_BODY_PT == DOCX_BODY_AFTER_GAP_PT, (
-        f"正文段后距脱钩缝宽变了：产物继承 {inherited_pt}pt、常量现值 {ds.SPACE_AFTER_BODY_PT}pt、"
-        f"缝宽期望 {DOCX_BODY_AFTER_GAP_PT}pt —— 改常量（或改版式）须连本断言一起评审"
+    defaults_twips = _docdefaults_after_twips(styles_xml)
+    # 臂二·等价换轨的哨兵：模板继承值与本仓显式值同格 ⇒ 版式不变（s927-51 §2 实测差异 0 处）
+    assert defaults_twips == int(DOCX_BODY_AFTER_EFFECTIVE_TWIPS), (
+        f"正文段继承来源（docDefaults）不再是 {DOCX_BODY_AFTER_EFFECTIVE_TWIPS} twips："
+        f"实得 {defaults_twips} —— 捆绑模板换了或被 apply_profile 改写过，"
+        f"本仓锁定值与模板正式分叉（台账 241ⓒ 记的就是这条未来风险）"
+    )
+    assert int(body_sp.get(qn("w:after"))) == defaults_twips, (
+        f"显式值 {body_sp.get(qn('w:after'))} 与继承值 {defaults_twips} 不同格 ⇒ B′ 的『零版式变化』前提失效，"
+        f"正文段观感已被改动（不再是等价换轨）"
+    )
+    # 臂三·接线因果：产物读数与常量现值同格（容差＝s927-45 §2 的半网格 0.025pt）
+    assert int(body_sp.get(qn("w:after"))) / 20.0 == pytest.approx(
+        ds.SPACE_AFTER_BODY_PT, abs=0.025
+    ), (
+        f"正文段显式 w:after 换算 {int(body_sp.get(qn('w:after'))) / 20.0}pt 与常量现值 "
+        f"{ds.SPACE_AFTER_BODY_PT}pt 不同格 ⇒ 接线取错了常量/单位（Pt 与 twips 的换算被改动）"
     )
 

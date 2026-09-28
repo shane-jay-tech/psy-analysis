@@ -141,6 +141,10 @@ def _add_paragraph(doc, text: str = "", *, level: int = 0, align: str = "left",
     if level > 0:
         pf.space_before = Pt(S.SPACE_BEFORE_HEADING_PT)
         pf.space_after = Pt(S.SPACE_AFTER_HEADING_PT)
+    else:
+        # s928-01 第二笔（案 B′ 接线）：正文段显式写本仓锁定值，不再靠模板 docDefaults 继承。
+        # 生效值与继承时代同格（200 twips＝10pt），改动只是将取值来源由 docDefaults 换成 direct。
+        pf.space_after = Pt(S.SPACE_AFTER_BODY_PT)
 
     size_map = {0: S.SIZE_BODY, 1: S.SIZE_H1, 2: S.SIZE_H2, 3: S.SIZE_H3}
     size = size_map.get(level, S.SIZE_BODY)
@@ -164,6 +168,9 @@ def _add_paragraph_with_inline_format(doc, text: str, *, first_line_indent: bool
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     pf = p.paragraph_format
     pf.line_spacing = S.LINE_SPACING
+    # s928-01 第二笔（案 B′ 接线）：正文助手同样显式写本仓锁定值（与 `_add_paragraph` 的
+    # level==0 分支同口径），生效值与继承时代同格 200 twips＝10pt。
+    pf.space_after = Pt(S.SPACE_AFTER_BODY_PT)
     if first_line_indent:
         pf.first_line_indent = Cm(S.FIRST_LINE_INDENT_CM)
 
