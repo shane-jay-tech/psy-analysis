@@ -614,7 +614,6 @@ def build_questionnaire_pdf(
     pdf.ln(4)
     write("—— 问卷结束，感谢您的参与 ——", size=12, bold=True, align="C")
 
-    out = pdf.output()
-    if isinstance(out, (bytes, bytearray)):
-        return bytes(out)
-    return bytes(out)  # fpdf2 新版本返回 bytearray，统一转 bytes
+    # fpdf2 2.8.x 的 output() 返 bytearray，与本函数 `-> bytes` 声明不符 ⇒ 出口统一折成 bytes。
+    # 原处那段两支同返的恒真判别（s924-06 遗留／s927-43 出形状）由 s927-55 清成下面这一行。
+    return bytes(pdf.output())

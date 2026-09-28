@@ -141,6 +141,36 @@ class TestQuestionnairePdf:
         out = build_questionnaire_pdf(sample_doc, scale_points=7)
         assert out[:4] == b"%PDF"
 
+    def test_pdf_output_container_is_normalized_to_bytes(self, sample_doc, monkeypatch):
+        """s927-55：把「出口归一为 bytes」钉成断言——这层语义原先只由一段恒真死分支**装着**在做。
+
+        被清掉的尾部四行两支同体（`if isinstance(out, (bytes, bytearray))` 与 else 都
+        `return bytes(out)`），条件永不影响结果 ⇒ 删它属零行为变化。但删完之后，"归一"
+        这件事只剩一处 `bytes(pdf.output())`，所以这里断的是**剩下的那一处真的在归一**：
+        现场探得本仓 fpdf2 2.8.7 的 `output()` 返 bytearray，再用 monkeypatch 强制走
+        bytearray 路并锁内容逐字节不变。变异自证：把 `bytes(...)` 剥掉 ⇒ 本例第 3 条断言转红。
+        """
+        from fpdf import FPDF
+
+        from src.questionnaire.exporters import build_questionnaire_pdf
+
+        real_output = FPDF.output
+        handed_back = {}
+
+        def fake_output(self, *args, **kwargs):
+            buf = bytearray(real_output(self, *args, **kwargs))
+            handed_back["buf"] = buf
+            return buf
+
+        monkeypatch.setattr(FPDF, "output", fake_output)
+        out = build_questionnaire_pdf(sample_doc, scale_points=5)
+
+        assert handed_back, "monkeypatch 没被走到 ⇒ 本例什么都没断（假绿守卫）"
+        assert isinstance(handed_back["buf"], bytearray)      # 交回来的确实是 bytearray
+        assert type(out) is bytes                             # 精确类型，不是"可缓冲"就算过
+        assert not isinstance(out, bytearray)                 # 没退化成带着旧容器返回
+        assert out == bytes(handed_back["buf"])               # 内容逐字节不变：清的是判别，不是数据
+
     def test_with_header_meta(self, sample_doc):
         from src.questionnaire.exporters import build_questionnaire_pdf
 
