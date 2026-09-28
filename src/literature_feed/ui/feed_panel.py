@@ -558,9 +558,14 @@ def _render_sources_tab(store: FeedStore) -> None:
                 "开始": (r["started_at"] or "")[:19].replace("T", " "),
                 "结束": (r["ended_at"] or "")[:19].replace("T", " "),
                 "状态": r["status"],
-                "新文章": summary.get("articles_new", 0),
-                "构念": summary.get("constructs", 0),
-                "方法": summary.get("methods", 0),
+                # 键名契约（s927-58）：生产者 = scheduler/daily_runner.RunSummary.to_dict()，
+                # 写的是 extracted_articles / extracted_constructs / extracted_methods。
+                # 此处曾读 articles_new / constructs / methods —— 三键全失配，dict.get 静默取 0，
+                # 「最近抓取审计」遂把盘上 18 条非零 run 抹平成全 0（钉桩见
+                # tests/test_feed_run_summary_key_contract.py）。
+                "新文章": summary.get("extracted_articles", 0),
+                "构念": summary.get("extracted_constructs", 0),
+                "方法": summary.get("extracted_methods", 0),
             })
         st.dataframe(run_rows, width="stretch", hide_index=True)
 
