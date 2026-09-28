@@ -109,7 +109,13 @@ def run_full_diagnosis(project_root: Optional[Path] = None) -> EnvironmentDiagno
             diag.items.append(DiagnosisItem("中文字体", "ok", f"可用：{', '.join(list(dict.fromkeys(zh_fonts))[:3])}", required=False))
         else:
             diag.items.append(DiagnosisItem("中文字体", "warning", "未检测到常用中文字体，图表可能显示异常", required=False))
-    except Exception:
+    # s927-38：原为裸 `except Exception`，会把本模块自己的 bug（如 s922-118 登记的
+    # `set(zh_fonts)[:3]` TypeError）吞成一句「无法检测字体」的假诊断。收窄为第三方/环境侧的
+    # 已知异常面：ImportError=matplotlib 缺失或损坏；AttributeError=fontManager/FontEntry 属性面；
+    # OSError=字体目录遍历与缓存读失败（PermissionError/FileNotFoundError 均是它的子类）；
+    # ValueError=matplotlib 内部 weight/stretch 与 findfont 兜底校验（font_manager.py:997/:1022/:1623）；
+    # NotImplementedError=非矢量字体（font_manager.py:545）。其余异常一律如实冒泡。
+    except (ImportError, AttributeError, OSError, ValueError, NotImplementedError):
         diag.items.append(DiagnosisItem("中文字体", "warning", "无法检测字体", required=False))
 
     # Playwright

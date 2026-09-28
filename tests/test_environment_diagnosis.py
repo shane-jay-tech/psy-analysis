@@ -27,7 +27,10 @@ s922-118 曾在此钉住一条**在册缺陷**，**s923-30 已按建议修法修
 导致「中文字体」的 ok 分支在任何机器上都不可达（本机装了 11 个常用中文字体也恒报 warning）。
 现改为 `list(dict.fromkeys(zh_fonts))[:3]`（有序去重后截三），并把
 原来那条「ok 分支永不可达」的缺陷钉桩翻正为 `test_chinese_font_ok_branch_reports_deduped_names`。
-:112 裸 `except Exception` 过宽的登记**保持不动**（本件不覆盖它）；
+**:112 的裸 `except Exception` 过宽面曾由 s923-30 登记留手，s927-38 按本单收窄为已知环境异常**
+（`except (ImportError, AttributeError, OSError, ValueError, NotImplementedError)`），
+钉桩见 `test_font_branch_degrades_only_for_known_environment_errors`
+与 `test_font_branch_lets_unexpected_bug_propagate`。
 同笔给 ok 分支补 `required=False` 的理由与两案见 s923-30 result 的「需裁决」段。
 
 红线自查：本件只读环境、不装依赖、不建目录（除 pytest 自带 tmp_path），不碰统计/医疗数值面。
@@ -216,7 +219,7 @@ def test_chinese_font_ok_branch_reports_deduped_names(host_isolated, monkeypatch
 
     本件由 s922-118 的「ok 分支永不可达」缺陷钉桩翻正而来：
     原桩断言任何机器都拿不到 ok，:109 修好后那条判据必须跟着翻，不能悄悄留着当绿。
-    :112 裸 `except Exception` 过宽的登记保持不动，本函数不覆盖它。
+    except 面的收窄由 s927-38 另起两例钉（见本函数下方），本函数只管 ok 分支的取值形状。
 
     四条断言各有独立杀伤力（本机变异实测五刀：换回 `set(zh_fonts)[:3]` 会被 :112 吞成
     warning 而红；`list(set(...))[:3]`（合法但乱序）三连红；`zh_fonts[:3]`（不去重）因首位
@@ -244,6 +247,98 @@ def test_chinese_font_ok_branch_reports_deduped_names(host_isolated, monkeypatch
     assert item.detail == "可用：SimHei, Microsoft YaHei, SimSun", item.detail
     assert "KaiTi" not in item.detail, "只取前三，第四名不得出现"
     assert item.required is False, "ok 分支也得是可选项，否则必选性随机器字体漂移（见 :199）"
+
+
+# ===========================================================================
+# s927-38：字体分支的 except 面（裸 except Exception → 已知环境异常）
+# ===========================================================================
+
+class _BoomFontManager:
+    """让 `fm.fontManager` 属性访问当场炸出指定异常（替身模块，桩型同 :240）。"""
+
+    def __init__(self, exc_cls, msg):
+        self._exc_cls = exc_cls
+        self._msg = msg
+
+    @property
+    def fontManager(self):
+        raise self._exc_cls(self._msg)
+
+
+def _install_boom_manager(monkeypatch, exc_cls, msg):
+    """沿用本件既有的桩型：替换包属性 `matplotlib.font_manager`。
+
+    `import a.b as c` 取的是父包上的属性，所以替 `matplotlib.font_manager` 就能接管
+    函数体内的冷导入（`test_chinese_font_ok_branch_reports_deduped_names` 用的是同一手法）。
+    """
+    import matplotlib  # noqa: F401  确保子模块已进 sys.modules，便于按包属性替换
+
+    monkeypatch.setattr(matplotlib, "font_manager", _BoomFontManager(exc_cls, msg), raising=True)
+
+
+# 收窄后仍被接住的五类，逐条出处见 production 侧注释与 result「证据」
+KNOWN_ENV_ERRORS = {
+    "ImportError": ImportError,
+    "AttributeError": AttributeError,
+    "OSError": OSError,
+    "ValueError": ValueError,
+    "NotImplementedError": NotImplementedError,
+}
+
+
+def test_font_branch_degrades_only_for_known_environment_errors(host_isolated, monkeypatch):
+    """完成标准③的行为面：五类环境/第三方异常仍降级为 warning，诊断器不因此崩。
+
+    这五类不是拍脑袋列的：matplotlib 3.11 的 `font_manager.py` 里 `fontManager = _load_fontmanager()`
+    是模块级求值，失败面 = 导入失败(ImportError) / 属性面(AttributeError) / 字体目录与缓存读
+    (OSError，含 PermissionError、FileNotFoundError) / weight・stretch・findfont 兜底校验
+    (ValueError，font_manager.py:997/:1022/:1623) / 非矢量字体(NotImplementedError，:545)。
+    """
+    for exc_name, exc_cls in KNOWN_ENV_ERRORS.items():
+        _install_boom_manager(monkeypatch, exc_cls, f"s927-38 fixture: {exc_name}")
+        item = _by_name(run_full_diagnosis(host_isolated), "中文字体")
+        assert item is not None, f"{exc_name} 时「中文字体」项必须仍被追加"
+        assert (item.status, item.detail, item.required) == ("warning", "无法检测字体", False), \
+            f"{exc_name} 应降级为原句 warning，实得 {item}"
+
+
+def test_font_branch_lets_unexpected_bug_propagate(host_isolated, monkeypatch):
+    """完成标准①＋③的核心：s922-118 那类**本模块自己的 bug** 不再被吞成假诊断。
+
+    用当年真实的杀伤形状复现：`set(...)[:3]` 抛 TypeError。收窄后它必须**如实冒泡**——
+    这正是裸 except 的危害所在（bug 会被伪装成「这台机器没装字体」）。
+    """
+    _install_boom_manager(monkeypatch, TypeError, "'set' object is not subscriptable")
+    with pytest.raises(TypeError, match="not subscriptable"):
+        run_full_diagnosis(host_isolated)
+
+
+def test_font_branch_except_is_not_bare_in_source():
+    """完成标准③的静态面：按 AST 数 handler，模块内不得再有裸／`except Exception`。
+
+    行为用例已能拦住回归，这条是把「收窄」本身钉成可读的形状判据。
+    走 AST 而非文本匹配有两个理由：①本件与生产码的注释里就写着 `except Exception` 字样，
+    文本判据会自己咬自己；②文本判据拦不住 `except (Exception,)` 这种换皮写法，AST 拦得住。
+    若日后有人在本模块其它检查项加宽捕获，本用例当场翻红，请**逐条评估后再更新本判据**。
+    """
+    import ast
+
+    tree = ast.parse(Path(ed.__file__).read_text(encoding="utf-8"))
+    handlers = [n for n in ast.walk(tree) if isinstance(n, ast.ExceptHandler)]
+    assert handlers, "本模块应有 try/except，读空说明 AST 判据失效"
+
+    def _names(node):
+        if node.type is None:
+            return {"<bare>"}
+        if isinstance(node.type, ast.Tuple):
+            return {e.id for e in node.type.elts if isinstance(e, ast.Name)}
+        return {node.type.id} if isinstance(node.type, ast.Name) else {ast.dump(node.type)}
+
+    caught = {ln: _names(h) for h in handlers for ln in [h.lineno]}
+    too_wide = {ln: names for ln, names in caught.items() if names & {"<bare>", "Exception", "BaseException"}}
+    assert not too_wide, f"这些行又在吞一切异常：{too_wide}（见 s927-38 note 的取舍理由）"
+    assert {"ImportError", "AttributeError", "OSError", "ValueError", "NotImplementedError"} in caught.values(), \
+        "字体分支的已知异常集合变了，请同步本判据与 s927-38 note"
 
 
 # ===========================================================================
