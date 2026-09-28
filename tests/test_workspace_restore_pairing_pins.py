@@ -1,43 +1,58 @@
 # -*- coding: utf-8 -*-
-"""s922-108：`restore_workspace` 的**非成对恢复现状**钉桩（df 独活 / inspector 缺席且不报警）。
+"""`restore_workspace` 的**成对恢复契约**钉桩（案 a：四键齐备才写 df）。
 
-⚠️ 本档钉的是「改前基线」，不是「应有形态」。普查档
-`docs/insights/psy-session-state-attr-read-census-20260921.md` **结论 4**（:98-101 行）点名的
-值语义风险正是这条路径；日间若给恢复路径补成对断言（结论 4 的建议收口顺序第一步），
-本档用例应主动转红 —— 那是设计内翻正信号，请改断言不要删用例。
+本档的来历分两代，读改动时请连起来看：
+- **s922-108**（09-22，HEAD `9551e1d`）钉的是「**改前基线**」——df 独活、inspector 缺席且不报警，
+  并在档头写明「日间若给恢复路径补成对断言（普查档结论 4 建议收口顺序第一步），
+  本档用例应主动转红——那是设计内翻正信号，请改断言不要删用例」。
+- **s927-28**（本班，HEAD `635680e`）落地案 a，按上述预告**把断言翻正、一条用例没删**，
+  并补「缺键恢复被拒／四键齐备成功」的成对断言。翻正点逐条标了 `s927-28 翻正` 便于回查。
 
-锚点复核（2026-09-22 本班按磁盘实况，HEAD `9551e1d`，**任务书三处锚点零漂移**）：
-- `src/utils/workspace.py:594` `df_b64 = loaded.get("df_b64")`
-- `:598` `st.session_state.df = pd.read_csv(io.BytesIO(csv_bytes))`（包在 `:596-601` 的 try 里，
-  `except Exception: pass` —— 解码失败**静默吞**）
-- `:606-611` `for k in ["meta", "inspector", "file_name", "analysis_history", ...]: if k in loaded`
-  逐键独立条件恢复，与 df 分支**零耦合**
-- 写侧对照 `:238-241` `build_workspace_snapshot`：四键各自 `if v is not None` 才落盘 ⇒ 快照本身也不成对
+施工面：`src/utils/workspace.py` 新增 `DF_PARTNER_KEYS` / `missing_df_partner_keys()`，
+`restore_workspace` 的 df 分支改为「四键（meta/inspector/file_name/analysis_history）**齐备且非 None**
+才解码写回」，缺键时记一条 `logger.warning` 并整组不写；其余键的恢复条件、返回值口径均未变。
 
-普查档的两处 app.py 行号**已漂**（本班实测留痕，不影响结论本身）：
-结论 4 记的「显式合取只有 1 处 `app.py:1173`」现在落在 **`app.py:990`**；
-`if st.session_state.df is not None:` 属性式读取实测 4 处（`:767 / :877 / :990 / :1050`），
-合取式仍**只有 1 处**（`:990`）—— 结论 4 的实质判断成立，只是行号要跟。
+为什么判据是「非 None」而不是「键在不在」：普查档
+`docs/insights/psy-session-state-attr-read-census-20260921.md` **结论 4**（:98-101）点名的
+是**值语义**风险——app.py 一片读点用 `if st.session_state.df is not None:` 掩护
+meta / inspector / file_name / analysis_history 的读取，键存在但为 None 时守卫照样过，
+报错发生在离缺键现场很远的下游、形态是 AttributeError/TypeError 而不是缺键。
 
-隔离口径：`src/utils/workspace.py` 全模块 **零文件 IO**（`open(` / `Path(` / `.home(` / `json.load` /
-`write_text` / `mkdir` 六个串实测零命中，见 `test_restore_module_has_zero_file_io`），
-项目文件由调用方读写 ⇒ 本班一律用 `tmp_path` 造真 JSON 文件再回读喂进 `restore_workspace`，
-不触碰 `~/.psy_analysis`。零 sqlite、零网络、零 LLM、零子进程。
+本班实测的收口范围（**与卷宗锚点数不一致，按磁盘实况收窄**）：他键守卫点位现值 **11** 处
+（工作树版与 HEAD 版 app.py 同值；卷宗写 13），其中外层守卫测 `df` 因而被案 a 收口的是 **6** 处，
+守卫测 `analysis_output`／`undergrad_mode` 的 5 处**案 a 收不到**。逐点表见
+`docs/insights/s927-28-guard13.md`。
+
+锚点复核（HEAD `635680e` 现取）：
+- `src/utils/workspace.py:594` `df_b64 = loaded.get("df_b64")` → 现值 `:616`，其上新增案 a 门卫
+- `:606-611` 的 `for k in ["meta", "inspector", "file_name", "analysis_history", ...]: if k in loaded`
+  → 现值 `:637-642`，逐键条件**未改**（案 a 只收紧 df 一侧）
+- 写侧对照 `build_workspace_snapshot:238-241` 四键各 `if v is not None` **未改**（改它＝另一单）
+
+隔离口径：`src/utils/workspace.py` 全模块**零文件 IO**（见 `test_restore_module_has_zero_file_io`），
+项目文件由调用方读写 ⇒ 一律用 `tmp_path` 造真 JSON 文件再回读喂进 `restore_workspace`，
+不触碰 `~/.psy_analysis`，不写 `data/`。零 sqlite、零网络、零 LLM、零子进程。
 """
 from __future__ import annotations
 
 import base64
 import io
 import json
+import logging
 
 import pandas as pd
 import pytest
 import streamlit as st
 
 from src.data.inspector import inspect_dataframe
-from src.utils.workspace import build_workspace_snapshot, restore_workspace
+from src.utils.workspace import (
+    DF_PARTNER_KEYS,
+    build_workspace_snapshot,
+    missing_df_partner_keys,
+    restore_workspace,
+)
 
-# 现状常量：恢复分支里 df 与这三键**不配对**（结论 4 的核心事实）
+# 现状常量：df 在恢复侧必须与这四键成对（案 a）
 PARTNER_KEYS = ("meta", "inspector", "file_name", "analysis_history")
 CURRENT_SCHEMA = "v3.5"  # workspace.py:403，写进 payload 以避开迁移链旁路
 
@@ -50,6 +65,21 @@ def _csv_b64(df: pd.DataFrame) -> str:
 
 def _sample_df(n=3) -> pd.DataFrame:
     return pd.DataFrame({"score": list(range(n)), "group": [f"g{i}" for i in range(n)]})
+
+
+def _complete_payload(df: pd.DataFrame | None = None, **overrides) -> dict:
+    """四键齐备的项目文件负载（案 a 之后 df 能被恢复的**唯一**形态）。"""
+    df = _sample_df(3) if df is None else df
+    payload = {
+        "_schema": CURRENT_SCHEMA,
+        "df_b64": _csv_b64(df),
+        "meta": {"rows": len(df)},
+        "inspector": inspect_dataframe(df),
+        "file_name": "survey.csv",
+        "analysis_history": [],
+    }
+    payload.update(overrides)
+    return payload
 
 
 def _project_file(tmp_path, payload: dict, name: str = "proj_001.json"):
@@ -68,15 +98,18 @@ def _keys_present() -> set:
     return {k for k in st.session_state.keys()}
 
 
-# ─────────────────── 现状形态判据（与 s922-104 的 _pinned_paths 同构） ───────────────────
+# ─────────────── 成对契约判据（s922-108 的现状判据按预告翻正） ───────────────
 def _df_should_restore(payload: dict) -> bool:
-    """现状语义：`df_b64` 非空 **且能解码成 CSV** 才会写 `session_state.df`。
+    """案 a 语义（s927-28 翻正）：`df_b64` 非空 **且四键齐备非 None** 才会写 `session_state.df`。
 
-    判据必须先算这个，否则会把「脏 base64 被 except 吞掉」误判成「加了成对前提」——
-    那两种形态在 session_state 上的留痕**本来就完全相同**（这正是本档要钉的风险）。
+    改前的判据只看「有 df_b64 且能解码」，那正是 `:594-611` 零耦合的写法。
+    解码失败仍算「不该恢复」——案 a 的门卫在解码**之前**，所以脏 b64 与缺键两种形态
+    在 session_state 上依然同形（这条没被本单改坏，见 `test_dirty_df_b64_*`）。
     """
     raw = payload.get("df_b64")
     if not raw:
+        return False
+    if missing_df_partner_keys(payload):
         return False
     try:
         pd.read_csv(io.BytesIO(base64.b64decode(raw)))
@@ -86,23 +119,24 @@ def _df_should_restore(payload: dict) -> bool:
 
 
 def _pinned_pairing_facts(payload: dict, present: set, restored: int) -> list[str]:
-    """返回「偏离非成对现状」的原因列表；现状下应为空。
+    """返回「偏离案 a 成对契约」的原因列表；契约成立时应为空（s927-28 由现状判据翻正而来）。
 
-    三条判据都只认 payload 里**有没有**那个键、df 能不能解码，不认邻居键 ——
-    这正是 `:594-611` 的写法。若施工方改成「四键齐备才写 df」或「缺 inspector 就补种/报警」，
-    本函数就会报红。
+    四条判据都从 payload 出发反推应有形态，不看实现——若有人把门卫改回「df 独写」
+    或改成「连兄弟键一起不写」，本函数立刻报红。
     """
     fails: list[str] = []
     expect_df = _df_should_restore(payload)
 
     if expect_df and "df" not in present:
-        fails.append("df_b64 可解码却没恢复：df 分支不再无条件单写（可能加了成对前提）")
+        fails.append("四键齐备且可解码却没恢复 df：案 a 的门卫写过头了（或解码分支被改坏）")
     if not expect_df and "df" in present:
-        fails.append("文件里没有可解码的 df_b64 却凭空冒出 df：补了默认种或从邻居键推导")
-    if expect_df and not payload.get("inspector") and "inspector" in present:
-        fails.append("缺 inspector 字段却被补种：恢复路径开始成对了")
-    if expect_df and "df" in present and restored < 1:
-        fails.append(f"df 已恢复却返回 {restored}：计数口径从「成功项数」变了")
+        fails.append("缺兄弟键或不可解码却凭空写了 df：案 a 的成对前提失效（回退成 df 独活）")
+    if expect_df:
+        missing_now = [k for k in PARTNER_KEYS if k not in present]
+        if missing_now:
+            fails.append(f"df 已恢复但兄弟键缺席 {missing_now}：成对不变式破了")
+        if restored < 1:
+            fails.append(f"df 已恢复却返回 {restored}：计数口径从「成功项数」变了")
     return fails
 
 
@@ -114,94 +148,73 @@ def clean_session_state():
     st.session_state.clear()
 
 
-# ─────────────────────────────── 钉桩用例 ───────────────────────────────
-def test_df_only_project_file_restores_df_and_leaves_inspector_absent(tmp_path):
-    """普查档结论 4 主现场：只带 df_b64 的项目文件恢复后 df 非空、inspector **键根本不存在**。
-
-    现状钉桩。`restored` 返回 1、不抛、不 warn —— 缺键这件事在恢复层零留痕，
-    这正是结论 4 说的「值语义风险」而非「不存在风险」。
+# ─────────────────────────────── 契约用例 ───────────────────────────────
+def test_df_only_project_file_is_refused_and_leaves_no_df(tmp_path):
+    """s927-28 翻正（原 `test_df_only_project_file_restores_df_and_leaves_inspector_absent`）：
+    只带 df_b64 的项目文件在案 a 下**整组不写**——改前它是 df 恢复、inspector 键根本不存在，
+    正是普查结论 4 的现场；现在 df 也不写，且 `restored == 0`、不抛。
     """
-    _path, loaded = _project_file(tmp_path, {"_schema": CURRENT_SCHEMA, "df_b64": _csv_b64(_sample_df())})
-
-    restored = restore_workspace(loaded)
-
-    assert restored == 1
-    assert st.session_state.df is not None and len(st.session_state.df) == 3
-    assert "df" in _keys_present()
-    for k in PARTNER_KEYS:
-        assert k not in _keys_present(), f"恢复层不该凭空补 {k}"
-    assert st.session_state.get("inspector") is None
-    assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
-
-
-def test_downstream_df_guard_passes_while_conjunction_guard_fails(tmp_path):
-    """结论 4 的爆点形态：df 单条件守卫过、合取守卫不过，且属性式读 inspector 当场 AttributeError。
-
-    现状钉桩（**报错发生在离缺键现场很远的下游**，形态是 AttributeError 而不是缺键）。
-    两种守卫形状照 `app.py:767/:877/:1050`（单条件）与 `app.py:990`（唯一一处合取）各复刻一行，
-    不 import app.py —— app.py 是他班 12/40 在途件，本班不碰。
-    """
-    _path, loaded = _project_file(tmp_path, {"_schema": CURRENT_SCHEMA, "df_b64": _csv_b64(_sample_df(2))})
-    restore_workspace(loaded)
-
-    single_cond = st.session_state.df is not None          # app.py:767 形状
-    conjunction = (st.session_state.df is not None
-                   and st.session_state.get("inspector") is not None)  # app.py:990 形状
-    assert single_cond is True and conjunction is False
-    with pytest.raises(AttributeError):
-        _ = st.session_state.inspector  # 属性式读取在此刻是整页红，不是 None
-
-
-def test_dirty_df_b64_is_swallowed_without_raise_or_partial_state(tmp_path):
-    """结论 4 点名的 `except Exception: pass`：脏 df_b64 静默吞，恢复计数不涨、df 键不出现。
-
-    现状钉桩。这里喂非法 base64（`b64decode` 抛 binascii.Error）。
-    要钉的点是「用户看不出任何异常」——现场既无 log 也无 session 标记，
-    恢复后与「文件本来就没 df」两种状态**在 session_state 里不可区分**。
-    """
-    payload = {"_schema": CURRENT_SCHEMA, "df_b64": "!!!not-base64!!!"}
+    payload = {"_schema": CURRENT_SCHEMA, "df_b64": _csv_b64(_sample_df())}
     _path, loaded = _project_file(tmp_path, payload)
 
-    restored = restore_workspace(loaded)  # 不许抛
+    restored = restore_workspace(loaded)
 
     assert restored == 0
-    assert _keys_present() == set()  # 连一个键都没写 ⇒ 与「文件本来没 df」逐字节同形
     assert "df" not in _keys_present()
+    for k in PARTNER_KEYS:
+        assert k not in _keys_present(), f"恢复层不该凭空补 {k}"
     assert st.session_state.get("df") is None
     assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
-    assert _df_should_restore(loaded) is False  # 前提自证：这份 b64 确实不可解码
 
 
-def test_empty_string_df_b64_is_skipped_before_the_try_block(tmp_path):
-    """结论 4 相邻面：`if df_b64:` 短路在 try **之前**（`:595`），空串连解码都不进。
+def test_df_restore_is_refused_when_any_one_partner_key_is_missing(tmp_path):
+    """成对断言·被拒半边（逐键四格）：四键少任一个 ⇒ df 不写，**其余键照写**。
 
-    现状钉桩。与上一条同为「零红」，但走的是 falsy 分支而不是 except 分支 ——
-    两分支在 session_state 上留痕完全相同，因此下游更分不出「没数据」与「数据坏了」。
+    「照写」是案 a 的边界：本单只收紧 df 一侧，没有把恢复改成全有或全无。
     """
-    payload = {"_schema": CURRENT_SCHEMA, "df_b64": ""}
-    _path, loaded = _project_file(tmp_path, payload)
+    for missing in PARTNER_KEYS:
+        st.session_state.clear()
+        payload = _complete_payload()
+        del payload[missing]
+        _path, loaded = _project_file(tmp_path, payload, name=f"no_{missing}.json")
+
+        restored = restore_workspace(loaded)
+
+        assert "df" not in _keys_present(), f"缺 {missing} 却恢复了 df"
+        assert restored == len(PARTNER_KEYS) - 1, f"缺 {missing} 时其余键应照恢复"
+        for k in PARTNER_KEYS:
+            if k != missing:
+                assert k in _keys_present()
+        assert missing not in _keys_present()
+        assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
+
+
+def test_partner_key_present_but_null_also_refuses_df(tmp_path):
+    """成对断言·被拒半边（None 变体）：键在但值为 null 也算缺——这才是结论 4 的**值语义**风险。
+
+    判据若写成 `k in loaded`，这份文件就会放行 df，下游 `inspector` 读到 None 照样炸；
+    本条与上一条合起来把「键在」与「值有用」分开钉住。
+    """
+    payload = _complete_payload(inspector=None)
+    _path, loaded = _project_file(tmp_path, payload, name="null_inspector.json")
 
     restored = restore_workspace(loaded)
 
-    assert restored == 0 and "df" not in _keys_present()
+    assert missing_df_partner_keys(loaded) == ("inspector",)
+    assert "df" not in _keys_present()
+    # inspector 这一格被 `if k in loaded` 照原样写成 None（本单没改这条循环）
+    assert st.session_state.get("inspector") is None and "inspector" in _keys_present()
     assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
 
 
-def test_all_four_partner_keys_present_restore_every_key_independently(tmp_path):
-    """四键齐备时逐键恢复：`restored` == 1(df) + 4 = 5，inspector 非 None。
+def test_all_four_partner_keys_present_restores_df_and_partners(tmp_path):
+    """成对断言·成功半边（s922-108 的对照组，案 a 落地后**必须仍绿**）：四键齐备 ⇒ df 照恢复。
 
-    现状钉桩（施工后的对照组：这条在成对断言落地后仍应绿，用来证明改动没把齐备路径改坏）。
-    `:606-608` 的循环还带 undergrad_*/app_mode/quick_model_id 五个键，本班只钉普查结论 4 点名的四键。
+    齐备路径是用户日常形态，本条证明门卫没把好的文件一起拦掉：
+    `restored == 1(df) + 4 == 5`、四键全部非 None、df 内容逐格相等。
     """
     df = _sample_df(3)
-    payload = {
-        "_schema": CURRENT_SCHEMA,
-        "df_b64": _csv_b64(df),
-        "meta": {"rows": 3},
-        "inspector": inspect_dataframe(df),
-        "file_name": "survey.csv",
-        "analysis_history": [{"test": "ttest"}],
-    }
+    payload = _complete_payload(df)
     _path, loaded = _project_file(tmp_path, payload)
 
     restored = restore_workspace(loaded)
@@ -210,16 +223,115 @@ def test_all_four_partner_keys_present_restore_every_key_independently(tmp_path)
     assert _keys_present() >= {"df"} | set(PARTNER_KEYS)
     assert st.session_state.inspector is not None
     assert st.session_state.file_name == "survey.csv"
+    assert st.session_state.analysis_history == []
     pd.testing.assert_frame_equal(st.session_state.df, df)
     assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
 
 
-def test_snapshot_roundtrip_through_real_project_file_drops_none_partners(tmp_path):
-    """写侧→文件→读侧全链路：df 有值而 inspector 为 None 时，快照**只带 df_b64**，恢复后必然单活。
+def test_missing_partner_key_warning_is_emitted_and_mentions_the_gap(caplog, tmp_path):
+    """被拒不许静默：案 a 拦下 df 时记一条 warning 并点名缺哪几键。
 
-    现状钉桩。`build_workspace_snapshot:238-241` 对四键各用 `if v is not None`，
-    所以「df 独活」不是构造出来的畸形文件，而是上传后尚未跑 inspect 的**正常中间态**会产出的形态——
-    这条把结论 4 的风险从「假设有人手改了项目文件」升级为「常规链路可自然产生」。
+    改前的形态是「恢复层零留痕」（s922-108 现状钉 ①），调用方 `project_panel.py:62/:83/:97`
+    又不消费返回值 ⇒ 用户与排障者都看不出 df 没回来。本班把留痕补在恢复层，
+    没动返回值口径，也没往 session_state 塞新键（普查结论 3：非 _defaults 的键属性读会整页红）。
+    """
+    payload = _complete_payload()
+    del payload["inspector"]
+    _path, loaded = _project_file(tmp_path, payload, name="no_inspector.json")
+
+    with caplog.at_level(logging.WARNING, logger="src.utils.workspace"):
+        restore_workspace(loaded)
+
+    msgs = [r.getMessage() for r in caplog.records
+            if r.name == "src.utils.workspace" and r.levelno >= logging.WARNING]
+    assert any("跳过 df" in m and "inspector" in m for m in msgs), msgs
+
+
+def test_quiet_when_partners_are_complete(caplog, tmp_path):
+    """反证配平：四键齐备时**不该**有本模块的 warning（否则上一条 warn 断言就是恒真的假绿）。
+
+    只筛 `src.utils.workspace` 这一个 logger——裸模式跑 streamlit 会自己刷
+    「missing ScriptRunContext」的 WARNING，跟案 a 无关，混进来会让本条永远红。
+    """
+    _path, loaded = _project_file(tmp_path, _complete_payload(), name="ok.json")
+
+    with caplog.at_level(logging.WARNING, logger="src.utils.workspace"):
+        restore_workspace(loaded)
+
+    own = [r.getMessage() for r in caplog.records
+           if r.name == "src.utils.workspace" and r.levelno >= logging.WARNING]
+    assert own == []
+    # 配平原判据的另一种写法：既没跳过 df，df 也确实回来了
+    assert st.session_state.df is not None
+
+
+def test_downstream_df_guard_cannot_be_fooled_by_a_df_only_file(tmp_path):
+    """s927-28 翻正（原 `test_downstream_df_guard_passes_while_conjunction_guard_fails`）：
+    结论 4 的爆点形态「单条件守卫过、合取守卫不过」由 df-only 文件驱动，案 a 之后**驱动不起来**。
+
+    两种守卫形状照 `app.py:879/:887`（单条件）与 `app.py:990`（唯一一处合取）各复刻一行，
+    不 import app.py——app.py 是他班 12/40 在途件，本班不碰。
+    改前这里 `single_cond is True and conjunction is False`＋属性读当场 AttributeError；
+    现在 df 压根没回来，单条件守卫与合取守卫同判 False，属性式读 inspector 仍是缺键红
+    （键没被凭空补种），但**读点根本走不到**（它被同一个 df 守卫挡在外面）。
+    """
+    payload = {"_schema": CURRENT_SCHEMA, "df_b64": _csv_b64(_sample_df(2))}
+    _path, loaded = _project_file(tmp_path, payload)
+    restore_workspace(loaded)
+
+    single_cond = st.session_state.get("df") is not None      # app.py:879 形状的判据
+    conjunction = (st.session_state.get("df") is not None
+                   and st.session_state.get("inspector") is not None)  # app.py:990 形状
+    assert single_cond is False and conjunction is False      # 两判据同值＝不再分裂
+    assert "df" not in _keys_present() and "inspector" not in _keys_present()
+    with pytest.raises(AttributeError):
+        _ = st.session_state.inspector  # 键仍不存在；但读点在 app.py 里被 df 守卫挡在前面
+
+
+def test_dirty_df_b64_is_swallowed_without_raise_or_partial_state(tmp_path):
+    """结论 4 点名的 `except Exception: pass`：脏 df_b64 静默吞，df 键不出现。
+
+    s927-28 翻正：载荷补成**四键齐备**——改前它只有 df_b64，案 a 的门卫在解码之前就拦下，
+    那条 try 分支根本没被走到，本例就会钉不到自己声称的东西。补键后「脏 b64 被 except 吞」
+    这一面仍然可达，判据照旧：不抛、df 键不出现；四个兄弟键按各自条件恢复（restored==4）。
+    """
+    payload = _complete_payload(df=None)
+    payload["df_b64"] = "!!!not-base64!!!"
+    _path, loaded = _project_file(tmp_path, payload)
+
+    restored = restore_workspace(loaded)  # 不许抛
+
+    assert "df" not in _keys_present()
+    assert st.session_state.get("df") is None
+    assert restored == 4  # 四个兄弟键照恢复
+    assert _df_should_restore(loaded) is False  # 前提自证：这份 b64 确实不可解码
+    assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
+
+
+def test_empty_string_df_b64_is_skipped_before_the_try_block(tmp_path):
+    """结论 4 相邻面：`if df_b64:` 短路在 try **之前**（案 a 的门卫也在 try 内，不改这条）。
+
+    现状照旧：空串连解码都不进，与「文件本来没 df」在 session_state 上同形。
+    """
+    payload = _complete_payload()
+    payload["df_b64"] = ""
+    _path, loaded = _project_file(tmp_path, payload)
+
+    restored = restore_workspace(loaded)
+
+    assert restored == 4 and "df" not in _keys_present()
+    assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
+
+
+def test_snapshot_roundtrip_through_real_project_file_still_drops_none_partners(tmp_path):
+    """写侧→文件→读侧全链路：df 有值而 inspector 为 None 时快照**只带 df_b64+meta**（写侧没改），
+    恢复侧现在把这份「自然中间态」整组拦下。
+
+    s927-28 翻正：改后 `restored == 1`（只有 meta）、df **不**回来。
+    ⚠ 这条同时是本单最大的行为变化记录点——s922-108 已证明「df 独活」不是畸形文件，
+    而是**上传后尚未跑 inspect 的正常中间态**会自然产出的形态；案 a 让这种项目文件
+    恢复后打开是「没有数据」。写侧 (`build_workspace_snapshot:238-241`) 与
+    调用方告警都**不在本单产出面**，已按实况写进 result 的遗留问题交主班裁。
     """
     df = _sample_df(4)
     st.session_state.df = df
@@ -235,19 +347,21 @@ def test_snapshot_roundtrip_through_real_project_file_drops_none_partners(tmp_pa
     st.session_state.clear()
     restored = restore_workspace(loaded)
 
-    assert restored == 2  # df + meta
+    assert restored == 1  # 只有 meta（改前是 df + meta == 2）
+    assert "df" not in _keys_present()
     assert "inspector" not in _keys_present()
     assert path.exists() and path.parent.is_relative_to(tmp_path)
-    pd.testing.assert_frame_equal(st.session_state.df, df)
+    assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
 
 
 def test_restore_module_has_zero_file_io():
     """结构性自证：`workspace.py` 全模块零文件 IO ⇒ 本班不可能碰 `~/.psy_analysis`。
 
-    现状钉桩（也是完成标准 3 的证法）：项目文件的读写在调用方
+    现状钉桩（也是完成标准的证法）：项目文件的读写在调用方
     （`src/ui/project_panel.py:62/:83/:97` 是 `restore_workspace` 的三个调用点），
     恢复函数只吃已加载的 dict。判据取 `inspect.getsource` 的原文子串扫描，不靠 git status
     （`data/` 与本仓 `~/.psy_analysis` 都在 git 视野外，git status 恒空＝零证明力）。
+    案 a 新增的只有 `logging`（不落盘），六个串实测仍零命中。
     """
     import inspect
 
@@ -258,33 +372,46 @@ def test_restore_module_has_zero_file_io():
         assert needle not in src, f"workspace 模块出现文件 IO 痕迹 {needle!r}，tmp_path 隔离前提失效"
 
 
-def test_pairing_predicate_is_discriminating_against_a_paired_form(tmp_path):
-    """反向用例：判据必须能区分「非成对现状」与「已改成成对」——否则本档全是假绿。
+def test_missing_partner_key_predicate_is_discriminating():
+    """反向用例（s922-108 的 `test_pairing_predicate_...` 按案 a 翻正）：
+    判据必须能区分「齐备」「缺任一键」「键在但为 None」三态，且对四键逐键有鉴别力。
 
-    与 s922-104 的两条 monkeypatch 反向用例同一套路，但这里喂的是**两份真项目文件**：
-    ① 「缺 inspector 的真风险文件」在现状判据下不报红（判据不误伤）；
-    ② 人为造出一份「成对断言已实施后」的读数（df 被拦下不写、inspector 被补种、计数归 0），
-       判据必须**同时**报出两条原因。哪天有人把判据改成恒真，这一条会先炸。
+    这是判据自身的防假绿：若 `missing_df_partner_keys` 被写成恒空或恒全缺，
+    参数化那两条会先炸。顺序也钉（返回按 DF_PARTNER_KEYS 序），因为 warning 文案直接拼这个序。
     """
-    df_ok = _sample_df(2)
-    complete = {"_schema": CURRENT_SCHEMA, "df_b64": _csv_b64(df_ok), "inspector": inspect_dataframe(df_ok)}
-    risky = {"_schema": CURRENT_SCHEMA, "df_b64": _csv_b64(df_ok)}
+    ok = _complete_payload()
+    assert DF_PARTNER_KEYS == PARTNER_KEYS  # 模块常量与本档表逐字同（写侧四键表）
+    assert missing_df_partner_keys(ok) == ()
+    assert missing_df_partner_keys({"_schema": CURRENT_SCHEMA}) == PARTNER_KEYS  # 全缺
+    for missing in PARTNER_KEYS:
+        assert missing_df_partner_keys(_complete_payload(**{missing: None})) == (missing,)
+    assert missing_df_partner_keys(
+        _complete_payload(meta=None, file_name=None)) == ("meta", "file_name")
+    # 键在但值为 None ⇒ 算缺（值语义），键在且值为假性空容器 ⇒ 不算缺
+    assert missing_df_partner_keys(_complete_payload(analysis_history=[])) == ()
 
-    _p1, loaded_full = _project_file(tmp_path, complete, name="complete.json")
-    restore_workspace(loaded_full)
-    assert _pinned_pairing_facts(loaded_full, _keys_present(), 2) == []  # ① 齐备文件不误伤
+
+def test_paired_contract_is_discriminating_against_the_old_df_only_form(tmp_path):
+    """反向用例（承 s922-108 的同名防假绿面）：把**改前形态**的读数喂进现在的判据必须报红。
+
+    ①齐备文件不误伤；②缺键文件在案 a 下不报红（拒绝对）；
+    ③人为造一份「df 独活」的读数（改前真实现场）⇒ 判据必须报出「凭空写了 df」。
+    哪天有人把判据改成恒真，这一条会先炸。
+    """
+    _p1, loaded_ok = _project_file(tmp_path, _complete_payload(), name="complete.json")
+    restore_workspace(loaded_ok)
+    assert _pinned_pairing_facts(loaded_ok, _keys_present(), 5) == []          # ①
 
     st.session_state.clear()
-    _p2, loaded = _project_file(tmp_path, risky, name="risky.json")
-    restored = restore_workspace(loaded)
-    assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []  # ① 风险文件也不误伤
+    risky_payload = _complete_payload()
+    del risky_payload["inspector"]
+    _p2, loaded_risky = _project_file(tmp_path, risky_payload, name="risky.json")
+    restored = restore_workspace(loaded_risky)
+    assert _pinned_pairing_facts(loaded_risky, _keys_present(), restored) == []  # ②
 
-    paired_form = (_keys_present() - {"df"}) | {"inspector"}  # ② 施工后的形态
-    assert "df" not in paired_form and "inspector" in paired_form
-    failures = _pinned_pairing_facts(loaded, paired_form, 0)
-    assert len(failures) == 2, f"判据应同时报出两条偏离，实测 {failures}"
-    assert any("没恢复" in r for r in failures), failures
-    assert any("成对" in r for r in failures), failures
+    old_form_present = _keys_present() | {"df", "inspector"}                     # ③ 改前形态
+    failures = _pinned_pairing_facts(loaded_risky, old_form_present, restored + 1)
+    assert any("凭空写了 df" in f for f in failures), failures
 
 
 if __name__ == "__main__":  # pragma: no cover

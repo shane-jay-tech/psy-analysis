@@ -4,11 +4,14 @@ from __future__ import annotations
 import json
 import base64
 import io
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, TYPE_CHECKING
 
 import pandas as pd
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from src.parser.intent_resolver import AnalysisPlan
@@ -573,8 +576,33 @@ def _build_migration_chain(from_schema: str, to_schema: str) -> list:
     return chain
 
 
+# ── s927-28 案 a：df 与它的四个兄弟键在恢复侧成对 ─────────────────────────
+# 表内容与写侧 build_workspace_snapshot() 里的 `for k in [...]` 四键逐字一致。
+DF_PARTNER_KEYS = ("meta", "inspector", "file_name", "analysis_history")
+
+
+def missing_df_partner_keys(loaded: Dict[str, Any]) -> tuple:
+    """案 a 的判据（纯函数，便于脱离 session_state 单测）：
+
+    返回 `loaded` 里**缺失或为 None** 的 df 兄弟键，按 DF_PARTNER_KEYS 的顺序。
+
+    为什么按「非 None」而不是「键在不在」：docs/insights/psy-session-state-attr-read-census-20260921.md
+    **结论 4** 点名的风险是**值语义**而非不存在——app.py 一片读点用
+    `if st.session_state.df is not None:` 掩护 meta / inspector / file_name / analysis_history
+    的读取，键存在但为 None 时守卫照样过、下游照样以 AttributeError/TypeError 的形态炸在
+    离缺键现场很远的地方。判据写成纯函数是为了让「df 已恢复 ⇒ 四键非 None」这条不变式
+    能被逐格断言，而不是只活在注释里。
+    """
+    return tuple(k for k in DF_PARTNER_KEYS if loaded.get(k) is None)
+
+
 def restore_workspace(loaded: Dict[str, Any]) -> int:
-    """从已加载的字典恢复 session_state，返回恢复的数据项数"""
+    """从已加载的字典恢复 session_state，返回恢复的数据项数。
+
+    s927-28 案 a：`df` 只在**四键（meta/inspector/file_name/analysis_history）齐备且非 None**
+    时才写回 session_state；不齐备则整组不写并记一条 warning（宁可不给数据，
+    也不给「df 有、兄弟键 None」这种下游测不出来的半成品现场）。
+    """
     restored = 0
 
     # 迁移（可能抛出未来版本错误）
@@ -591,14 +619,22 @@ def restore_workspace(loaded: Dict[str, Any]) -> int:
         }
 
     # DataFrame
+    # s927-28 案 a（普查档结论 4 的收口第一步）：四键不齐 ⇒ 连 df 一起不写。
     df_b64 = loaded.get("df_b64")
     if df_b64:
-        try:
-            csv_bytes = base64.b64decode(df_b64)
-            st.session_state.df = pd.read_csv(io.BytesIO(csv_bytes))
-            restored += 1
-        except Exception:
-            pass
+        _partner_gaps = missing_df_partner_keys(loaded)
+        if _partner_gaps:
+            logger.warning(
+                "工作区恢复已跳过 df：项目文件缺 df 的兄弟键 %s（案 a＝四键齐备才写 df；"
+                "其余键仍按各自条件恢复）", "/".join(_partner_gaps),
+            )
+        else:
+            try:
+                csv_bytes = base64.b64decode(df_b64)
+                st.session_state.df = pd.read_csv(io.BytesIO(csv_bytes))
+                restored += 1
+            except Exception:
+                pass
 
     # 简单字段
     # v4.4: llm_provider / llm_model / llm_temperature 已从 session_state 移除；

@@ -155,6 +155,11 @@ class TestWorkspaceSaveLoad:
         st.session_state.df = pd.DataFrame({"score": [1, 2, 3, 4, 5]})
         st.session_state.file_name = "test.csv"
         st.session_state.meta = {"source_type": "csv", "row_count": 5, "col_count": 1}
+        # s927-28 案 a：df 与 meta/inspector/file_name/analysis_history 在恢复侧成对，
+        # 本例是「存了就取回来」的往返面，故补齐两键；缺键被拒由
+        # tests/test_workspace_restore_pairing_pins.py 逐键钉。
+        st.session_state.inspector = {"n_rows": 5}
+        st.session_state.analysis_history = []
         st.session_state.plan = None
         st.session_state.undergrad_mode = False
         st.session_state.undergrad_step = 0

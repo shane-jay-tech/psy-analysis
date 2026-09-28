@@ -75,10 +75,15 @@ class TestBuildAndRestoreWorkspace:
         assert "df_b64" in ws
 
     def test_restore_workspace_roundtrip(self):
+        # s927-28 案 a：df 只在四键（meta/inspector/file_name/analysis_history）齐备时才恢复，
+        # 本例补上另两键以保留原意（df/meta/file_name 往返保真）；缺键被拒的面由
+        # tests/test_workspace_restore_pairing_pins.py 逐键钉。
         st.session_state.clear()
         st.session_state.df = pd.DataFrame({"x": [1, 2, 3]})
         st.session_state.meta = {"source_type": "csv"}
+        st.session_state.inspector = {"n_rows": 3}
         st.session_state.file_name = "demo.csv"
+        st.session_state.analysis_history = []
         ws = build_workspace_snapshot()
 
         st.session_state.clear()
