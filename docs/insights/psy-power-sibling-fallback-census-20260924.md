@@ -256,3 +256,26 @@ PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -c "import sys,types,pandas as p
 ⚠ 两条本机坑复用记录（下传给同仓下一班）：
 ① 本探针必须带 `PYTHONIOENCODING=utf-8` 才不把 `⚠/✅` 崩在 gbk（psy 与 kaoyan 相反，kaoyan 侧禁带）；
 ② `json.dumps` 对 `np.int64` 直接 TypeError ⇒ numpy 标量要在 `default=` 里显式转 int/float。
+
+## 9.1 勘误落实记录（s927-62 追加 · 2026-09-29T05:0x 现取 · 纯插入，上文一字未改）
+
+- 追加班：`qoder-executor-20260929-0450-psy102`（信箱单 `s927-62`）；HEAD `4d3608e`。
+- 开工前置自检：`git status --porcelain -- docs/insights/psy-power-sibling-fallback-census-20260924.md` → **0 行（干净）**，
+  `docs/insights/psy-power-solver-redesign-20260923.md` → 同样 0 行 ⇒ 两档的「工作树 == HEAD」成立，本记录只报单值。
+- 删除数自证：本档以「纯插入」形态追加，`git diff --numstat` 的**删除列必须为 0**（插行数与验收读数见 `zcode-bridge/outbox/s927-62.result.md` 证据节）。
+
+| # | §9 原条目 | 本次复核读数（命令 → 值） | 落点与状态 |
+|---|---|---|---|
+| 1 | `s924-05.task.md:17` 锚点「`post_hoc_power.py:164 except Exception:`」，且暗示 4 处兜底在同文件 | `sed -n '164,166p' src/analysis/post_hoc_power.py` → `:165` 才是 `except Exception:`（**§9 结论复验成立**）；<br>🔴 但 §9 记的四处兜底行号 `power_analysis.py:163-167/206-210/237-241/283-287` **已过期**：现读 `rg -n "n_lo, n_hi" src/experiment_design/power_analysis.py` → `:201 (k+1,2000)`／`:244 (5,3000)`／`:275 (df+2,5000)`／`:321 (2,2000)`，另有 `:104` 的 t 族（A′ 落地后整体后移约 38 行） | 勘误行只能追加在**本档**（任务书在信箱域 `done/s924-05.task.md`，卷宗「禁止事项」列信箱只读 ⇒ 本班不改）；<br>⇒ 本档 §2 行号表与 §1 的现值读数一并进入**历史态**，引用前须按上列命令现取 |
+| 2 | 同卷宗「做什么」段的前提「与**已落地** t 族 A′ 哨兵逐处对照」不成立（§9 现值：`solved` 0 命中、`s924-04` 仍在 inbox） | `rg -c "\bsolved\b" src/experiment_design/power_analysis.py src/analysis/post_hoc_power.py` → **16 ／ 9**（rc=0，不再是 0）；<br>`git log --oneline -1 -- src/analysis/post_hoc_power.py` → `2f08c60 feat(psy): s924-04＋s924-16 两单同归本笔（power 求解 A′ 拒答口径落地…）`；<br>`ls D:/code/zcode-bridge/done/s924-04.task.md` → 存在（已不在 inbox） | 🔴 **§9 第 2 条本身已被现实推翻**：A′ 于 `2f08c60` 落地、`solved` 哨兵已在两文件（`power_analysis.py:35-36` 定义、`:108/:111` 赋值）。<br>本班不改 §1/§6 正文，只在此登记：**以「A′ 未落地」为前提的全部段落（含本档 §6 的「不可迁移原因」列）现均失效**，重述属另单 |
+| 3 | 设计稿 `psy-power-solver-redesign-20260923.md:180` 写「`post_hoc_power.py:244-276`：**6 处** `calculate_sample_size`」 | `rg -c "calculate_sample_size\(" src/analysis/post_hoc_power.py` → **5**（§9 结论复验成立）；`sed -n '180p'` 现文仍作「6 处」⇒ 错值未被任何人订正 | ✅ 已在设计稿档末追加勘误行（同档纯插入，见该档 §末「勘误（s927-62）」） |
+| 4 | 设计稿 `:181` 写「`design_engine.py:685-693`（`_auto_power_analysis`）」，§9 订正为「实为 `:685-701`」 | `rg -n "def _auto_power_analysis" src/experiment_design/design_engine.py` → **`:755`**；`rg -n "return calculate_sample_size"` → **7 处**：`:759/:761/:763/:765/:767/:769/:771`<br>⇒ 「7 处」这个**数量**订正复验成立，但 §9 给的行号 `:689-701` **也已是历史值**（该件经 `7d1f05f s927-72`／`2f08c60 s924-04` 改写） | ✅ 已在设计稿档末追加勘误行，并写明「行号一律现取，勿抄 §9」 |
+| 5 | `done/s923-03.result.md:56` 与 `:144` 的「另 3 处（ANOVA／卡方／多因素）零命中」应收窄 | `sed -n '56p;144p'` 逐字复现：`:56`「- 3.3 另外三个同型兜底点（ANOVA 9 点／卡方 12 点／多因素 4 点）实测**零命中**——列出来是为了"连坐修"而非"已坏"。」；`:144`「7. **同型兜底另 3 处…**今天零命中，但是同一枚未爆的雷；」 | ⛔ **不落笔**：目标是信箱域历史结果件（卷宗「禁止事项」＋波次 brief §A：信箱内容只读、改它＝改历史留痕）。<br>本班把「收窄口径」原文誊进本记录即完成可执行部分，实际回写请主班裁（待人工台账项） |
+| 6 | 效果量口径：喂进求解器的是 Cramér's V 而声明是 Cohen's w（§9 锚点 `post_hoc_power.py:315` 标签＋`:171` 透传、`chi_square.py:75-76`／`:139-140`、`power_analysis.py:229`） | 复核**成立但锚点漂移**：`src/analysis/post_hoc_power.py:171` `w = getattr(result, "effect_size", None)` ✓ 原样透传；<br>标签二合一行现读 `post_hoc_power.py:353` `return "Cohen's w / Cramer's V"`（§9 记 `:315`）；<br>`chi_square.py:75-76` `effect_size=round(float(cramers_v),4)` / `effect_size_name="Cramer's V"` ✓、`:140` `effect_size_name="Cohen's w"`（gof 侧，§9 记 `:139-140` ✓）；<br>求解器声明口径行现读 `power_analysis.py:267`「lambda = N * w^2, 其中 w 是 Cohen's w 效应量」（§9 记 `:229`） | ⛔ **不落笔且不改码**：这是**统计口径**归属（V 当 w 用会算错 `lambda = N·w²`），红线＝只出材料不下判定；<br>本班不改 `post_hoc_power.py:353` 的标签、不裁该用哪个，**登记为主班待人工**；引用行号按本列现值 |
+
+### 本次追加的三条硬结论（供主班收账）
+
+1. **§9 的 6 条里只有 3 条还能直接落笔**（#3、#4 落设计稿；#1 落本档），**2 条撞信箱只读域**（#1 的任务书本体、#5），**1 条撞统计口径红线**（#6）。
+2. **§9 自身正在老化**：#2 已被 `2f08c60` 推翻、#1/#4/#6 的行号已漂 ⇒ 本档任何行号引用前必须现取，`## 10. 复算配方` 第 2 步的 `sed -n '163,167p;…'` 区间**同样过期**（现读见 #1 列）。
+3. 本档 §8 的「零改动自证」基线随同老化：它记的是 2026-09-25 的盘面；本笔追加后该档自身变成「被后班追加过」的状态，形态＝纯插入。
+

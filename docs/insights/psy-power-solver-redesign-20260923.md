@@ -289,3 +289,22 @@ git --no-pager log --oneline -3 -- src/experiment_design/power_analysis.py
 t 检验族 14 个常规效应量测点里 11 个中招、过检 11~133 倍，而缺省参数（`d=0.5`）正好落在中招区；
 相关族则在极小 r 处朝反方向中招（欠配 63%~191%）。**最小修（只改 NaN 判据）能堵住最刺眼的那句 ✅，
 但它会让系统继续输出 4000 这个错数** —— 这是本稿不建议只走 C 的唯一理由。
+
+---
+
+## 勘误（s927-62 追加 · 2026-09-29T05:0x 现取 · 纯插入，上文一字未改）
+
+- 追加班：`qoder-executor-20260929-0450-psy102`（信箱单 `s927-62`）；HEAD `4d3608e`。
+  开工前置自检：`git status --porcelain -- docs/insights/psy-power-solver-redesign-20260923.md` → 0 行（干净 ⇒ 工作树==HEAD）。
+- 勘误来源：`docs/insights/psy-power-sibling-fallback-census-20260924.md` §9 待订正清单第 3、4 条（该清单由 `s924-05` 产出）。
+- 形态约束：原正文（含 `:180`/`:181` 两行表格）**未改一字**；本段只做追加，`git diff --numstat` 删除列为 0。
+
+| 本稿位置 | 本稿原写法 | 现读（命令 → 值） | 该怎么读 |
+|---|---|---|---|
+| `:180`（消费方 1） | 「`src/analysis/post_hoc_power.py:244-276`：**6 处** `calculate_sample_size`」 | `rg -c "calculate_sample_size\(" src/analysis/post_hoc_power.py` → **5** | 计数取 **5**；`244-276` 这个区间也过期（A′ 落地后 `post_hoc_power.py` 已被 `2f08c60`/`7d1f05f` 改写，行号一律现取） |
+| `:181`（消费方 2） | 「`src/experiment_design/design_engine.py:685-693`（`_auto_power_analysis`）→ `:571 format_power_report`」 | `rg -n "def _auto_power_analysis" src/experiment_design/design_engine.py` → **`:755`**；`rg -n "return calculate_sample_size" …` → 7 处 **`:759/:761/:763/:765/:767/:769/:771`** | 函数体实跨 `:755-:771`，**6 行宽的区间圈不住**（本稿少列 2 个 return）；`→ :571` 未复核，引用前现取 |
+
+⚠ 两条纪律提示（写给下一个引用本稿的人）：
+① 本稿的行号是 2026-09-23 的快照，`src/experiment_design/{power_analysis,design_engine}.py` 与 `src/analysis/post_hoc_power.py` 此后均被改写过 ⇒ **任何行号引用前必跑上表命令**；
+② `design_engine.py` 在 2026-09-29 凌晨刚随 `7d1f05f`（s927-72）入库，引用时按 HEAD／工作树双报（本班验该档与本档此刻均干净，故单值即可）。
+
