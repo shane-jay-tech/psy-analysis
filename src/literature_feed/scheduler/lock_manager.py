@@ -98,9 +98,18 @@ class LockManager:
     # ------------------------------------------------------------------ #
 
     @contextlib.contextmanager
-    def acquire(self):
-        """非阻塞抢锁；失败抛 ``LockBusyError``。"""
-        self._open_and_lock()
+    def acquire(self, now: Optional[float] = None):
+        """非阻塞抢锁；失败抛 ``LockBusyError``。
+
+        Args:
+            now: s927-35 加的**时钟接缝**（与 ``is_stale`` 同款、同样可选）。``None``
+                （缺省）= 内部按真实时钟判陈旧，行为与旧版逐字一致；传入 epoch 秒 =
+                用这个"现在"判陈旧，并把它透传给 ``_open_and_lock`` → ``is_stale`` /
+                ``break_stale``，让"判陈旧"与"删档"共用同一个读数。
+                有了它，``_open_and_lock`` 里那条 stale 强抢路径（现 :191-192）可以精确
+                压线断言，测试不必再在 ``os.utime`` 与 SUT 取时之间留裕量（s922-109 遗留 1）。
+        """
+        self._open_and_lock(now=now)
         try:
             self._write_owner_info()
             yield self
@@ -154,9 +163,16 @@ class LockManager:
             )
         return stale
 
-    def break_stale(self) -> bool:
-        """删除 stale 锁文件。返回是否真的删了。"""
-        if not self.is_stale():
+    def break_stale(self, now: Optional[float] = None) -> bool:
+        """删除 stale 锁文件。返回是否真的删了。
+
+        Args:
+            now: s927-35 加的**时钟接缝**（与 ``is_stale`` 同款、同样可选）。``None``
+                （缺省）= 真实时钟，行为与旧版逐字一致（旧版本就硬调
+                ``self.is_stale()`` 不带参）；传入 epoch 秒 = 原样透传给
+                ``is_stale(now=…)``，判据与告警年龄都用这个读数。
+        """
+        if not self.is_stale(now=now):
             return False
         with contextlib.suppress(OSError):
             self.lock_path.unlink()
@@ -167,13 +183,13 @@ class LockManager:
     # 内部
     # ------------------------------------------------------------------ #
 
-    def _open_and_lock(self) -> None:
+    def _open_and_lock(self, now: Optional[float] = None) -> None:
         if self._fh is not None:
             raise RuntimeError("LockManager 已经持锁，不要嵌套 acquire")
 
-        # 处理 stale：mtime 太老的强抢
-        if self.is_stale():
-            self.break_stale()
+        # 处理 stale：mtime 太老的强抢（s927-35：注入的 now 一路透传，两侧同读数）
+        if self.is_stale(now=now):
+            self.break_stale(now=now)
 
         # 打开/创建文件
         try:

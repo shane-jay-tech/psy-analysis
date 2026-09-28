@@ -2,11 +2,14 @@
 
 锁文件一律放 `tmp_path`，并 autouse 挡掉 `ensure_dirs()`——**否则构造 LockManager 就会在
 真实 `data/literature_feed/` 下建目录**（见 `_alert_once` 之外的唯一副作用）。零网络、零真实调度器。
-锚点：:54 `ttl_seconds: int = 21600,  # 6h`；判陈旧在 :128 起（`def is_stale`）。
+锚点：:54 `ttl_seconds: int = 21600,  # 6h`；判陈旧在 :137 起（`def is_stale`）。
 s922-10 订正：此处原写 `:123`，那是 s919-05（5a9e46f）时的实况；`def is_stale` 被
 s920-08（5fe7754，LockBusyError 带持有者 pid）位移 +5 → :128，此后 s921-13（e02df5a）加 `now`
 接缝只改签名不改行号，:128 至今未再漂（`git show <sha>:…/lock_manager.py | grep -n "def is_stale"`
 逐个复测）。:54 那一条自始至终没漂。
+s927-35 订正：上面那句"至今未再漂"已过期——s927-35 给 `acquire`／`break_stale` 补可选 `now`
+接缝时，`acquire` 的 docstring 与 `is_stale` 之前的注释共 +9 行 ⇒ `def is_stale` 漂到 :137、
+判据本体 `stale = age > self.ttl_seconds` 在 :157（`grep -n` 现取，2026-09-28）。:54 仍没漂。
 """
 import os
 import time
@@ -81,7 +84,7 @@ _FIXED_MTIME = 1_000.0          # 1970-01-01 附近的固定基准，避免文�
 
 
 def test_is_stale_boundary_is_strictly_greater_than_ttl(tmp_path):
-    """恰 ttl ⇒ 不陈旧；超 ttl（这里取 0.5 秒，任务书口径的"超 1 秒"同侧）⇒ 陈旧。钉住 `lock_manager.py:148` 的 `>` 而非 `>=`。
+    """恰 ttl ⇒ 不陈旧；超 ttl（这里取 0.5 秒，任务书口径的"超 1 秒"同侧）⇒ 陈旧。钉住 `lock_manager.py:157` 的 `>` 而非 `>=`。
 
     旧用例（`ttl=100 / mtime=now±50`）证不了这件事：`os.utime` 里那次 `time.time()`
     与 SUT 里那次之间必然已过去若干微秒 ⇒ age 恒偏大，压着 ttl 断"不陈旧"会随机翻红。
@@ -131,27 +134,62 @@ def test_stale_alert_age_uses_the_injected_clock(tmp_path, caplog):
 
 
 def test_break_stale_deletes_only_when_stale(tmp_path):
+    """压线写法（s927-35 收尾，s922-109 遗留 1 的第二半）：真实时钟裕量取消。
+
+    旧口径（`ttl=10` / `os.utime(now-30)`）在"未过期"与"已过期"两侧各留 20 秒裕量，
+    只测得出"差得很多"，测不出边界开闭。接缝落地后（`lock_manager.py:166` 接可选 `now`、
+    `:175` 原样透传给 `is_stale`）本例改按 s922-109 原计划的压线形状：固定基准 mtime
+    ＋注入 `now` ⇒ `age` 精确可表，钉三段——恰 `age == ttl` 不删（`>` 而非 `>=`）、
+    过线 1 秒删、文件已没了二次调用不炸。
+
+    不传 `now` 的真实时钟面不在本例重复（见 `test_break_stale_verdict_agrees_with_the_seam_readout`
+    与 `tests/test_lock_now_seam_boundary.py::test_break_stale_default_now_still_reads_wall_clock`）。
+    """
     path = _lock_file(tmp_path)
     mgr = LockManager(path, ttl_seconds=10)
     path.write_text("\n", encoding="utf-8")
+    os.utime(path, (_FIXED_MTIME, _FIXED_MTIME))
+    assert path.stat().st_mtime == _FIXED_MTIME            # 前提：文件系统没把固定基准量化掉
 
-    assert mgr.break_stale() is False                  # 未过期不删
+    assert mgr.break_stale(now=_FIXED_MTIME + 10) is False   # age == ttl：`>` 判未超时，不删
     assert path.exists()
 
-    os.utime(path, (time.time() - 30, time.time() - 30))
-    assert mgr.break_stale() is True
+    assert mgr.break_stale(now=_FIXED_MTIME + 11) is True    # age = ttl + 1：过线 ⇒ 删
     assert not path.exists()
-    assert mgr.break_stale() is False                  # 文件已没了，二次调用不炸
+    assert mgr.break_stale(now=_FIXED_MTIME + 11) is False   # 文件已没了，二次调用不炸
 
 
 def test_acquire_steals_a_stale_lock(tmp_path):
+    """压线写法（s927-35 收尾）：注入 `now` ⇒ stale 强抢的边界精确可断，55 秒裕量取消。
+
+    旧口径（`ttl=5` / `os.utime(now-60)`）留 55 秒真实时钟裕量，只证"老得很多时抢得到"，
+    证不了 `_open_and_lock` 里那条强抢路径（现 `lock_manager.py:191-192`）究竟在哪儿越线。
+    接缝落地后（`:101` 接 `now` → `:112` 透传 → `_open_and_lock:186` → `is_stale`/`break_stale`
+    共用同一个读数）本例钉的是**可观察副作用＝有没有越界删掉旧锁档**，而不是"抢没抢到"
+    （本地无竞争者，两种时钟下锁都拿得到，只有删不删档分得出两侧）：
+    ①恰 `age == ttl` ⇒ 不强抢，旧档内容原样保留（持有者信息追加在后面）；
+    ②`age = ttl + 1` ⇒ 强抢，旧档被 unlink 后重写，marker 随之消失。
+    """
+    marker = "STALE-LOCK-BODY-HELD-BY-SOMEONE-ELSE"
     path = _lock_file(tmp_path)
-    path.write_text("\n", encoding="utf-8")
-    os.utime(path, (time.time() - 60, time.time() - 60))
+    path.write_text(f"{marker}\n", encoding="utf-8")
+    os.utime(path, (_FIXED_MTIME, _FIXED_MTIME))
+    assert path.stat().st_mtime == _FIXED_MTIME            # 前提：文件系统没把固定基准量化掉
 
     mgr = LockManager(path, ttl_seconds=5)
-    with mgr.acquire():
+
+    with mgr.acquire(now=_FIXED_MTIME + 5):                # age == ttl：未超时 ⇒ 不该删旧档
         assert mgr._fh is not None
+    held = path.read_text(encoding="utf-8")
+    assert marker in held                                  # 旧档保留（追加写不清空）
+    assert f"pid={os.getpid()}" in held                     # 持有者信息照旧写在后面
+
+    os.utime(path, (_FIXED_MTIME, _FIXED_MTIME))           # 上一步写盘动过 mtime ⇒ 压回基准再测过线侧
+    with mgr.acquire(now=_FIXED_MTIME + 6):                # age = ttl + 1：过线 ⇒ 强抢
+        assert mgr._fh is not None
+    stolen = path.read_text(encoding="utf-8")
+    assert marker not in stolen                            # 旧档确实被删过、重写得只剩持有者信息
+    assert f"pid={os.getpid()}" in stolen
 
 
 def test_is_held_by_other_false_when_free_and_lock_released_after_probe(tmp_path):
@@ -291,26 +329,42 @@ def test_acquire_succeeds_even_if_fsync_fails(tmp_path, monkeypatch):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# s922-109 追加：边界真值已挪到 `tests/test_lock_stale_boundary.py`（19 例、零 sleep、
-# 零裕量），本文件 :83 那条压线例与它**同一口径**（固定基准 mtime + 注入 now ⇒ age 精确）。
-# 下面两例钉的是"为什么本文件 :133/:147 仍要留真实时钟裕量"——那两处**不能**改走接缝写法，
-# 因为入口根本没接 now 参数。任务书「同批修，不留双口径」的实测结论见这两条例子的 docstring。
+# s922-109 追加 → s927-35 收尾订正：边界真值在 `tests/test_lock_stale_boundary.py`
+# （19 例、零 sleep、零裕量）与 `tests/test_lock_now_seam_boundary.py`（10 例，压线两边界
+# × `break_stale`/`acquire` 两个入口），本文件 `test_is_stale_boundary_is_strictly_greater_than_ttl`
+# （原注释写作 ":83"，行号会漂 ⇒ 此处改引用例名）与它们**同一口径**
+# （固定基准 mtime + 注入 now ⇒ age 精确）。
+# 下面两例钉的是接缝的**签名面**与**单口径自证**：`break_stale` / `acquire` /
+# `_open_and_lock` 现已都接可选 `now`（缺省 `None`＝真实时钟，向后兼容）。
+# ⚠ 本段原注释断"上面 `test_break_stale_deletes_only_when_stale` /
+# `test_acquire_steals_a_stale_lock` 两处**不能**改走接缝写法，因为入口根本没接 now 参数"
+# ——该断言已随 s927-35 接缝落地而过期，两条用例现已改成压线写法、裕量随之取消。
 # ─────────────────────────────────────────────────────────────────────────────
-def test_break_stale_and_acquire_expose_no_clock_seam(tmp_path):
-    """结构面钉桩：`break_stale()` / `acquire()` 的签名里**没有** `now`，只有 `is_stale` 有。
+def test_break_stale_and_acquire_expose_the_clock_seam(tmp_path):
+    """结构面钉桩（翻转版）：`is_stale` / `break_stale` / `acquire` / `_open_and_lock` 都接 `now`，缺省 `None`。
 
-    ⇒ 本文件 `test_break_stale_deletes_only_when_stale`（:133）与
-    `test_acquire_steals_a_stale_lock`（:147）用的真实时钟裕量不是"没改干净的双口径"，
-    而是**接缝缺失下的唯一写法**（`break_stale:159` 内部硬调 `self.is_stale()` 不带参）。
-    出口（属行为改动、本班不做）：给这两个入口加同样的可选 `now` 接缝，
-    那两条用例即可改成压线写法、裕量随之取消。若哪天实现补了 `now` 参数，本用例会红——那是设计内翻正。
+    **设计内翻正已兑现**。本例原名 `test_break_stale_and_acquire_expose_no_clock_seam`
+    （s922-109 落的结构桩，断的是两个公开入口签名里**没有** `now`），它自己的 docstring
+    逐字预告了这一步：「出口（属行为改动、本班不做）：给这两个入口加同样的可选 `now` 接缝，
+    那两条用例即可改成压线写法、裕量随之取消。若哪天实现补了 `now` 参数，本用例会红——
+    那是设计内翻正。」⇒ 出处：s927-35（`docs/insights/s927-35-locknow.md` §5 方案 B，
+    主班裁定"卷宗原口径优先"）＋ s922-109 遗留 1（`zcode-bridge/done/s922-109-lock-stale-boundary.result.md`）。
+    按该桩自述的出口把断言反转，不删例、不放宽任何边界断言。
+
+    与 `tests/test_lock_now_seam_boundary.py::test_the_two_entries_now_expose_the_seam` 的分工：
+    那条钉两个**公开**入口的接缝与缺省值；本例额外钉**内部透传件 `_open_and_lock` 也接了 `now`**
+    （缺这条透传，`acquire` 注入的时钟到不了 stale 强抢路径），两档不重复计账。
     """
     import inspect
 
     stale_params = list(inspect.signature(LockManager.is_stale).parameters)
-    assert stale_params == ["self", "now"], stale_params
-    assert list(inspect.signature(LockManager.break_stale).parameters) == ["self"]
-    assert list(inspect.signature(LockManager.acquire).parameters) == ["self"]
+    assert stale_params == ["self", "now"], stale_params                   # s921-13 原样未动
+    assert list(inspect.signature(LockManager.break_stale).parameters) == ["self", "now"]
+    assert list(inspect.signature(LockManager.acquire).parameters) == ["self", "now"]
+    assert list(inspect.signature(LockManager._open_and_lock).parameters) == ["self", "now"]
+    # 缺省必须是 None（＝真实时钟），否则"向后兼容"这句不成立
+    for entry in (LockManager.break_stale, LockManager.acquire, LockManager._open_and_lock):
+        assert inspect.signature(entry).parameters["now"].default is None, entry
 
 
 def test_break_stale_verdict_agrees_with_the_seam_readout(tmp_path):
