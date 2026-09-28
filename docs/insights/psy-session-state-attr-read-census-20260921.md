@@ -272,3 +272,109 @@ $ .venv/Scripts/python.exe -X utf8 tmp/s923-25/remap_census.py   # 整表重排�
 
 > 注：`tmp/` 在本仓 `.gitignore:29` 内，上面两个脚本与两份 app.py 副本**不入库**；第四节表格由该脚本生成，若脚本被清、按上面三条 `rg` 仍能复核本节承重 4 的对号结论。
 
+## 20260928 回写节（s927-37：把结论 1 的「27 键」逐键落盘）
+
+> 取值时刻 2026-09-28 13:5x。psy HEAD `4ad0664`；执行班 `qoder-executor-20260928-0340-psy88`（波次 44 写位／文档面）。
+> 触发点：`zcode-bridge/done/s922-112-defaults-keys-snapshot.result.md:51-52` 遗留 2——「快照与普查档是**两份独立清单**：
+> 分片真丢键时本测试翻红，但 `psy-session-state-attr-read-census-20260921.md` 的结论 1（27 键）需人工按提示回写；
+> 本单只在测试里写了回写指引，未改普查档（属规划/文档域）」。本节就是那次回写，**零生产码／零测试件改动**。
+> 与 s923-25 追加节同规：**只追加、上文一字未改**（`git diff --numstat` 现读 deletions=0）——
+> 本仓同族档（`psy-session-subscript-read-census-20260922.md:71` 引「上份『63/67 都靠 `_defaults` 兜住』」、
+> 本档自述「本档 :101」「:146-:148」）都在按**行号**引用上文，改上文会让别人的锚点整体位移。
+
+### 一、结论 1（本档 :92）那两处旧锚先对号
+
+本档 :92 原记「表在 `app.py:273-298`，落键循环在 `app.py:299-301`」——即第五节「未覆盖 1」点名的、
+当时只补了行号没补清单的那一格：
+
+| 本档 :92（09-21 落盘） | 现盘（工作树与 `HEAD:app.py` 逐位同） |
+|---|---|
+| `_defaults` 表体 `app.py:273-298` | **`app.py:90-115`**（`:90 _defaults = {` ／ `:115 }`；`:96` 是注释行，`:110`/`:111`/`:113`/`:114` 带尾注） |
+| 落键循环 `app.py:299-301` | **`app.py:116-118`**（`:116 for key, val in _defaults.items():`／`:117 if key not in st.session_state:`／`:118 st.session_state[key] = val`） |
+
+⇒ 结论 1 的**承重不变**：仍是"唯一启动补种表、无条件 `if key not in` 落种"，只是号码老了；
+本档 :147 那条顺序前提（补种在前、`render_privacy_gate`／`run_once_*` 在后）本确节**未复核**，引它前先现跑。
+
+### 二、27 键逐键清单（AST 现场解析工作树 `app.py`，不执行 app.py）
+
+按**源码序**（哨兵清单是同一 27 枚的**排序态**，二者经第三节三向等式互绑）。
+「本档读面」＝该键是否出现在本档 :18-:85 的 67 行属性式读取逐点表里。
+
+| # | 键 | 盘上行号 | 播种默认值 | 本档读面 |
+|---|---|---|---|---|
+| 1 | `df` | :91 | `None` | ✓ |
+| 2 | `meta` | :91 | `None` | ✓ |
+| 3 | `inspector` | :91 | `None` | ✓ |
+| 4 | `analysis_output` | :92 | `None` | ✓ |
+| 5 | `plan` | :92 | `None` | ✗（正则路多出的那 1 键，见本档 :141——散文里的 `st.session_state.plan`） |
+| 6 | `file_name` | :92 | `None` | ✓ |
+| 7 | `questionnaire_design` | :93 | `None` | ✓ |
+| 8 | `paper_engine` | :94 | `None` | ✓ |
+| 9 | `experiment_engine` | :95 | `None` | ✓ |
+| 10 | `quick_model_id` | :97 | `""` | ✗ |
+| 11 | `onboarding_completed` | :98 | `False` | ✓ |
+| 12 | `privacy_accepted` | :99 | `False` | ✓ |
+| 13 | `undergrad_mode` | :100 | `False` | ✓ |
+| 14 | `undergrad_path` | :101 | `None` | ✗ |
+| 15 | `undergrad_step` | :102 | `0` | ✗ |
+| 16 | `undergrad_wizard_data` | :103 | `{}` | ✓ |
+| 17 | `analysis_history` | :104 | `[]` | ✓ |
+| 18 | `_wizard_return` | :105 | `None` | ✓（本档 :148 已点名它不是"临时键裸读"） |
+| 19 | `workspace_saved` | :106 | `None` | ✗（死键候选，判语在同族档，见本确节第四节末） |
+| 20 | `language` | :107 | `"zh"` | ✓（本档表内两点随 `f1b4a38`／s922-102 片 7a 已离开 app.py，见本档 :162 与 :250-:251；现盘读点＝`src/ui/questionnaire_panel.py:104`/`:108`，本档记的 `:94`/`:98` 又漂了 +10——即本档 :258「src 侧 22 个锚点未对号」的又一例） |
+| 21 | `output_language` | :108 | `"zh"` | ✗ |
+| 22 | `interactive_charts` | :109 | `False` | ✓ |
+| 23 | `archive_tag` | :110 | `""` | ✗（属性**写**侧在本档 :195 行的成对写点里，读侧无） |
+| 24 | `quick_entry` | :111 | `None` | ✗ |
+| 25 | `show_quick_detail` | :112 | `False` | ✗ |
+| 26 | `startup_check_done` | :113 | `False` | ✓ |
+| 27 | `env_status` | :114 | `None` | ✓ |
+
+合计 27 枚（`len()` 现算，非手数）；「✓」18 枚／「✗」9 枚。
+
+### 三、与哨兵测试的读数对照（**如实：回写前后不变**）
+
+- 哨兵＝`tests/test_app_defaults_keys_snapshot.py`（s922-112 落）。清单在 `:35-63`（`EXPECTED_DEFAULTS_KEYS`，排序态 27 项）；
+  判据是「集合等／有序表等／基数等」三向互证 ＋ `len(EXPECTED_DEFAULTS_KEYS) == 27`。
+- 现跑读数：`4 passed in 0.18s`，rc=0。⇒ **哨兵本来就绿，本节没有、也不可能"使它翻绿"**：它 AST 读的是 `app.py`
+  磁盘源码，与本档是两份互不依赖的清单（这正是 s922-112 遗留 2 的原话）。差异如实登记为
+  **「文档回写对哨兵零影响」**——反过来说，本确节的清单若与哨兵清单不一致，也不会被任何测试发现，
+  所以第四节给了独立复算，第五节给了可复现命令。
+- 独立复算（AST 两路，`.venv` Python 3.12.9）：
+  - 哨兵清单 vs 工作树实测：集合等 **True**／排序等 **True**／「哨兵有·盘上无」∅／「盘上有·哨兵无」∅；
+  - 工作树 vs `HEAD:app.py`（`4ad0664`）：键数 27=27、集合等 True、有序等 True、两侧差集均空 ⇒
+    在途 ` M app.py`（`git diff --numstat` ＝ `12 40`、净 −28 行）**没动 `_defaults` 的键集与默认值**，
+    本档 :146「`_defaults` 块在在途 hunk 之前，故两版一致」的前提在现盘仍成立（位置已换到"hunk 在 384 以下"，见本档 :172）。
+  - 哨兵件自带的 `__main__` 自检（`python tests/test_app_defaults_keys_snapshot.py`）打印 `_defaults 键数=27` ＋ 排序清单，rc=0。
+
+### 四、本档属性读面 vs 27 键（doc-side 复算，**不重扫源码**）
+
+- 本档 :18-:85 逐点表去重＝**20 个被读键**；其中 **18 个**在 27 键表内，2 个不在（`analysis_pipeline`／`polished_draft`）
+  ⇒ **结论 1 的「20 中的 18」与结论 2 的「真·键不存在面只剩 2 键 4 点」在现盘上仍自洽**。
+  注意这一复算的口径：它是对**本档自己的表**做集合运算（文档内自洽性），不是重跑 s922-04 的 AST 普查 ⇒ 不改本档总量读数（67/115/182）。
+- 反向 9 枚（27 − 18）＝`archive_tag`／`output_language`／`plan`／`quick_entry`／`quick_model_id`／`show_quick_detail`／
+  `undergrad_path`／`undergrad_step`／`workspace_saved` ⇒ 它们**不在属性式读面**（走下标式／别名面／widget `key=` 面，
+  或只被写不被读）。同族档已各自登记，本确节**不重复处置、不改判**：
+  `psy-session-state-ast-census-20260924.md:62`（「27 键中 26 个有静态直访、`workspace_saved` 仅有播种」）、
+  `psy-session-key-implicit-census-20260924.md:60`（`_defaults` 覆盖率按不同分母 22.7%／6.9%／6.2%）。
+
+### 五、复现（一律 `.venv` 解释器）
+
+```
+$ cd /d/code/psy-analysis
+$ .venv/Scripts/python.exe -m pytest tests/test_app_defaults_keys_snapshot.py -q        # 4 passed，rc=0
+$ .venv/Scripts/python.exe tests/test_app_defaults_keys_snapshot.py                     # 打印 键数=27 ＋排序清单，rc=0
+$ grep -n "_defaults" app.py                                                            # 现读 :90（表体起）与 :116（落键循环）
+$ git diff --numstat -- app.py                                                          # 12  40  app.py（净 −28，键集未变）
+```
+
+### 六、本确节的边界（没做什么）
+
+1. **零生产码／零测试件改动**：`app.py` 与 `tests/*` 只读；本确节只动本档一枚文件、纯追加。
+2. **没把 `analysis_pipeline`／`polished_draft` 补进 `_defaults`**（本档 :95 的那条建议）：属行为改动、
+   且落点是未归因在途件 `app.py`（波次 42/44 列为禁碰面）⇒ 留人工/主班，不在本单面。
+3. **没重跑属性式普查**（67/20/18/182 等分母），也**没改** :147 的调用序前提与 :149 的下标式对偶面缺口记载。
+4. **没替别人回写同族档或哨兵清单**：三处清单（本档表／哨兵 `:35-63`／同族普查）仍各自独立，本节的作用是把
+   本档结论 1 那句"这 27 个键"从**指代**变成**清单**，使三份可比对拍。
+5. 红线自查：本确节不涉统计数值／效应量／p 值判定；键名一律先 grep 再引（盘上无 `analysis_ready`，真名 `analysis_recipe`，与本单无关）。
+
