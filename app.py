@@ -137,53 +137,22 @@ render_privacy_gate()
 
 # ============================================================
 # 启动时自动清理（文献缓存 7 天过期 + cancel_id 清理）
+# —— d913a-43 拆分至 src/ui/startup_checks.py（行为零变更）
 # ============================================================
-if "has_auto_cleaned" not in st.session_state:
-    st.session_state.has_auto_cleaned = True
-    try:
-        cache_result = cleanup_literature_cache(older_than_days=7)
-        if cache_result["cleaned"] > 0:
-            import logging
-            logging.info(f"文献缓存自动清理：{cache_result['cleaned']} 个过期文件")
-    except Exception:
-        pass
+from src.ui.startup_checks import run_once_env_check, run_once_startup_cleanup
+
+run_once_startup_cleanup()
 
 # ============================================================
 # 启动时一键环境检查（v5.8：毫秒级 find_spec 自检，toast 弹出，不阻塞）
+# —— d913a-43 同上拆分（行为零变更）
 # ============================================================
-if not st.session_state.startup_check_done:
-    st.session_state.startup_check_done = True
-    try:
-        env_status = run_startup_check()
-        st.session_state.env_status = env_status
-        render_env_status_toasts(env_status)
-    except Exception:
-        # 自检失败绝不能让整个应用白屏（v5.8 鲁棒性修复）
-        st.session_state.env_status = None
+run_once_env_check()
 
-# v5.8: 后台预热重型统计依赖（daemon 线程，不阻塞渲染）。
-# 用户在阅读界面/上传数据的同时，pingouin/statsmodels/semopy 等
-# 已在后台导入完成，第一次点「开始分析」不再额外等待 10~30s。
-def _preload_heavy_deps() -> None:
-    try:
-        import scipy.stats  # noqa: F401
-        import statsmodels.api  # noqa: F401
-        import pingouin  # noqa: F401
-        import sklearn.cluster  # noqa: F401
-        import factor_analyzer  # noqa: F401
-        import openpyxl  # noqa: F401
-        import jieba  # noqa: F401
-        import semopy  # noqa: F401
-        import kaleido  # noqa: F401
-    except Exception:
-        pass  # 预热失败静默——真正用到时会有明确的懒加载错误提示
+# v5.8: 后台预热重型统计依赖（daemon 线程，不阻塞渲染）—— d914-23 拆分至 src/ui/heavy_preload.py
+from src.ui.heavy_preload import start_heavy_preload_once
 
-if not st.session_state.get("_heavy_preload_started"):
-    st.session_state._heavy_preload_started = True
-    try:
-        threading.Thread(target=_preload_heavy_deps, daemon=True, name="heavy-preload").start()
-    except Exception:
-        pass
+start_heavy_preload_once()
 
 # v2.9: 顶部环境健康提示条（仅在有问题时显示）
 render_env_health_banner()
@@ -199,6 +168,9 @@ render_restore_prompt(st)
 
 def _autosave_current_workspace(*, force: bool = False) -> bool:
     """保存当前项目；所有失败由 autosave 状态统一反馈，不阻断主流程。
+
+    d914-23 注：autosave 已收敛于本单点函数，调用点对照＝app.py:1015（强制）与
+    app.py:1319（强制）——调用方无需改动。
 
     返回值契约（h912-06「返回＝受理」）：True＝受理——方案 B 后台路径下仅代表
     已入队（落盘由 worker 异步完成，atexit flush 兜底），调用方不得据 True 断言
