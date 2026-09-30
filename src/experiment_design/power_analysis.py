@@ -201,23 +201,30 @@ def _solve_n_for_anova_f(f_effect: float, k: int, power: float, alpha: float,
     n_lo, n_hi = k + 1, 2000
     try:
         n = brentq(f, n_lo, n_hi, maxiter=100)
-    except ValueError:
-        n = n_hi
+        solved, failure_reason = True, ""
+    except ValueError as exc:
+        # 出口 A′ 同款（s927-61 连坐修）：求根失败不再把区间上界当答案
+        solved, failure_reason = False, _solve_failure_reason(f, n_lo, n_hi, exc)
+        n = 0
 
-    n = int(np.ceil(n))
-    n_per = n
-    actual = power_at_n(n)
+    if solved:
+        n = int(np.ceil(n))
+        actual = power_at_n(n)
+    else:
+        actual = float("nan")
 
     return PowerResult(
         test_type=ttype, test_name_zh=name,
-        required_n=n, required_per_group=n_per, n_groups=k,
+        required_n=n, required_per_group=n, n_groups=k,
         power=power, alpha=alpha, effect_size=f_effect,
         effect_size_name="Cohen's f", effect_size_label=_label_effect(f_effect, EFFECT_BENCHMARKS["cohens_f"]),
         actual_power=actual, df=(k - 1),
-        note=f"{k}个水平/组，每组{n_per}人（{'重复测量' if is_repeated else '独立组'}），共{'n=' + str(n) if is_repeated else 'N=' + str(n * k)}",
+        note=(f"{k}个水平/组，每组{n}人（{'重复测量' if is_repeated else '独立组'}），共{'n=' + str(n) if is_repeated else 'N=' + str(n * k)}"
+              if solved else f"{name}：区间内无法求解样本量，不给出数字以免误导"),
         assumptions=f"效应量f={f_effect:.2f}，α={alpha}，效力1-β={power}" + (
             f"，重复测量相关ρ={correlation}" if is_repeated else ""
         ),
+        solved=solved, failure_reason=failure_reason,
     )
 
 
@@ -244,20 +251,28 @@ def _solve_n_for_correlation(r: float, power: float, alpha: float) -> PowerResul
     n_lo, n_hi = 5, 3000
     try:
         n = brentq(f, n_lo, n_hi, maxiter=100)
-    except ValueError:
-        n = n_hi
+        solved, failure_reason = True, ""
+    except ValueError as exc:
+        # 出口 A′ 同款（s927-61 连坐修）：求根失败不再把区间上界当答案
+        solved, failure_reason = False, _solve_failure_reason(f, n_lo, n_hi, exc)
+        n = 0
 
-    n = int(np.ceil(n))
-    actual = power_at_n(n)
+    if solved:
+        n = int(np.ceil(n))
+        actual = power_at_n(n)
+    else:
+        actual = float("nan")
 
     return PowerResult(
         test_type="correlation", test_name_zh="Pearson相关分析",
         required_n=n, required_per_group=n, n_groups=1,
         power=power, alpha=alpha, effect_size=r,
         effect_size_name="r", effect_size_label=_label_effect(abs(r), EFFECT_BENCHMARKS["r"]),
-        actual_power=actual, df=n - 2,
-        note=f"需要{n}名被试以检测r={r:.2f}的相关",
+        actual_power=actual, df=n - 2 if solved else 0,
+        note=("需要{n}名被试以检测r={r:.2f}的相关".format(n=n, r=r)
+              if solved else "相关分析：区间内无法求解样本量，不给出数字以免误导"),
         assumptions=f"效应量r={r:.2f}，双侧α={alpha}，效力1-β={power}",
+        solved=solved, failure_reason=failure_reason,
     )
 
 
@@ -275,11 +290,18 @@ def _solve_n_for_chisq(w: float, df: int, power: float, alpha: float) -> PowerRe
     n_lo, n_hi = df + 2, 5000
     try:
         n = brentq(lambda n: power_at_n(n) - power, n_lo, n_hi, maxiter=100)
-    except ValueError:
-        n = n_hi
+        solved, failure_reason = True, ""
+    except ValueError as exc:
+        # 出口 A′ 同款（s927-61 连坐修）：求根失败不再把区间上界当答案
+        solved, failure_reason = False, _solve_failure_reason(
+            lambda n: power_at_n(n) - power, n_lo, n_hi, exc)
+        n = 0
 
-    n = int(np.ceil(n))
-    actual = power_at_n(n)
+    if solved:
+        n = int(np.ceil(n))
+        actual = power_at_n(n)
+    else:
+        actual = float("nan")
 
     return PowerResult(
         test_type="chisq", test_name_zh="卡方检验",
@@ -287,8 +309,10 @@ def _solve_n_for_chisq(w: float, df: int, power: float, alpha: float) -> PowerRe
         power=power, alpha=alpha, effect_size=w,
         effect_size_name="Cohen's w", effect_size_label=_label_effect(w, EFFECT_BENCHMARKS["cohens_w"]),
         actual_power=actual, df=df,
-        note=f"需要{n}名被试",
+        note=(f"需要{n}名被试" if solved
+              else "卡方检验：区间内无法求解样本量，不给出数字以免误导"),
         assumptions=f"效应量w={w:.2f}，自由度df={df}，α={alpha}，效力1-β={power}",
+        solved=solved, failure_reason=failure_reason,
     )
 
 
@@ -321,12 +345,20 @@ def _solve_n_for_factorial_anova(f_effect: float, design: str,
     n_lo, n_hi = 2, 2000
     try:
         n_per = brentq(lambda n: power_at_n(n) - power, n_lo, n_hi, maxiter=100)
-    except ValueError:
-        n_per = n_hi
+        solved, failure_reason = True, ""
+    except ValueError as exc:
+        # 出口 A′ 同款（s927-61 连坐修）：求根失败不再把区间上界当答案
+        solved, failure_reason = False, _solve_failure_reason(
+            lambda n: power_at_n(n) - power, n_lo, n_hi, exc)
+        n_per = 0
 
-    n_per = int(np.ceil(n_per))
-    N = n_per * k
-    actual = power_at_n(n_per)
+    if solved:
+        n_per = int(np.ceil(n_per))
+        N = n_per * k
+        actual = power_at_n(n_per)
+    else:
+        N = 0
+        actual = float("nan")
 
     return PowerResult(
         test_type="factorial_anova", test_name_zh=f"{design}因素方差分析",
@@ -334,8 +366,10 @@ def _solve_n_for_factorial_anova(f_effect: float, design: str,
         power=power, alpha=alpha, effect_size=f_effect,
         effect_size_name="Cohen's f", effect_size_label=_label_effect(f_effect, EFFECT_BENCHMARKS["cohens_f"]),
         actual_power=actual, df=df1,
-        note=f"{design}设计，{k}个实验条件，每组{n_per}人，共{N}人",
+        note=(f"{design}设计，{k}个实验条件，每组{n_per}人，共{N}人" if solved
+              else "多因素方差分析：区间内无法求解样本量，不给出数字以免误导"),
         assumptions=f"效应量f={f_effect:.2f}，α={alpha}，效力1-β={power}，df1={df1}",
+        solved=solved, failure_reason=failure_reason,
     )
 
 
