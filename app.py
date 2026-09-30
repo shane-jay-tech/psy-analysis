@@ -1567,17 +1567,19 @@ elif mode == "📋 问卷设计":
     st.caption("输入研究问题 → 智能识别构念 → 生成信效度优秀的问卷 → 完整设计报告")
 
     # v4.1: 子工作流——AI 反向生成 vs 上传现有题目 vs 导入清洗
+    from src.ui.questionnaire_panel import classify_questionnaire_sub_mode
     _q_sub_mode = st.radio(
         "选择工作流",
         ["🆕 AI 设计新问卷", "📤 上传现有题目（预审 + 排版导出）", "📊 问卷数据导入与清洗"],
         horizontal=True,
         key="_q_sub_mode_radio",
     )
-    if _q_sub_mode.startswith("📤"):
+    _q_sub_class = classify_questionnaire_sub_mode(_q_sub_mode)
+    if _q_sub_class == "upload_items":
         from src.ui.items_upload_panel import render_items_upload_panel
         render_items_upload_panel()
         st.stop()
-    elif _q_sub_mode.startswith("📊"):
+    elif _q_sub_class == "import_clean":
         from src.ui.questionnaire_import_panel import render_questionnaire_import_panel
         render_questionnaire_import_panel(st.session_state)
         st.stop()
