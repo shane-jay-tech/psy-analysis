@@ -2403,5 +2403,11 @@ elif mode == "🗂️ 模板中心":
     except Exception as _tpl_err:
         st.error(f"模板中心加载失败：{_tpl_err}")
         on_error_display("template_center_load_failed", "error")
+else:
+    # s927-59: 路由兜底——PAGE_MODES 与路由分支漂移（链外 mode）时回默认页，不静默空白
+    import logging
+    logging.getLogger("psy.app.route").warning("app.py 路由链外 mode=%r，回默认页", mode)
+    st.session_state.app_mode = "📈 数据分析"
+    st.rerun()
 
 
