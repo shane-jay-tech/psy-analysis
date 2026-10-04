@@ -2377,7 +2377,7 @@ elif mode == "📦 交付包导出":
         )
         if not _pre_check_result["safe"]:
             st.error(
-                f"⚠️ 隐私预检发现 {_pre_check_result['high_count']} 项高风险敏感信息"
+                f"⚠️ 隐私预检发现 {_pre_check_result.get('blocking_count', _pre_check_result['high_count'])} 项高风险敏感信息"
                 f"（共 {_pre_check_result['total_count']} 项）。正式交付已阻止，请先检查并脱敏。"
             )
             with st.expander("查看详情"):
