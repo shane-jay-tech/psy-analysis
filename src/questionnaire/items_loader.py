@@ -32,6 +32,10 @@ class ItemsDoc:
     instructions: str = ""
     items: List[str] = field(default_factory=list)
     reverse_indices: List[int] = field(default_factory=list)
+    # 源题号（d598 遗留 C3 稳定题号解析层）：与 items 平行。仅当 ≥1 个编号题捕获到
+    # 源号才填充（无源号的条目=None，如 bullet/段落题混排）；空列表=回落位置生成
+    # （下游 Q1..Qn），与旧版输出逐字节一致。
+    item_nos: List[Optional[int]] = field(default_factory=list)
     source_format: str = ""
     raw_warnings: List[str] = field(default_factory=list)
 
@@ -328,7 +332,7 @@ def _parse_text(text: str, source_format: str) -> ItemsDoc:
             break
 
     # ---- 2. 抽题（先找编号/bullet）----
-    items_with_idx: List[Tuple[int, str, str]] = []  # (line_index, style, text)
+    items_with_idx: List[Tuple[int, str, str, Optional[int]]] = []  # (line_index, style, text, 源题号)
     first_heading_skipped = title_idx is not None
     for i, ln in enumerate(lines):
         if first_heading_skipped and i == title_idx:
@@ -338,13 +342,15 @@ def _parse_text(text: str, source_format: str) -> ItemsDoc:
             continue
         hit = _is_item_line(ln)
         if hit:
-            items_with_idx.append((i, hit[0], hit[1]))
+            # 源题号捕获：编号题回读 _NUMBERED_RE 的 (\d+) 组（_is_item_line 丢弃了它）
+            _m = _NUMBERED_RE.match(ln) if hit[0] == "numbered" else None
+            items_with_idx.append((i, hit[0], hit[1], int(_m.group(1)) if _m else None))
 
     # ---- 3. 抽题失败时的兜底：纯段落每行一题（条件较严：连续 ≥3 行非空）----
     used_paragraph_fallback = False
     skipped_as_instruction: List[Tuple[int, str]] = []  # (line_idx, text) 用于回填指导语
     if not items_with_idx:
-        candidates: List[Tuple[int, str, str]] = []
+        candidates: List[Tuple[int, str, str, Optional[int]]] = []
         for i, ln in enumerate(lines):
             s = ln.strip()
             if not s:
@@ -357,7 +363,7 @@ def _parse_text(text: str, source_format: str) -> ItemsDoc:
             if _looks_like_instruction(s):
                 skipped_as_instruction.append((i, s))
                 continue
-            candidates.append((i, "plain", s))
+            candidates.append((i, "plain", s, None))
         if len(candidates) >= 3:
             items_with_idx = candidates
             used_paragraph_fallback = True
@@ -387,18 +393,20 @@ def _parse_text(text: str, source_format: str) -> ItemsDoc:
     # ---- 5. 反向题识别 + 文本清洗 ----
     items: List[str] = []
     reverse_indices: List[int] = []
-    for k, (_idx, _style, raw) in enumerate(items_with_idx):
+    item_nos: List[Optional[int]] = []
+    for k, (_idx, _style, raw, _src_no) in enumerate(items_with_idx):
         cleaned, is_rev = _detect_reverse(raw)
         cleaned = _clean_item(cleaned)
         if not cleaned:
             continue
         items.append(cleaned)
+        item_nos.append(_src_no)
         if is_rev:
             reverse_indices.append(len(items) - 1)
 
     warnings: List[str] = []
     # 风格混杂提醒
-    styles = {s for _i, s, _t in items_with_idx}
+    styles = {s for _i, s, _t, _n in items_with_idx}
     if len(styles) > 1 and "plain" not in styles:
         warnings.append(f"文件中混用了多种题目格式：{sorted(styles)}；已统一抽出。")
     if used_paragraph_fallback:
@@ -414,6 +422,7 @@ def _parse_text(text: str, source_format: str) -> ItemsDoc:
         instructions=instructions,
         items=items,
         reverse_indices=reverse_indices,
+        item_nos=item_nos if any(n is not None for n in item_nos) else [],
         source_format=source_format,
         raw_warnings=warnings,
     )
