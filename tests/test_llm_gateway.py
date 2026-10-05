@@ -1140,3 +1140,74 @@ class TestTraceFieldContract:
         r_indexed, r_soft = _summary_keys_consumed(renamed)
         assert "avg_elapsed_ms_typo" in (r_indexed | r_soft)
         assert not (r_indexed | r_soft) <= SUMMARY_KEYS, "改名没被抓到 ⇒ 本条判据不承重"
+
+
+# ---------------------------------------------------------------------------
+# s1002-13：读侧真值判定钉桩（与 s924-51 写侧守卫成对）
+# ---------------------------------------------------------------------------
+
+class TestCacheReadSideTruthinessPin:
+    """读侧 `gateway.py:503 if cached:` 用**真值判定**而非 `is not None`（s924-51 遗留 3）。
+
+    ⚠️ 语义注记（改读侧前必读）：现状下即使绕过写侧守卫把空串塞进缓存
+    （本例用 gw._cache_put 直接注入模拟），读侧也判不出命中——`if cached` 对 ""
+    为假 ⇒ 走正常调用路径。这是**与写侧守卫配套的兜底**：两层合起来才保证
+    「空串永不从缓存回流」。若将来有人把读侧改成 `is not None`，空串将开始
+    「命中并回流」，对外行为变更（cached=True＋content=""）——**属行为变更，
+    需另行放行（人工裁决），不得顺手改**；改的同时必须评估 s924-51 写侧守卫
+    是否仍承担全部防线。
+    """
+
+    def test_empty_string_in_cache_is_never_served_as_hit(self):
+        from src.llm_gateway import gateway as gw
+        from src.llm_gateway import clear_cache, register_llm_backend, set_cache_enabled
+
+        clear_cache()
+        set_cache_enabled(True)
+        cfg = _ok_config()
+        msgs = _s92451_msgs("readside-empty-pin")
+        key = gw._cache_key(msgs, cfg["model"], 0.7)
+
+        # 绕过写侧守卫直接注入空串（模拟"有人改坏写侧"的上游形态）
+        gw._cache_put(key, "placeholder")
+        gw._response_cache[key] = ""            # 直接灌毒：写侧不会产出这个形态
+        assert gw._cache_get(key) == ""         # 存储层确实存着空串
+
+        calls = {"n": 0}
+
+        def _real_backend(messages, model="", **kwargs):
+            calls["n"] += 1
+            return "真文回退"
+
+        register_llm_backend("s100213_readside", _real_backend)
+        r = llm_chat(msgs, llm_config=cfg, backend="s100213_readside")
+        assert calls["n"] == 1, "空串被判成缓存命中 ⇒ 读侧已改成 is not None（行为变更未放行）"
+        assert r.content == "真文回退"
+        assert r.fields.get("cached") is not True
+
+    def test_nonempty_string_still_served_as_hit(self):
+        """对照腿：非空串照常命中（钉住读侧不是完全坏了）。"""
+        from src.llm_gateway import gateway as gw
+        from src.llm_gateway import clear_cache, set_cache_enabled
+
+        clear_cache()
+        set_cache_enabled(True)
+        cfg = _ok_config()
+        msgs = _s92451_msgs("readside-nonempty-hit")
+        key = gw._cache_key(msgs, cfg["model"], 0.7)
+        gw._cache_put(key, "缓存正文")
+
+        # 后端解析先于缓存检查（:494 在 :503 前）⇒ 须注册真后端；
+        # 命中路径不会调它（calls 停 0）＝「命中先于后端调用」的附随钉。
+        calls = {"n": 0}
+
+        def _never_called(messages, model="", **kwargs):
+            calls["n"] += 1
+            return "不应被调"
+
+        from src.llm_gateway import register_llm_backend
+        register_llm_backend("s100213_readside_hit", _never_called)
+        r = llm_chat(msgs, llm_config=cfg, backend="s100213_readside_hit")
+        assert r.content == "缓存正文"
+        assert r.fields.get("cached") is True
+        assert calls["n"] == 0
