@@ -126,6 +126,7 @@ def render_paper_writing_ui():
                 "论文标题（可选，留空则自动生成）",
                 value=engine.state.title_hint,
                 placeholder="不超过25字",
+                help="超 25 字会在生成时按规约钳制（末位「…」标记）",
                 key="paper_title_hint",
             )
 

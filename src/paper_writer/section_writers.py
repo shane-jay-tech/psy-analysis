@@ -1,3 +1,6 @@
+import logging
+
+logger = logging.getLogger(__name__)
 """论文写作系统 — 各章节生成器
 
 每个生成器接收 PaperContext，输出格式化的论文段落。
@@ -96,12 +99,20 @@ def _clamp_title(title: str, limit: int) -> str:
 def write_title(context: PaperContext) -> str:
     """生成论文标题（心理学报风格：不超过规约表 WRITING_RULES['title'] 的字数上限，现为 25 字）。
 
-    title_hint 是用户手填标题，原样返回、不静默改写；只有自动推断出的标题受上限约束。
+    s1002-29（s924-60 遗留 1 落地）：title_hint（用户手填）超限时**提示＋钳制**——
+    与自动路径同规约（同 limit、「…」截断风格），经 logging 提示不静默；非超长的
+    手填标题仍原样返回（不静默改写语义对合规输入保持）。
     """
-    if context.title_hint:
-        return context.title_hint
-
     limit = _title_rule_max_len()
+    if context.title_hint:
+        hint = context.title_hint
+        if len(hint) > limit:
+            logger.warning(
+                "title_hint 超长（%d > %d 字），已按规约钳制：%r",
+                len(hint), limit, hint[:limit])
+            return _clamp_title(hint, limit)
+        return hint
+
     # 从研究变量推断标题
     hypotheses = context.hypotheses
     if hypotheses:

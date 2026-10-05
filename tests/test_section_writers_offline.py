@@ -70,6 +70,12 @@ LLM_MODULE_PREFIXES = ("src.llm_gateway", "openai", "litellm", "anthropic")
 
 
 @pytest.fixture
+def base_context():
+    from src.paper_writer.section_writers import PaperContext
+    return PaperContext(topic="合成主题", hypotheses=[], title_hint="")
+
+
+@pytest.fixture
 def offline_tripwire(monkeypatch):
     """运行期离线门：LLM 网关模块不可导入，socket 连接直接炸。"""
     for name in ("src.llm_gateway", "src.llm_gateway.gateway", "openai"):
@@ -374,3 +380,29 @@ def test_module_llm_import_is_isolated_to_deep_discussion():
                 if isinstance(sub, ast.ImportFrom) and _hits_llm(sub.module or ""):
                     holders.add(node.name)
     assert holders == {"write_discussion_deep"}, f"LLM 导入泄漏到非深度讨论函数：{holders}"
+
+
+# ---------------------------------------------------------------------------
+# s1002-29（s924-60 遗留 1）：title_hint 超长提示＋钳制（与自动路径同规约）
+# ---------------------------------------------------------------------------
+
+class TestTitleHintClamp:
+    def test_overlong_hint_clamped_with_ellipsis(self, base_context):
+        limit = 25
+        base_context.title_hint = "一" * (limit + 10)
+        title = write_title(base_context)
+        assert len(title) <= limit
+        assert title.endswith("…")
+        assert not title.startswith("一一" * 12 + "一")  # 原文未原样透传
+
+    def test_within_limit_hint_untouched(self, base_context):
+        base_context.title_hint = "大学生社交焦虑与自尊的关系研究"
+        assert write_title(base_context) == "大学生社交焦虑与自尊的关系研究"
+
+    def test_clamp_path_logs_warning(self, base_context, caplog):
+        import logging
+        base_context.title_hint = "超" * 40
+        with caplog.at_level(logging.WARNING, logger="src.paper_writer.section_writers"):
+            write_title(base_context)
+        assert any("title_hint 超长" in r.getMessage() for r in caplog.records), \
+            "钳制未留提示（静默截断回归）"
