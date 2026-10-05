@@ -156,3 +156,37 @@ class TestLiteratureMatrix:
         assert restored.dimensions == ["A", "B"]
         assert restored.get_cell("lit1", "A") == "v1"
         assert restored.highlighted_keys == ["lit1"]
+
+
+class TestLiteratureMatrixDeepCopyGate:
+    """s1002-11（s924-64 B-3 升格门禁）：from_dict 的防御性拷贝＝session_state 隔离层。
+
+    矿源 E4 运行时证成的形态钉成门禁：调用方侧对象（raw dict / cells 内层 dict /
+    dimensions / highlighted_keys）任意变异后， LiteratureMatrix 内部状态必须不变。
+    变异刀：浅拷贝实现（to_dict 去掉 dict(v)/list(...) 包裹）会让本例当场红。
+    """
+
+    def test_caller_side_mutations_never_leak_into_matrix(self):
+        raw = {
+            "dimensions": ["a", "b"],
+            "cells": {"k1": {"a": "v1"}},
+            "highlighted_keys": ["k1"],
+        }
+        m = LiteratureMatrix.from_dict(raw)
+
+        # 调用方侧四路变异（E4 同款）
+        raw["cells"]["k1"]["a"] = "MUTATED"
+        raw["cells"]["k2"] = {"a": "injected"}
+        raw["dimensions"].append("POLLUTED")
+        raw["highlighted_keys"].append("X")
+
+        assert m.get_cell("k1", "a") == "v1", "内层 cells 被别名共享（浅拷贝）"
+        assert "k2" not in m.cells, "外层 cells 被别名共享"
+        assert m.dimensions == ["a", "b"], "dimensions 被别名共享"
+        assert m.highlighted_keys == ["k1"], "highlighted_keys 被别名共享"
+
+        # 反向：矩阵侧变异也不得渗回 raw（隔离是双向的）
+        m.set_cell("k1", "a", "CHANGED")
+        m.dimensions.append("M2")
+        assert raw["cells"]["k1"]["a"] == "MUTATED"  # raw 保持调用方自己的值
+        assert "M2" not in raw["dimensions"]
