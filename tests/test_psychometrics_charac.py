@@ -92,9 +92,17 @@ def test_empty_construct_falls_back_instead_of_crashing():
 
 
 def test_malformed_dimensions_currently_raises_type_error():
-    """现状：`dimensions` 给成字符串列表 ⇒ `d["name"]` 直接 TypeError（**不**是优雅降级）。
+    """【s1002-30 翻正】name 缺键已 .get("name", "") 兜底（s920-19 遗留1）：
+    字符串列表维度不再 TypeError——取值形态显示为空名，指南骨架正常产出。"""
+    text = ps.content_validity_guidance({"dimensions": ["认知", "情感"]})
+    assert "2 个维度" in text
+    assert "认知" in text and "情感" in text        # str 形态按原值显示
+    assert "内容效度保障策略" in text
 
-    钉住它是为了让"改成 .get 兜底"这个决定有代价可见：现在所有调用方必须传 dict 形状的维度。
-    """
-    with pytest.raises(TypeError):
-        ps.content_validity_guidance({"dimensions": ["认知", "情感"]})
+
+def test_content_validity_dict_dim_missing_name_key_yields_empty_name():
+    """dict 维度缺 name 键 ⇒ 空名占位，不 KeyError。"""
+    text = ps.content_validity_guidance({"dimensions": [{"points": 3}, {"name": "情感"}]})
+    assert "2 个维度" in text
+    assert "情感" in text
+    assert "KeyError" not in text

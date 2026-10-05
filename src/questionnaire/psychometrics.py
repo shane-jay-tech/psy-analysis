@@ -23,7 +23,9 @@ def content_validity_guidance(construct: dict) -> str:
             "4. 检查题目是否覆盖了构念的所有理论维度（无遗漏、无冗余）"
         )
 
-    dim_names = [d["name"] for d in dims]
+    # s1002-30（s920-19 遗留1 落地）：name 缺键兜底——非 dict 维度（str 形状）
+    # 按原值显示、dict 缺 name 显示空名，均不再 TypeError（指南判据文本零改动）。
+    dim_names = [d.get("name", "") if isinstance(d, dict) else str(d) for d in dims]
     dim_list = "、".join(dim_names)
 
     return (
