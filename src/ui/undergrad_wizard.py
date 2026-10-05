@@ -3631,8 +3631,11 @@ def render_undergrad_wizard():
                         _updated = st.checkbox(_label, value=_checked, key=f"lr_lit_{_key}")
                         wiz_data["lit_review_checked"][_key] = _updated
                     st.caption("提示：取消勾选可排除特定文献。下方还有基于变量自动匹配的预设文献库。")
-        except Exception:
-            pass
+        except Exception as exc:
+            # s1002-19（s923-23 D3 / s924-39 遗留2）：渲染侧裸 pass 改 WARN 观测——
+            # 5 类脏值在页面上表现为「整块推荐文献消失」时至少留日志，格式与
+            # :129（本件既有 WARN_FORMAT）一致。
+            logger.warning("向导推荐文献渲染失败（整块降级为空）: %s", exc)
 
         with st.expander("📚 基于分析变量自动推荐文献（点击展开）", expanded=False):
             st.caption("系统根据你的分析变量自动匹配相关文献，勾选后可在论文中引用。")

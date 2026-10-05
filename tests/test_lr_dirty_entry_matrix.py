@@ -301,21 +301,24 @@ def test_wizard_read_side_single_dirty_relevance_score_kills_the_whole_section()
         _lr_wizard_read({"literature_items": [bad, good]})
 
 
-def test_wizard_read_side_is_wrapped_in_bare_except_pass(monkeypatch):
-    """结构前提：包住读侧环的 `try`（`undergrad_wizard.py:3592-3631`）的 handler 是
-    `except Exception: pass` —— 即上两条用例的 TypeError/ValueError **在页面上不可见**。
+def test_wizard_read_side_handler_now_logs_warning(monkeypatch):
+    """【s1002-19 翻正】s923-23 D3 / s924-39 遗留2 落地：读侧环的 handler 已从
+    `except Exception: pass` 改为 `except Exception as exc:` ＋ `logger.warning(...)`——
+    「整块推荐文献消失」时留观测日志（WARN 文案与 :129 既有格式同源）。
 
-    这条是"抛错 vs 宽容"真值表的**表现层换算器**：不钉它，前面的 pytest.raises 会被误读成
-    "用户会看到报错"。修复若改成 `logging.warning(...)`，本用例红（那是好事，按注释翻正）。
+    原例（钉 pass 现状）按其自述「修复即红按注释翻正」执行：仍钉 handler 结构
+    （type=Exception 恰 1 个），但主体断言改为 warning 调用在册。
     """
     outer = [n for n in ast.walk(_wiz_tree)
              if isinstance(n, ast.Try) and n.lineno <= _wiz_for.lineno <= n.end_lineno]
-    assert outer, "读侧环之外找不到包裹它的 try ⇒ 静默前提已变，须重估全部读侧用例"
+    assert outer, "读侧环之外找不到包裹它的 try ⇒ 结构前提已变，须重估全部读侧用例"
     innermost = min(outer, key=lambda n: n.end_lineno - n.lineno)
     assert len(innermost.handlers) == 1
     h = innermost.handlers[0]
     assert ast.unparse(h.type) == "Exception"
-    assert [ast.unparse(s) for s in h.body] == ["pass"]
+    body_src = [ast.unparse(stmt) for stmt in h.body]
+    assert any("logger.warning" in b for b in body_src),         f"观测 WARN 丢失（回退成静默）：{body_src}"
+    assert not any(b == "pass" for b in body_src), "handler 又变回裸 pass"
 
 
 # ═════════════ 入口 3：review_import.apply_review_comments_to_state（:134 写回面） ═════════════
