@@ -53,6 +53,61 @@ def isolate_streamlit_app_test_storage(request, monkeypatch, tmp_path):
     monkeypatch.setattr(archive_manager, "ARCHIVE_ROOT", tmp_path / "archive")
     monkeypatch.setattr(usage_logger, "_LOG_DIR", tmp_path / "logs")
 
+    # s1002-07：autouse 沙盒纳入文献库根（s924-59 遗留 E7——原夹具不覆盖 feed 族）。
+    # 双腿：①setenv（feed_paths 模块期未求值的新进程/懒导入路径解析到 tmp）；
+    # ②模块期已求值的 feed_paths 属性整体重指 tmp（含 DATA_ROOT 与各派生 PATH），
+    #   使模块期绑定过这些属性的既有代码也跟沙盒走。AppTest 面不触 feed 写路径时
+    #   本腿零副作用；_resolve_data_root 对 setenv 的响应见 paths.py:10-24。
+    monkeypatch.setenv("LITERATURE_FEED_DATA_ROOT", str(tmp_path / "literature_feed"))
+    from src.literature_feed import paths as _feed_paths
+
+    feed_root = Path(str(tmp_path / "literature_feed"))
+    monkeypatch.setattr(_feed_paths, "DATA_ROOT", feed_root, raising=False)
+    monkeypatch.setattr(_feed_paths, "DB_PATH", feed_root / "feed.sqlite", raising=False)
+    monkeypatch.setattr(_feed_paths, "JSONL_RAW_DIR", feed_root / "raw", raising=False)
+    monkeypatch.setattr(_feed_paths, "LOCK_DIR", feed_root / "locks", raising=False)
+    monkeypatch.setattr(_feed_paths, "DOMAIN_WEIGHTS_PATH", feed_root / "domain_weights.yaml", raising=False)
+    monkeypatch.setattr(_feed_paths, "METHOD_WEIGHTS_PATH", feed_root / "method_weights.yaml", raising=False)
+    monkeypatch.setattr(_feed_paths, "TRENDING_WEIGHTS_PATH", feed_root / "trending_weights.yaml", raising=False)
+    monkeypatch.setattr(_feed_paths, "BUDGET_PATH", feed_root / "llm_budget.json", raising=False)
+    # 第二层：模块期复制了 paths 常量的副本面（s930-04 已勘明的包级副本形态）——
+    # 只重指 paths 本体拦不住它们，逐副本重指（缺属性静默跳过，形态漂移不炸）。
+    # 副本重指表：模块名 -> {副本属性: 沙盒值}（缺模块/缺属性静默跳过，形态漂移不炸）。
+    for _mod_name, _pairs in {
+        "src.literature_feed": {
+            "DATA_ROOT": feed_root,
+            "DB_PATH": feed_root / "feed.sqlite",
+            "JSONL_RAW_DIR": feed_root / "raw",
+            "LOCK_DIR": feed_root / "locks",
+            "DOMAIN_WEIGHTS_PATH": feed_root / "domain_weights.yaml",
+            "METHOD_WEIGHTS_PATH": feed_root / "method_weights.yaml",
+            "TRENDING_WEIGHTS_PATH": feed_root / "trending_weights.yaml",
+            "BUDGET_PATH": feed_root / "llm_budget.json",
+        },
+        "src.literature_feed.storage.feed_store": {"DB_PATH": feed_root / "feed.sqlite"},
+        "src.literature_feed.storage.jsonl_archive": {"JSONL_RAW_DIR": feed_root / "raw"},
+        "src.literature_feed.storage.budget_tracker": {"BUDGET_PATH": feed_root / "llm_budget.json"},
+        "src.literature_feed.scheduler.lock_manager": {"FETCH_LOCK_FILE": feed_root / "fetch.lock"},
+        "src.literature_feed.scheduler.daily_runner": {"TRENDING_WEIGHTS_PATH": feed_root / "trending_weights.yaml"},
+        "src.literature_feed.trend": {
+            "DOMAIN_WEIGHTS_PATH": feed_root / "domain_weights.yaml",
+            "METHOD_WEIGHTS_PATH": feed_root / "method_weights.yaml",
+            "TRENDING_WEIGHTS_PATH": feed_root / "trending_weights.yaml",
+        },
+        "src.literature_feed.ui.feed_panel": {
+            "DOMAIN_WEIGHTS_PATH": feed_root / "domain_weights.yaml",
+            "METHOD_WEIGHTS_PATH": feed_root / "method_weights.yaml",
+            "TRENDING_WEIGHTS_PATH": feed_root / "trending_weights.yaml",
+        },
+    }.items():
+        import importlib
+        try:
+            _mod = importlib.import_module(_mod_name)
+        except Exception:
+            continue
+        for _attr, _val in _pairs.items():
+            monkeypatch.setattr(_mod, _attr, _val, raising=False)
+
 
 def pytest_addoption(parser):
     parser.addoption(

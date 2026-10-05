@@ -16,7 +16,7 @@ from datetime import date
 
 import pytest
 
-from src.literature_feed.paths import METHOD_WEIGHTS_PATH
+from src.literature_feed import paths as feed_paths
 from src.literature_feed.storage.feed_store import ArticleRow, CandidateRow, FeedStore
 from src.literature_feed.trend.method_weights import MethodWeights
 from src.literature_feed.trend.scorer import (
@@ -28,7 +28,16 @@ from src.literature_feed.trend.domain_weights import DomainWeights
 
 
 def _load() -> MethodWeights:
-    return MethodWeights.from_yaml_path(METHOD_WEIGHTS_PATH)
+    """夹具期现取路径（s1002-07，s924-30 遗留出口）：不再模块期绑定 METHOD_WEIGHTS_PATH。
+
+    模块期 ``from paths import METHOD_WEIGHTS_PATH`` 会把「真库种子 yaml」路径钉死在
+    本模块命名空间——沙盒夹具重指后这里仍指真库 ⇒ 带守卫跑全族必红（s924-30 实测
+    17 红）。现改为**调用期经 feed_paths 模块属性现取**：paths 的 DATA_ROOT 虽是模块期
+    求值，但本件配套的 feed_root 式夹具用 monkeypatch.setattr 重指 feed_paths 上的
+    属性（不只 setenv），属性读取即跟沙盒走；未配沙盒的裸跑仍解析到真库种子 yaml
+    （本件语义=读种子词表，非写库件，裸跑合法）。
+    """
+    return MethodWeights.from_yaml_path(feed_paths.METHOD_WEIGHTS_PATH)
 
 
 # ---------------------------------------------------------------------------
