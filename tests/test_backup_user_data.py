@@ -21,7 +21,18 @@ def sandbox(tmp_path, monkeypatch):
     (projects / "p1" / "notes.md").write_text("note", encoding="utf-8")
     feed = tmp_path / "repo" / "data" / "literature_feed" / "feed.sqlite"
     feed.parent.mkdir(parents=True)
-    feed.write_bytes(b"fake-sqlite")
+    # s1004-21（s930-47 归因落地）：夹具喂**真 sqlite 库**（含 articles 表）——
+    # r5 A1（6fb6b16）把备份改走 sqlite3.backup() 真库协议后，旧的 11 字节假串
+    # 会被正确报 DatabaseError。顺带激活 _live_article_count 的非 None 分支。
+    import sqlite3
+
+    con = sqlite3.connect(feed)
+    try:
+        con.execute("CREATE TABLE articles (id INTEGER PRIMARY KEY, title TEXT)")
+        con.executemany("INSERT INTO articles (title) VALUES (?)", [(f"t{i}",) for i in range(3)])
+        con.commit()
+    finally:
+        con.close()
     root = tmp_path / "backups"
     monkeypatch.setattr(bud, "PROJECTS_DIR", projects)
     monkeypatch.setattr(bud, "FEED_DB", feed)
