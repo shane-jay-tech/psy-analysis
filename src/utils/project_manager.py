@@ -106,12 +106,25 @@ def _read_locked(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         import time as _time
+        from src.utils import instance_lock as _il
+        lock_key = str(Path(PROJECTS_DIR) / _il.LOCK_FILENAME)
         for attempt in range(20):
             try:
                 return locked_fn(*args, **kwargs)
-            except ProjectLockedError:
+            except ProjectLockedError as exc:
+                # 「自己人」两形态不降级、直接无锁读：
+                # ①真重入记账（depth>0，with project_lock 同帧）；
+                # ②锁文件 holder==本 pid（测试台架播种假锁/同进程残留）——读自己写的
+                #   数据无跨实例半截写风险。
+                if _il._depth_by_path.get(lock_key, 0) > 0:
+                    with _IO_LOCK:
+                        return func(*args, **kwargs)
+                holder_pid = exc.holder_pid
+                if holder_pid == os.getpid():
+                    with _IO_LOCK:
+                        return func(*args, **kwargs)
                 _time.sleep(0.05)
-        # 1s 仍被占：按无数据降级（读路径的 None/[] 语义），不抛——UI 面不因锁弹错
+        # 1s 仍被占（真跨实例）：按无数据降级（读路径的 None/[] 语义），不抛——UI 面不因锁弹错
         logger.warning("project_manager: 读路径锁 1s 未取得（另一实例持有），按空数据降级: %s",
                        getattr(func, "__name__", "?"))
         return None if func.__name__ != "list_projects" else []
