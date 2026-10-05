@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""`_set_east_asian_font`（`src/questionnaire/exporters.py:238-251`）**静默回退面的观测现状**钉桩（s923-05）。
+"""`_set_east_asian_font`（`src/questionnaire/exporters.py` 内 `def _set_east_asian_font`）**静默回退面的观测现状**钉桩（s923-05）。
 
 出处：`zcode-bridge/done/s922-13-psy-exporters-docx.result.md:92-94`
 ——「CJK 字体设置可能一直在悄悄失败而无人知，**现有观测面为零（不抛、不 log）**。
@@ -269,7 +269,7 @@ def test_subtitle_kaiti_run_carries_eastasia_mapping() -> None:
 
 
 def test_run_fallback_append_would_land_rpr_after_text_and_stays_silent() -> None:
-    """**附带在册隐患**：`:245` 的 `etree.SubElement(style.element, qn("w:rPr"))` 是**尾插**。
+    """**附带在册隐患**：`etree.SubElement(style.element, qn("w:rPr"))` 这行（唯一文本锚＝尾插 rPr）是**尾插**。
 
     run 元素里 `w:rPr` 必须是**首子元素**；若哪天有人在设任何字体属性之前先调这个 helper，
     rPr 会被插到 `w:t` 之后 —— 不抛、不 log、能存能读回（本例前半段），

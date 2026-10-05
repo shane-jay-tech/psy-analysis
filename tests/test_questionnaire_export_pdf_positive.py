@@ -71,7 +71,7 @@ def _design() -> dict:
 
 @requires_cjk_renderer
 def test_positive_branch_returns_nonempty_pdf_bytes_with_magic_header() -> None:
-    """任务的正题：正常分支出**非空**字节且以 `%PDF` 头开头（:268-435 全跑通、`pdf.output()` 有货）。
+    """任务的正题：正常分支出**非空**字节且以 `%PDF` 头开头（「研究问题」到「附录」全段跑通、`pdf.output()` 有货）。
 
     降级桩给不出这条证据 —— 它只证明「抛得对」，不证明「不抛时出的是能开的文件」。
     """
@@ -85,7 +85,7 @@ def test_positive_branch_returns_nonempty_pdf_bytes_with_magic_header() -> None:
 
 @requires_cjk_renderer
 def test_positive_branch_actually_embeds_a_cjk_font_program() -> None:
-    """正向分支独有价值：`:274-275` 的两次 `add_font` 要把字体程序真的嵌进 PDF。
+    """正向分支独有价值：`add_font` 的两次调用（字体程序嵌入段，唯一文本锚＝`add_font(font_name`）要把字体程序真的嵌进 PDF。
 
     断的是 `/FontFile2`（TrueType 字体流）与 `/CIDFontType2` 存在，
     **不**断 `/BaseFont` 的具体名字 —— 子集前缀（`MPDFAA+` 之类）每次随机、
