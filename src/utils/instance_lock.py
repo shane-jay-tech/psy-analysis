@@ -15,7 +15,7 @@ import os
 import time
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 LOCK_FILENAME = ".psy_project.lock"
@@ -129,7 +129,10 @@ def project_lock(lock_dir, *, stale_seconds: float = DEFAULT_STALE_SECONDS):
             raise ProjectLockedError(str(lock_path), holder_pid or -1, holder_since)
     if fd is None:
         raise ProjectLockedError(str(lock_path), -1, "")
-    os.write(fd, f"{os.getpid()} {datetime.now().isoformat(timespec='seconds')}".encode("ascii"))
+    # s1002-17（s924-63 推荐案 A 第 2 步）：内容戳改 tz-aware UTC——naive 本地时间在
+    # 跨时区/夏令时场景会产生 8h 级偏差读数（矿源 R3 实测），且与仓内先例
+    # lock_manager.py:244（datetime.now(timezone.utc)）收敛同口径。
+    os.write(fd, f"{os.getpid()} {datetime.now(timezone.utc).isoformat(timespec='seconds')}".encode("ascii"))
     os.close(fd)
     _depth_by_path[key] = 1
     try:

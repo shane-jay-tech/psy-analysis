@@ -51,7 +51,11 @@ def test_lock_file_contains_pid_and_timestamp(lock_dir):
         text = Path(lp).read_text(encoding="utf-8")
         pid_str, since = text.split(" ")
         assert int(pid_str) == os.getpid()
-        assert "T" in since  # ISO 时间戳
+        # s1002-17 加严（s924-63 遗留 1：原 "T" in since 零判别力）——内容戳必须是
+        # tz-aware UTC ISO 串：含日期 T 分隔＋末尾 +00:00 时区偏移。
+        assert "T" in since
+        assert since.endswith("+00:00"), f"内容戳应为 tz-aware UTC（…+00:00），实得 {since!r}"
+        assert "T" in since and "+" in since.split("T")[1]
 
 
 def test_same_process_reentrant(lock_dir):
