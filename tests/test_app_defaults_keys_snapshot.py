@@ -17,8 +17,9 @@
 autosave atexit / 项目扫描），`tests/conftest.py::isolate_streamlit_app_test_storage` 的存在正是因为它
 要重定向用户存储；而本用例只需 `_defaults` 的**键字面量**，AST 读同一份磁盘源码零副作用、等价、且不依赖隔离夹具。
 
-普查结论 2 的反证见 `test_polished_draft_absence_is_a_noop_for_the_guard`：`polished_draft`
-（及 `analysis_pipeline`）本就不在 `_defaults`，删除它们对快照零影响。
+【s1002-14 更新】普查结论 2 的两键已按遗留 2 建议补进 `_defaults`（analysis_pipeline/
+polished_draft，27→29 键），下面的反证例 `test_polished_draft_absence_is_a_noop_for_the_guard`
+随之上翻为「在册键删除必翻红」的元验证形态。
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ EXPECTED_DEFAULTS_KEYS: list[str] = [
     "_wizard_return",
     "analysis_history",
     "analysis_output",
+    "analysis_pipeline",
     "archive_tag",
     "df",
     "env_status",
@@ -48,6 +50,7 @@ EXPECTED_DEFAULTS_KEYS: list[str] = [
     "onboarding_completed",
     "output_language",
     "paper_engine",
+    "polished_draft",
     "plan",
     "privacy_accepted",
     "questionnaire_design",
@@ -99,7 +102,7 @@ def test_defaults_keys_match_snapshot_three_way() -> None:
     )
     # 基数即当前实测值（先跑 `python -c "import app;print(len(app._defaults))"` 打印再固化）。
     # 27 由 len(EXPECTED) 现算并被上面的基数等绑回磁盘，不是游离魔数。
-    assert len(expected) == 27, "固化清单自身长度漂移（应与工作树实测 27 键一致）"
+    assert len(expected) == 29, "固化清单自身长度漂移（s1002-14 后应为 29 键：27+analysis_pipeline/polished_draft）"
 
 
 def test_key_removal_would_flip_the_guard() -> None:
@@ -112,14 +115,13 @@ def test_key_removal_would_flip_the_guard() -> None:
         assert len(dropped) == len(EXPECTED_DEFAULTS_KEYS) - 1
 
 
-def test_polished_draft_absence_is_a_noop_for_the_guard() -> None:
-    """反证（普查结论 2）：polished_draft / analysis_pipeline 本就不在 _defaults 表内，
-    「删 polished_draft」对补种快照零影响——它靠函数内就地 in 守卫自补种，不归 _defaults 管。"""
+def test_polished_draft_and_analysis_pipeline_now_seeded_and_guarded() -> None:
+    """【s1002-14 翻正】两键已按普查遗留 2 补进 _defaults（27→29）：
+    在册后「删除任一键」对三向等式必翻红（升级为全局不变量的本体验证）。"""
     actual = set(_defaults_keys())
-    assert "polished_draft" not in actual
-    assert "analysis_pipeline" not in actual
-    # 因为它不在表内，把它从快照里「删掉」是恒等操作；若有人把它塞进 _defaults，此断言即翻红。
-    assert actual - {"polished_draft"} == actual
+    assert "polished_draft" in actual and "analysis_pipeline" in actual
+    dropped = actual - {"polished_draft", "analysis_pipeline"}
+    assert dropped != actual and len(dropped) == len(actual) - 2
 
 
 def test_every_expected_key_is_a_string_literal() -> None:

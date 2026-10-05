@@ -93,6 +93,11 @@ _defaults = {
     "questionnaire_design": None,
     "paper_engine": None,
     "experiment_engine": None,
+    # s1002-14（s922-04 普查遗留 2）：属性式读点的两键升级为全局补种
+    # （undergrad_wizard.py:3571 读 polished_draft；pipeline_manager.py:65 查 analysis_pipeline），
+    # 必置从函数局部不变量升级为全局不变量。
+    "analysis_pipeline": None,
+    "polished_draft": None,
     # v4.4: LLM 配置统一走顶部「🤖 AI 模型」selectbox + D:\code\.env.local
     "quick_model_id": "",
     "onboarding_completed": False,
