@@ -309,3 +309,71 @@ class TestTruncateBoundary:
     def test_prefix_is_preserved_for_long_text(self):
         text = "".join(str(i % 10) for i in range(40))
         assert K._truncate(text, 12) == text[:12] + "..."
+
+
+# ============================================================================
+# s1002-03：LLM 降级分支悬空导入修复（原 `from config.llm_providers import
+# get_provider_config` 符号不存在 ⇒ ImportError 被 search_kb 的 except 吞掉，
+# 构念库 LLM 降级搜索恒返回空）。现接入现役无头配置源 resolve_headless_model。
+# 零联网：urlopen 全程替身；无配置态走显式空支，不发任何请求。
+# ============================================================================
+
+class TestSearchViaLlmConfigResolution:
+    def test_no_llm_config_returns_explicit_empty_without_import_error(self, monkeypatch):
+        """无 LLM 配置（resolve=None）：不抛 ImportError、走显式空支返回 []。"""
+        from src.literature_feed.extract import headless_llm
+
+        monkeypatch.setattr(headless_llm, "resolve_headless_model", lambda: None)
+        assert K._search_via_llm("测试构念X", "态度") == []
+
+    def test_config_present_happy_path_parses_canned_response(self, monkeypatch):
+        """配置在（fake cfg）+ urlopen 替身：返回结构 = llm_generated 单条包装，零联网。"""
+        import io as _io
+        import json as _json
+        import urllib.request as _urllib
+
+        from src.literature_feed.extract import headless_llm
+
+        fake_cfg = {"api_key": "fake-key", "model": "fake-model",
+                    "base_url": "https://example.invalid/v1"}
+        monkeypatch.setattr(headless_llm, "resolve_headless_model", lambda: fake_cfg)
+
+        canned = {"choices": [{"message": {"content": _json.dumps({
+            "name_zh": "测试构念X", "definition": "合成定义",
+        })}}]}
+
+        class _FakeResp:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def read(self):
+                return _json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        captured = {}
+
+        def fake_urlopen(req, timeout=None):
+            captured["url"] = req.full_url
+            captured["auth"] = req.headers.get("Authorization")
+            return _FakeResp(canned)
+
+        monkeypatch.setattr(_urllib, "urlopen", fake_urlopen)
+        results = K._search_via_llm("测试构念X", "态度")
+        assert len(results) == 1
+        assert results[0]["source"] == "llm_generated"
+        assert results[0]["construct"]["name_zh"] == "测试构念X"
+        assert captured["url"].startswith("https://example.invalid/v1")
+        assert "fake-key" in captured["auth"]          # 走的是注入 cfg 的 key
+        # 零落盘：不写真实缓存（缓存写在 search_kb 层，本函数无 IO）
+
+    def test_dangling_import_symbol_gone_from_source(self):
+        """回归钉：悬空符号不再出现在 kb_search 源码（修复本体）。"""
+        import inspect
+        src = inspect.getsource(K)
+        assert "from config.llm_providers import" not in src   # 悬空导入语句本体
+        assert "resolve_headless_model" in src

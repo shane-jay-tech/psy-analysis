@@ -235,9 +235,13 @@ def _search_crossref(construct_name: str, domain: str = "") -> List[Dict]:
 
 def _search_via_llm(construct_name: str, domain: str = "") -> List[Dict]:
     """通过LLM查询文献信息（降级方案）"""
-    from config.llm_providers import get_provider_config
+    # s1002-03 修复：原处从 config.llm_providers 悬空导入 get_provider_config（该符号不存在
+    # ⇒ ImportError 被 :105 的 except 吞掉 ⇒ LLM 降级搜索恒返回空）。
+    # 现接入仓内现役无头配置源 resolve_headless_model（.env.local 四组回退链），
+    # 未配置时返回 None ⇒ 显式空结果，语义不变但功能恢复。
+    from src.literature_feed.extract.headless_llm import resolve_headless_model
 
-    provider = get_provider_config("deepseek")
+    provider = resolve_headless_model()
     if not provider or not provider.get("api_key"):
         return []
 
