@@ -15,16 +15,32 @@ np.random.seed(42)
 
 
 def _repo_root() -> Path:
-    """仓库根：正常脚本运行按 __file__ 锚定；沙箱 exec 退回 cwd。
+    """仓库根：正常脚本运行按 __file__ 锚定；沙箱 exec（无 __file__）逐层向上找
+    含 ``tests/fixtures/golden_stats`` 标记目录的父目录，找不到当场 raise。
 
     退回分支不是多余的：tests/test_cfa_sem_golden.py::TestGeneratorReproducibility
     把本文件源码以「只有 __name__ 的 globals」exec 进沙箱（见该件 :59-80 的
     「不给 __file__ 等模块上下文」口径）来验可复现性，且把 DataFrame.to_csv
     换成内存捕获、只按文件名认产物。若这里裸写 __file__，沙箱会 NameError，
     那 4 例可复现性钉桩会当场连坐。
+
+    s1002-04 收紧：退回分支原为 ``Path.cwd()``——cwd 是仓外目录时会把 golden
+    写到错误的绝对路径（s922-16 病灶的沙箱侧变体）。现改为向上找标记目录，
+    找不到就 RuntimeError（宁可当场报错，也不猜路径写盘；s924-13 口径）。
     """
     here = globals().get("__file__")
-    return Path(here).resolve().parents[1] if here else Path.cwd()
+    if here:
+        return Path(here).resolve().parents[1]
+
+    marker = ("tests", "fixtures", "golden_stats")
+    cwd = Path.cwd().resolve()
+    for cand in (cwd, *cwd.parents):
+        if (cand.joinpath(*marker)).is_dir():
+            return cand
+    raise RuntimeError(
+        f"仓库根解析失败：cwd 链上找不到含 tests/fixtures/golden_stats 的目录（cwd={cwd}）。"
+        "拒绝猜测路径写盘。"
+    )
 
 
 GOLDEN_ROOT = _repo_root() / "tests" / "fixtures" / "golden_stats"

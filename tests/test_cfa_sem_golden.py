@@ -65,6 +65,9 @@ def _run_generator_in_sandbox() -> dict:
     """exec 生成器源码，但把 ``DataFrame.to_csv`` 换成内存捕获，返回 {落点名: CSV 文本}。
 
     不给 ``__file__`` 等模块上下文（源码不依赖），并确保异常直接抛出而不是被静默吞掉。
+    s1002-04 口径更新：沙箱态下 ``_repo_root`` 退回分支**不再用 cwd 兜底**——改为从 cwd
+    逐层向上找含 ``tests/fixtures/golden_stats`` 的父目录；pytest 的 cwd=仓库根 ⇒ 命中本仓，
+    找不到则 RuntimeError（拒绝猜路径写盘）。本沙盘不落盘，实际路径只进内存捕获键名。
     """
     source = GENERATOR.read_text(encoding="utf-8")
     captured: dict = {}
