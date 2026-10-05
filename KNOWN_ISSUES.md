@@ -15,7 +15,7 @@
 > 自动保存原子写盘、Kaleido 浏览器回退及版本/隐私声明统一，详见
 > `docs/history/UPGRADE_REPORT_V5.10.md`。
 >
-> 历史 v3.x 记录见 `UPGRADE_REPORT_V3.0.md` ~ `UPGRADE_REPORT_V3.9.md`，
+> 历史 v3.x 记录见 `docs/history/UPGRADE_REPORT_V3.0.md` ~ `docs/history/UPGRADE_REPORT_V3.9.md`，
 > v4.x 决策见 `docs/decisions/2026-05-23-*.md` 与 `2026-05-26-*.md`。
 
 ---
@@ -36,6 +36,13 @@
 | **v4.6.b** | 冗余清理：A 类 ~1500 行 src 死代码 + B 类 legacy 函数 + F2/F3 用户视角冗余 | `docs/decisions/2026-05-26-redundancy-audit.md` |
 
 **测试基线**：v3.9 (1140) → v4.0 (1166) → v4.1+4.2 (1208) → v4.3 (1222) → v4.4 (1253) → v4.5 (1260) → v4.6.a (1260) → v4.6.b (1235) → v5.11 当前 3306 个离线收集项（复现：.venv/Scripts/python.exe -m pytest --collect-only -q -m "not online"，2026-09-21 复测；轨迹 2644@09-17→3297@09-21 傍晚→3306@09-21 深夜，增量来自 s920/s921/s922 批纯测试单）。
+
+> **📊 口径更新（2026-10-02 追加，s930-41；段内订正＋日期注记形状）**：上列 3306@09-21 与 `-m "not online"` 单口径为**历史值**。现值三读（系统侧 python 3.12.9，2026-10-02 09:xx 实测）：
+> - 全量：`python -m pytest --collect-only -q` → **5636**
+> - `-m "not online"`：**5606**（deselect 30）
+> - `-m "not (e2e or playwright)"`：**5600**（deselect 36——浏览器 11 例在 `.venv` 侧不收集，见 tests/test_interpreter_collect_gap_s93007.py 钉；`-m "not slow"` 已成**空口径**：`pytest.mark.slow` 注册与使用均零命中，任何「全量 = not slow」引用属陈旧）
+> - 沙盒环境要求：playwright 仅系统侧安装（`D:\ms-playwright`），纯 `.venv` 侧不收集浏览器族。
+> 三数并列**勿混用**（旧 3306 系 09-21 单口径时点值，与现值差＝s922 之后的测试增量+e2e 面）。
 
 ---
 
@@ -124,6 +131,8 @@
 | 最大行数约 100 万行 | 大表运算变慢 | 可能变慢但不崩溃 |
 | 分类变量水平数 | 超过 10 级时提醒 | 无硬限制，仅提示 |
 | 缺失值默认 listwise | 分析样本缩减 | 提示缺失比例 |
+
+> **执行纪律（s1004-25 入档，源 s930-09 回归教训）**：改共享模块的**用户可见文案**（错误提示/警告/日志串）前，必须先 `rg -n "<文案原文片段>" tests/` 全仓核对该文案的钉桩面（含断言串/正则/快照期望），并把命中的测试件**点名写进任务书**随改随跑。案例：s930-09 改 lock_manager 的 stale 文案（「1s (<1 min)」秒级化）只跑了本件、漏 grep `test_lock_stale_boundary.py` 钉桩件致红，s930-48 同笔翻钉复绿（双件 43 passed）——事故链见 `zcode-bridge/done/s930-09.result.md` 与 `zcode-bridge/done/s930-48.result.md`。
 
 > 2026-09-09（pm30）：其余四节（环境边界/方法支持分层/安全与隐私边界）已由 docs/KNOWN_LIMITATIONS.md 迁入本文件（映射依据 docs/insights/known-issues-doc-alignment-20260905.md）；KL 自此为对外派生口径页，以本文件为准。
 
