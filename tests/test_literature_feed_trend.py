@@ -13,14 +13,26 @@ from pathlib import Path
 
 import pytest
 
+_FEED_PACKAGE_PREFIX = "src.literature_feed"
+
 
 @pytest.fixture
 def feed_root(tmp_path, monkeypatch):
     monkeypatch.setenv("LITERATURE_FEED_DATA_ROOT", str(tmp_path))
     import sys
-    for mod in list(sys.modules):
-        if mod.startswith("src.literature_feed"):
-            del sys.modules[mod]
+    # s1002-06 窄口径化：宽口径驱逐（删全部 src.literature_feed* 不还原）会与
+    # 「模块期 import＋monkeypatch 模块属性」的兄弟件互撞（s924-29 根因面）。
+    # 照 test_feed_panel_trending_override 的快照-还原模式：驱逐前留还原点，
+    # teardown 先清本夹具新建的模块再整体还原。
+    _feed_snapshot = {k: v for k, v in sys.modules.items() if k.startswith(_FEED_PACKAGE_PREFIX)}
+    for _name in _feed_snapshot:
+        del sys.modules[_name]
+    try:
+        yield tmp_path
+    finally:
+        for _name in [k for k in sys.modules if k.startswith(_FEED_PACKAGE_PREFIX)]:
+            del sys.modules[_name]
+        sys.modules.update(_feed_snapshot)
     return tmp_path
 
 
