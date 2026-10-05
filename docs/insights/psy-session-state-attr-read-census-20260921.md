@@ -378,3 +378,25 @@ $ git diff --numstat -- app.py                                                  
    本档结论 1 那句"这 27 个键"从**指代**变成**清单**，使三份可比对拍。
 5. 红线自查：本确节不涉统计数值／效应量／p 值判定；键名一律先 grep 再引（盘上无 `analysis_ready`，真名 `analysis_recipe`，与本单无关）。
 
+
+
+## 附：现盘重取订正节（s930-53，2026-10-03 重取 / 主班 2026-10-04 落盘）
+
+**结论一行**：src 侧 22 个锚点全齐——无漂移 12 条、漂移 10 条（另：本档 :258 同句点名的 workspace.py 恢复路径两点亦漂，见附注）。
+
+| 文件 | 档记行号 | 现值行号 | 漂移量 | 可复跑 grep 证据（命令原文＋命中行） |
+|---|---|---|---|---|
+| src/ui/paper_writing_ui.py | :596 | :591 | −5 | `$ grep -n "提示导入" src/ui/paper_writing_ui.py` → `591:    # 如果没有分析结果但有分析输出，提示导入` |
+| src/ui/questionnaire_panel.py | :94 | :104 | +10 | `$ grep -n "index=0 if" src/ui/questionnaire_panel.py` → `104: index=0 if st.session_state.language == "zh" else 1,` |
+| src/ui/questionnaire_panel.py | :98 | :108 | +10 | `$ grep -n "if lang != st.session_state.language" src/ui/questionnaire_panel.py` → `108: if lang != st.session_state.language:` |
+| src/ui/questionnaire_panel.py | :440 | :451 | +11 | `$ grep -n "questionnaire_design is not None" src/ui/questionnaire_panel.py` → `451:    if st.session_state.questionnaire_design is not None:` |
+| src/ui/questionnaire_panel.py | :441 | :452 | +11 | `$ grep -n "design = st.session_state.questionnaire_design" src/ui/questionnaire_panel.py` → `452:        design = st.session_state.questionnaire_design` |
+| src/ui/undergrad_wizard.py | :302 | :306 | +4 | `$ grep -n 'undergrad_wizard_data.get("analysi' src/ui/undergrad_wizard.py` → `306: output = st.session_state.undergrad_wizard_data.get("analysis_output"…` |
+| src/ui/undergrad_wizard.py | :1939 | :1942 | +3 | `$ grep -n '"undergrad_wizard_data" in st.session_state' src/ui/undergrad_wizard.py` → `1942: if "undergrad_wizard_data" in st.session_state:` |
+| src/ui/undergrad_wizard.py | :2269 | :2272 | +3 | `$ grep -n '_wizard_return" is not None' src/ui/undergrad_wizard.py` → `2272: if st.session_state.get("_wizard_return") is not None:` |
+| src/ui/undergrad_wizard.py | :3567 | :3571 | +4 | `$ grep -n "polished_draft is not None" src/ui/undergrad_wizard.py` → `3571: if st.session_state.polished_draft is not None:` |
+| src/ui/undergrad_wizard.py | :3570 | :3574 | +4 | `$ grep -n "st.markdown(st.session_state.polished_draft)" src/ui/undergrad_wizard.py` → `3574: st.markdown(st.session_state.polished_draft)` |
+
+**workspace.py 两点漂移附注**：本档 :258 同句点名的恢复路径两点（档记 :594-601 / :606-611）——现 `def restore_workspace` 在 **:614** 起（`$ grep -n "def restore_workspace" src/utils/workspace.py` → `614:def restore_workspace(loaded: Dict[str, Any]) -> int:`），整体下移约 +21/-20；按 def 行现取即可。
+
+本节现值以 2026-10-03 现盘为准；再取请重跑证据列 grep（本班 2026-10-06 抽三条复核逐条命中，见 outbox/20261004-010227-8091.result.md）。
