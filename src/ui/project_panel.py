@@ -60,8 +60,11 @@ def _save_active_then_load(target_id: str):
     if target_ws:
         try:
             restore_workspace(target_ws)
-        except Exception:
-            pass
+        except Exception as e:
+            # s1002-16（s924-62 遗留1）：静默 pass 改可观测横幅——
+            # 恢复失败（如 FutureSchemaError 拒载）必须让用户看见，不再静默降级成空态。
+            # 非重抛：维持「主流程不炸」的既有口径（拒载硬闸属人工裁决面）。
+            st.error(f"项目工作区恢复失败（{type(e).__name__}），已跳过恢复；数据文件未受影响。")
 
 
 def ensure_active_project_on_first_visit():
@@ -81,8 +84,11 @@ def ensure_active_project_on_first_visit():
         if ws:
             try:
                 restore_workspace(ws)
-            except Exception:
-                pass
+            except Exception as e:
+                # s1002-16（s924-62 遗留1）：静默 pass 改可观测横幅——
+                # 恢复失败（如 FutureSchemaError 拒载）必须让用户看见，不再静默降级成空态。
+                # 非重抛：维持「主流程不炸」的既有口径（拒载硬闸属人工裁决面）。
+                st.error(f"旧版 autosave 迁移：工作区恢复失败（{type(e).__name__}），已跳过恢复。")
         pm.set_active_project(st.session_state, migrated.id)
         return
 
@@ -95,8 +101,11 @@ def ensure_active_project_on_first_visit():
         if ws:
             try:
                 restore_workspace(ws)
-            except Exception:
-                pass
+            except Exception as e:
+                # s1002-16（s924-62 遗留1）：静默 pass 改可观测横幅——
+                # 恢复失败（如 FutureSchemaError 拒载）必须让用户看见，不再静默降级成空态。
+                # 非重抛：维持「主流程不炸」的既有口径（拒载硬闸属人工裁决面）。
+                st.error(f"最近项目工作区恢复失败（{type(e).__name__}），已跳过恢复。")
         pm.set_active_project(st.session_state, target.id)
         return
 
