@@ -183,7 +183,7 @@ def test_docx_ships_normally_while_cjk_mapping_missing_and_only_debug_records(ca
     强制 `_set_east_asian_font` 全程失败后：
     ① `export_to_docx` 照样出稿、不抛，**只在 DEBUG 面留 6 条记录**（s924-08 口径 A；
        条数＝调用次数，s924-09 补副标题楷体后由 5 变 6）；
-    ② 回读文档里 Normal 样式的 `w:ascii` **仍是「宋体」**（`:33` 设的），
+    ② 回读文档里 Normal 样式的 `w:ascii` **仍是「宋体」**（`rFonts.set(qn("w:ascii"), font_name)` 设的），
        所以任何只看 `style.font.name` 的检查都会**误判为"字体配好了"**；
     ③ 而 `w:eastAsia` 压根不存在 ⇒ 中文实际没拿到东亚字体映射。
     ②③ 之差就是"常量说谎"的现场，也是本件存在的理由。
@@ -211,8 +211,8 @@ def test_docx_ships_normally_while_cjk_mapping_missing_and_only_debug_records(ca
 def test_invalid_font_name_is_not_a_failure_at_all_and_lands_verbatim() -> None:
     """**否证**任务书口径「monkeypatch 字体名为必失败值」：字体名根本**不校验**。
 
-    `:249` 只做 `rFonts.set(qn("w:eastAsia"), font_name)` —— 任意字符串都塞得进去，
-    不抛 ⇒ 走不到 `:250-251` 的 except。于是「字体名写错」这一类比"结构化失败"**更安静**：
+    函数主体只做 `rFonts.set(qn("w:eastAsia"), font_name)` —— 任意字符串都塞得进去，
+    不抛 ⇒ 走不到函数尾部的 except。于是「字体名写错」这一类比"结构化失败"**更安静**：
     它连失败都不算，直接把错值写进 XML，等到 Word 打开才现形。
     故本件的失败桩改用 `fail_cjk_lookup`（制造真异常），而不是任务书说的"必失败字体名"。
     """
@@ -274,7 +274,7 @@ def test_run_fallback_append_would_land_rpr_after_text_and_stays_silent() -> Non
     run 元素里 `w:rPr` 必须是**首子元素**；若哪天有人在设任何字体属性之前先调这个 helper，
     rPr 会被插到 `w:t` 之后 —— 不抛、不 log、能存能读回（本例前半段），
     但产物不符 OOXML 元素序，Word 侧行为未定义。
-    今天**没踩到**是因为 `:51-53` 先设了 size/bold/name，rPr 已由 python-docx 按正确位置建好
+    今天**没踩到**是因为前文先设了 size/bold/name，rPr 已由 python-docx 按正确位置建好
     （本例后半段把"今天是对的"一起钉住，防止有人反过来改）。
     """
     doc = Document()
