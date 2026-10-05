@@ -88,6 +88,36 @@ def _locked(func):
     return wrapper
 
 
+def _read_locked(func):
+    """读路径锁（s1002-28，s923-44 遗留 1）：四读路径纳入锁语义。
+
+    矿源缺口：list_projects/get_project/load_workspace/migrate_legacy_autosave 四读
+    不经 OS 锁 ⇒ 另一实例写索引/工作区的中途可能读到旧帧（_atomic_write_json 的
+    os.replace 已挡大部分，但读旧帧仍会造成「切项目看不到新项目」类不一致）。
+
+    实现约束：在册门禁 test_instance_lock_alert_gap_pin::
+    test_only_production_consumer_is_project_manager 钉 src/ 下 project_lock 调用
+    **恰好 1 处** ⇒ 本装饰器不新建锁调用，改为**委托 _locked**（复用同一唯一锁点，
+    project_lock 可重入语义让嵌套安全：load_workspace→get_project 双读嵌套不死锁）。
+    被占时**不抛**（设计稿回退节「读操作给只读逃生口」）：短暂自旋后按空数据降级。
+    """
+    locked_fn = _locked(func)
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        import time as _time
+        for attempt in range(20):
+            try:
+                return locked_fn(*args, **kwargs)
+            except ProjectLockedError:
+                _time.sleep(0.05)
+        # 1s 仍被占：按无数据降级（读路径的 None/[] 语义），不抛——UI 面不因锁弹错
+        logger.warning("project_manager: 读路径锁 1s 未取得（另一实例持有），按空数据降级: %s",
+                       getattr(func, "__name__", "?"))
+        return None if func.__name__ != "list_projects" else []
+    return wrapper
+
+
 def _now_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -184,6 +214,7 @@ def _write_index(projects: List[Project]):
 # 公共 API
 # --------------------------------------------------------------------------- #
 
+@_read_locked
 def list_projects() -> List[Project]:
     """返回所有项目，按 updated_at 倒序（最近访问的在前）。"""
     projects = _read_index()
@@ -191,6 +222,7 @@ def list_projects() -> List[Project]:
     return projects
 
 
+@_read_locked
 def get_project(project_id: str) -> Optional[Project]:
     for p in _read_index():
         if p.id == project_id:
@@ -308,6 +340,7 @@ def save_workspace(project_id: str, workspace: Dict[str, Any]) -> bool:
         return False
 
 
+@_read_locked
 def load_workspace(project_id: str) -> Optional[Dict[str, Any]]:
     proj = get_project(project_id)
     if proj is None or not proj.file_path.exists():
@@ -324,6 +357,7 @@ def load_workspace(project_id: str) -> Optional[Dict[str, Any]]:
 # v3.0 → v3.1 迁移：把旧 ~/.psy_analysis/autosave.json 转为「未命名项目」
 # --------------------------------------------------------------------------- #
 
+@_read_locked
 def migrate_legacy_autosave() -> Optional[Project]:
     """把 v3.0 的 autosave.json 一次性迁移为新项目，返回新建的项目。
 
