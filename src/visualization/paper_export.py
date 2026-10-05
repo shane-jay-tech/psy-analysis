@@ -69,28 +69,14 @@ def _kaleido_available() -> bool:
 
 
 def _find_local_chromium() -> Path | None:
-    """寻找 Kaleido 可用的浏览器，优先 Chrome 与 Playwright Chromium。"""
-    configured = os.environ.get("BROWSER_PATH")
-    if configured:
-        configured_path = Path(configured)
-        if configured_path.is_file():
-            return configured_path
+    """寻找 Kaleido 可用的浏览器，优先 Chrome 与 Playwright Chromium。
 
-    candidates = [
-        Path(os.environ.get("PROGRAMFILES", "")) / "Google/Chrome/Application/chrome.exe",
-        Path(os.environ.get("PROGRAMFILES(X86)", "")) / "Google/Chrome/Application/chrome.exe",
-    ]
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if local_app_data:
-        playwright_root = Path(local_app_data) / "ms-playwright"
-        if playwright_root.is_dir():
-            candidates.extend(
-                sorted(
-                    playwright_root.glob("chromium-*/chrome-win*/chrome.exe"),
-                    reverse=True,
-                )
-            )
-    return next((path for path in candidates if path.is_file()), None)
+    s1004-32：实现抽至轻量件 ``src/utils/browser_detect.py``（零重型依赖），
+    供 env_check.check_kaleido 深检复用；此处 re-export 保持渲染路径与既有调用面不变。
+    """
+    from ..utils.browser_detect import find_local_chromium
+
+    return find_local_chromium()
 
 
 def _render_static_image(fig: go.Figure, **kwargs) -> bytes:

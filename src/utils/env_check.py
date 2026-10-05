@@ -14,6 +14,8 @@ import importlib.metadata
 import importlib.util
 from typing import Dict, List, Tuple
 
+from .browser_detect import find_local_chromium
+
 
 def _probe(package: str, import_name: str | None = None) -> Tuple[bool, str]:
     """探测包是否安装（find_spec 不执行模块代码，毫秒级）。
@@ -44,11 +46,20 @@ def check_semopy() -> Tuple[bool, str]:
 
 
 def check_kaleido() -> Tuple[bool, str]:
-    """检查 kaleido (Plotly 图表静态导出) 是否可用（仅探测，不 import）"""
+    """检查 kaleido + Chromium 渲染链（仅探测，不 import 重型依赖）。
+
+    三级契约（0e66 遗留：真渲染还要浏览器运行时，s1004-32 深检同笔）：
+    包缺 → False；包在浏览器缺 → False（可设 BROWSER_PATH / kaleido_get_chrome）；
+    全具备 → True（附浏览器名）。
+    """
     ok, msg = _probe("kaleido")
     if not ok:
         return False, "kaleido 未安装 — 论文版 PNG 导出不可用，HTML 导出正常"
-    return ok, msg
+    browser = find_local_chromium()
+    if browser is None:
+        return False, ("kaleido 已安装但未找到 Chrome/Chromium 渲染浏览器 — PNG 导出将失败；"
+                       "可设 BROWSER_PATH 或运行 kaleido_get_chrome，临时可导 HTML")
+    return True, f"kaleido 就绪（渲染浏览器：{browser.name}）"
 
 
 def check_factor_analyzer() -> Tuple[bool, str]:

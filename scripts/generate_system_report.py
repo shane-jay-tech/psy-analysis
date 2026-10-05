@@ -156,6 +156,14 @@ def gather_metrics():
             dep_status["pytest"] = True
         except ImportError:
             dep_status["pytest"] = False
+        # s1004-32（0e66 遗留）：kaleido 真渲染还要浏览器运行时，探测清单纳入
+        # Chromium 系浏览器层（与 env_check.check_kaleido 深检同笔同源）。
+        try:
+            from src.utils.browser_detect import find_local_chromium
+
+            dep_status["chrome_browser"] = find_local_chromium() is not None
+        except Exception:
+            dep_status["chrome_browser"] = False
     metrics["dependencies"] = dep_status
 
     return metrics
