@@ -239,3 +239,38 @@ def test_cover_paragraph_and_indent_family_numbers(artifact) -> None:
     assert all(q.paragraph_format.first_line_indent.cm == pytest.approx(0.74, abs=TWIPS_GRANULARITY_CM)
                for q in indented) and len(indented) == 10
     assert Cm(1).twips == 567                                       # 换算自证，防"数字抄错"
+
+
+# ═══════ 5b. Heading3 sz→szCs 联动扰动刀（s1002-12 堵"szCs 写死 28 恒绿"盲区） ═══════
+def test_heading3_szcs_is_derived_from_sz_not_hardcoded(monkeypatch) -> None:
+    """s924-10 遗留 4：Heading3 档对「把 szCs 写死成 28」恒绿——因为 H3 的 sz 恰好也是 28。
+
+    堵法＝**测试态扰动**：monkeypatch 本模块对 exporters.Pt 的引用路径不可行（Pt 在
+    exporters 内 from-import），故 patch exporters 命名空间里的 Pt，把 H3 的 Pt(14)
+    偷换成 Pt(18) ⇒ w:sz=36。真联动（szCs := sz）⇒ szCs=36；写死 28 的假联动 ⇒ szCs=28。
+    只动测试态，零生产码改动，monkeypatch 用例结束自动还原。
+    """
+    import docx.shared as _shared
+    real_pt = _shared.Pt
+    calls = {"n": 0}
+
+    def pt_shifter(v):
+        # exporters 的 heading 循环按 {1:22, 2:16, 3:14} 调 Pt；把 14 的调用（H3）换成 18。
+        # Pt 在 exporters 内函数级 from-import ⇒ 只能 patch 源头 docx.shared.Pt
+        # （monkeypatch 用例结束自动还原；Normal 的 Pt(12) 与封面 Pt 不受影响）。
+        calls["n"] += 1
+        if v == 14:
+            return real_pt(18)
+        return real_pt(v)
+
+    monkeypatch.setattr(_shared, "Pt", pt_shifter)
+    blob = exporters.export_to_docx(_design())
+    with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+        styles_xml = zf.read("word/styles.xml").decode("utf-8")
+    h3 = _style_xml(styles_xml, "Heading3")
+    sz = re.findall(r'<w:sz w:val="(\d+)"/>', h3)
+    szcs = re.findall(r'<w:szCs w:val="(\d+)"/>', h3)
+    assert calls["n"] >= 3, "扰动未生效：Pt 调用次数异常"
+    assert sz == ["36"], f"H3 sz 扰动未生效：{sz}"
+    assert szcs == ["36"], (
+        f"H3 szCs 未跟随扰动后的 sz=36（实得 {szcs}）——联动被写成写死值，盲区回归")
