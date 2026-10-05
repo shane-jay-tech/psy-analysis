@@ -391,3 +391,59 @@ def test_break_stale_verdict_agrees_with_the_seam_readout(tmp_path):
     assert mgr.is_stale(now=fresh + 95) is False
     assert mgr.break_stale() is False                        # 同一判据，不删
     assert path.exists()
+
+
+# ---------------------------------------------------------------------------
+# s930-09：stat() OSError 优雅降级 ＋ stale for 0 min 截断文案修正
+# ---------------------------------------------------------------------------
+def test_is_stale_oserror_degrades_to_false(tmp_path, monkeypatch):
+    """s922-109 遗留 2 补覆盖：exists() 与 stat() 之间锁文件被删/权限拒绝
+    （stat() 抛 OSError）⇒ is_stale 优雅降级返回 False，不抛。"""
+    mgr = LockManager(_lock_file(tmp_path), ttl_seconds=60)
+    lf = mgr.lock_path
+    lf.write_text("x")                          # 先让 exists() 为真
+    real_stat = type(lf).stat
+
+    def _race_stat(self, *a, **k):
+        raise OSError("race deleted")           # exists() 已过、stat() 时文件被删
+
+    monkeypatch.setattr(type(lf), "stat", _race_stat)
+    assert mgr.is_stale() is False              # 优雅降级（修复前此处 OSError 上抛）
+
+
+def test_stale_under_one_minute_shows_seconds_not_zero_min(tmp_path, caplog):
+    """s922-109 遗留 4 文案修正：ttl<60s 时 age_min 恒 0，旧文案「stale for 0 min」
+    误导——<1 分钟改显式秒数。"""
+    import logging
+    mgr = LockManager(_lock_file(tmp_path), ttl_seconds=30)
+    mgr.lock_path.write_text("x")
+    os.utime(mgr.lock_path, (time.time() - 35, time.time() - 35))   # age=35s > ttl=30
+    with caplog.at_level(logging.WARNING):
+        assert mgr.is_stale(now=time.time()) is True
+    joined = "\n".join(r.getMessage() for r in caplog.records)
+    assert "stale for 35s (<1 min)" in joined, f"秒级文案未生效：{joined}"
+    assert "stale for 0 min" not in joined
+
+
+# ---------------------------------------------------------------------------
+# s1002-18（s924-70 遗留5）：追加累积形态下 _read_owner_pid 取最末条 pid
+# （原 re.search 取首条 ⇒ 持有者长期报成最老那位，矿源实测报 130036 而非 135684）。
+# ---------------------------------------------------------------------------
+
+def test_read_owner_pid_takes_last_of_appended_entries(tmp_path):
+    """多次 acquire 追加多条 pid= 行 ⇒ 读侧报最末条（最新持有者）。"""
+    lf = _lock_file(tmp_path)
+    lf.write_bytes(b"x")  # byte 0 锁字节 sentinel
+    with open(lf, "ab") as fh:
+        fh.write(b"\npid=130036 acquired_at=2026-09-01T08:00:00+00:00\n")
+        fh.write(b"\npid=135684 acquired_at=2026-09-30T09:00:00+00:00\n")
+    mgr = LockManager(lf)
+    assert mgr._read_owner_pid() == 135684
+
+
+def test_read_owner_pid_single_entry_unchanged(tmp_path):
+    """单条形态回归：行为与修前一致。"""
+    lf = _lock_file(tmp_path)
+    lf.write_bytes(b"x\npid=42 acquired_at=2026-09-30T09:00:00+00:00\n")
+    mgr = LockManager(lf)
+    assert mgr._read_owner_pid() == 42

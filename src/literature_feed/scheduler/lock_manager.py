@@ -78,8 +78,11 @@ class LockManager:
                 text = fh.read().decode("utf-8", errors="replace")
         except OSError:
             return None
-        m = re.search(r"pid=(\d+)", text)
-        return int(m.group(1)) if m else None
+        # s1002-18（s924-70 遗留5）：追加累积形态下取**最末条** pid——re.search 取首条
+        # 会把持有者长期报成最老那位（矿源实测报 130036 而非 135684）。可读性修复，
+        # TTL/is_stale/break_stale 锁语义零改动。
+        matches = re.findall(r"pid=(\d+)", text)
+        return int(matches[-1]) if matches else None
 
     def _owner_suffix(self) -> str:
         """给"抢锁失败"补一句是谁占着——读不到就当 unknown，绝不因为取信息而改变结论。"""
@@ -145,9 +148,11 @@ class LockManager:
                 同一次调用的 age 与告警里的 age_min 共用这一个读数；旧版调了两次
                 ``time.time()``，两个值之间夹着 stat 与字符串格式化，会差出调度抖动。
         """
-        if not self.lock_path.exists():
-            return False
         try:
+            # s930-09：exists() 也可能因竞态/权限抛 OSError（3.12 Path.exists 不兜
+            # 全部 OSError 形态）——并入本 try，stat() 分支一并优雅降级（s922-109 遗留 2）。
+            if not self.lock_path.exists():
+                return False
             mtime = self.lock_path.stat().st_mtime
         except OSError:
             return False
@@ -157,9 +162,13 @@ class LockManager:
         stale = age > self.ttl_seconds
         if stale:
             age_min = int(age / 60)
+            # s930-09：ttl<60s 时 age_min 恒 0 ⇒「stale for 0 min」截断文案误导
+            #（实际是 X 秒）；<1 分钟改显式秒数。
+            detail = (f"stale for {int(age)}s (<1 min)" if age_min < 1
+                      else f"stale for {age_min} min")
             self._alert_once(
                 "stale_lock",
-                f"lock={self.lock_path} stale for {age_min} min (ttl={self.ttl_seconds}s)",
+                f"lock={self.lock_path} {detail} (ttl={self.ttl_seconds}s)",
             )
         return stale
 
