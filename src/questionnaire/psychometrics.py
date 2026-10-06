@@ -2,6 +2,8 @@
 
 from typing import Dict
 
+from src.analysis import thresholds
+
 from src.analysis.reliability_bands import ACCEPTABLE, EXCELLENT, GOOD, UNACCEPTABLE
 
 
@@ -19,7 +21,7 @@ def content_validity_guidance(construct: dict) -> str:
             "**保障策略：**\n"
             "1. 基于明确的构念定义生成题目\n"
             "2. 邀请3-5名相关领域专家评审题目与构念的匹配度\n"
-            "3. 计算内容效度指数 (CVI)：专家评定\"相关\"的比例 ≥ 0.80 为可接受\n"
+            f"3. 计算内容效度指数 (CVI)：专家评定\"相关\"的比例 ≥ {thresholds.CVI.acceptable} 为可接受\n"
             "4. 检查题目是否覆盖了构念的所有理论维度（无遗漏、无冗余）"
         )
 
@@ -34,8 +36,8 @@ def content_validity_guidance(construct: dict) -> str:
         "1. **维度-题目匹配表**：将每道题映射到对应维度，确保没有维度被遗漏\n"
         "2. **专家评审法**：邀请3-5名相关领域专家评审：\n"
         "   - 每道题是否测量了目标维度？（1=不相关, 4=非常相关）\n"
-        "   - 计算内容效度指数 (I-CVI ≥ 0.78 为可接受)\n"
-        "   - 量表水平内容效度指数 (S-CVI/Ave ≥ 0.90)\n"
+        f"   - 计算内容效度指数 (I-CVI ≥ {thresholds.ICVI.acceptable} 为可接受)\n"
+        f"   - 量表水平内容效度指数 (S-CVI/Ave ≥ {thresholds.SCVI.acceptable})\n"
         "3. **认知访谈**：选取5-8名目标被试进行认知访谈，检验题目是否被正确理解\n"
         "4. **可读性检查**：确保题目语言适合目标人群的阅读水平\n"
         "   - 避免双重否定（如\"我不认为我不应该...\"）\n"
@@ -75,24 +77,24 @@ def construct_validity_guidance(construct: dict) -> str:
         "结构效度用于验证问卷的理论因子结构是否与实际数据吻合。\n",
         "**探索性因素分析 (EFA)：**\n"
         f"- 建议样本量：N ≥ {total_items * 10}（题目数的10倍以上，最少200）\n"
-        "- 前提检验：KMO ≥ 0.80 为良好，Bartlett球形检验p < 0.05\n"
+        f"- 前提检验：KMO ≥ {thresholds.KMO.good} 为良好，Bartlett球形检验p < 0.05\n"
         "- 抽取方法：主成分分析（PCA）或主轴因子法（PAF）\n"
         "- 旋转方法：理论上维度相关时用斜交旋转（如Promax），独立时用正交旋转（如Varimax）\n"
         "- 保留标准：特征值 > 1（Kaiser准则）+ 碎石图拐点\n"
         f"- 预期抽取 {n_dims} 个因子，解释总方差 ≥ 60%\n"
-        "- 保留标准：因子载荷 ≥ 0.40，交叉载荷 < 0.30\n\n"
+        f"- 保留标准：因子载荷 ≥ {thresholds.LOADING.good}，交叉载荷 < {thresholds.CROSS_LOADING}\n\n"
         "**验证性因素分析 (CFA)：**\n"
         "- 在EFA后用独立样本进行CFA验证\n"
         "- 拟合指标标准：\n"
         "  χ²/df < 3（良好）, < 5（可接受）\n"
-        "  CFI ≥ 0.90（可接受）, ≥ 0.95（良好）\n"
-        "  TLI ≥ 0.90（可接受）, ≥ 0.95（良好）\n"
-        "  RMSEA < 0.08（可接受）, < 0.05（良好）, 90%CI不包含0.08以上\n"
-        "  SRMR < 0.08（良好）\n\n"
+        f"  CFI ≥ {thresholds.CFA.acceptable}（可接受）, ≥ {thresholds.CFA.good}（良好）\n"
+        f"  TLI ≥ {thresholds.TLI.acceptable}（可接受）, ≥ {thresholds.TLI.good}（良好）\n"
+        f"  RMSEA < {thresholds.RMSEA.acceptable}（可接受）, < {thresholds.RMSEA.good}（良好）, 90%CI不包含{thresholds.RMSEA.acceptable}以上\n"
+        f"  SRMR < {thresholds.SRMR.good}（良好）\n\n"
         "**聚合效度与区分效度：**\n"
-        "- 平均方差抽取量 (AVE) ≥ 0.50 表示聚合效度良好\n"
+        f"- 平均方差抽取量 (AVE) ≥ {thresholds.AVE.acceptable} 表示聚合效度良好\n"
         "- AVE的平方根 > 维度间相关系数 表示区分效度良好\n"
-        "- 组合信度 (CR) ≥ 0.70"
+        f"- 组合信度 (CR) ≥ {thresholds.CR.acceptable}"
     ]
     return "\n".join(guidance)
 
@@ -114,7 +116,7 @@ def reliability_guidance(construct: dict) -> str:
         "4. 纠正题总相关 (CITC) < 0.30 的题目应考虑删除\n\n"
         "**重测信度：**\n"
         "- 间隔2-4周对同一批被试重测，计算两次得分的组内相关系数 (ICC)\n"
-        "- ICC ≥ 0.70 为可接受（适用于相对稳定的构念如人格）\n"
+        f"- ICC ≥ {thresholds.ICC.acceptable} 为可接受（适用于相对稳定的构念如人格）\n"
         "- 状态型构念（如焦虑、心情）的重测信度预期较低，属正常现象\n\n"
         "**分半信度：**\n"
         "- 将题目按奇偶序号分为两半，计算Spearman-Brown校正后的相关系数\n"

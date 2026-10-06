@@ -1,5 +1,7 @@
 """信度分析：Cronbach's α / 分半信度 / McDonald's ω / 组合信度 CR / ICC / 重测 / κ"""
 import pandas as pd
+
+from src.analysis import thresholds
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass, field
@@ -116,7 +118,8 @@ def split_half_reliability(df: pd.DataFrame, items: list) -> ReliabilityResult:
         n_items=n_items,
         n_cases=n_cases,
         split_half_r=round(r_half, 3),
-        warning="" if sb_r >= 0.70 else f"⚠ 分半信度={sb_r:.3f}，低于可接受水平（0.70）。",
+        warning="" if sb_r >= thresholds.SPLIT_HALF.good else (
+            f"⚠ 分半信度={sb_r:.3f}，低于可接受水平（{thresholds.SPLIT_HALF.good}）。"),
     )
 
 
@@ -172,10 +175,10 @@ def mcdonald_omega(df: pd.DataFrame, items: list,
     omega = round(omega, 3)
 
     warning = ""
-    if omega < 0.60:
-        warning = f"⚠ ω={omega} 低于可接受水平（0.60）。"
-    elif omega < 0.70:
-        warning = f"ω={omega} 处于探索性研究的可接受边界（0.60-0.70）。"
+    if omega < thresholds.OMEGA.acceptable:
+        warning = f"⚠ ω={omega} 低于可接受水平（{thresholds.OMEGA.acceptable}）。"
+    elif omega < thresholds.OMEGA.good:
+        warning = f"ω={omega} 处于探索性研究的可接受边界（{thresholds.OMEGA.acceptable}-{thresholds.OMEGA.good}）。"
 
     return ReliabilityResult(
         test_type="mcdonald_omega",
