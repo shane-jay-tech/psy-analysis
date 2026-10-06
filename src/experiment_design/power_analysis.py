@@ -487,7 +487,12 @@ def format_power_report(result: PowerResult) -> str:
 # ── 便捷函数 ──────────────────────────────────────────────
 
 def quick_sample_size(test_type: str, effect_size: float = 0.5) -> Dict:
-    """快速估算样本量，返回简洁字典。"""
+    """快速估算样本量，返回简洁字典。
+
+    欠配注意（s1004-05，s927-61 哨兵语义）：effect_size 欠配（如默认 0.5 遇极小效应）
+    时返回 n_total=0 且 solved=False 的哨兵字典——调用方必须检查 n_total 是否为 0，
+    直接拿 n_total 当样本量用会静默得到 0。
+    """
     result = calculate_sample_size(test_type, effect_size)
     return {
         "test": result.test_name_zh,
