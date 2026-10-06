@@ -253,8 +253,13 @@ def _extract_main_finding(abstract: str) -> str:
 def _extract_limitations(abstract: str) -> str:
     if not abstract:
         return ""
-    sentences = re.split(r"[。.!?！？]", abstract)
-    keywords = ["局限", "limitation", "limited", "constrained", "drawback", "caveat"]
+    # s1006-02（配方①归一）：与 _extract_summary 同款正则——数字后句点不切
+    # （「样本量为 0.5 万」不再截成「…为 0」，pd02 同族缺口修法）。
+    sentences = re.split(r"[。!?！？]|\.(?!\d)", abstract)
+    # s1006-02（配方②二元组扩充）：「未来研究需要…」漏检实锤补钉；单词「未来」
+    # 误命中高风险不收（:109 钉「未来单词不算局限」与此不冲突零翻红）。
+    keywords = ["局限", "limitation", "limited", "constrained", "drawback", "caveat",
+                "未来研究", "future research"]
     for s in sentences:
         s = s.strip()
         for kw in keywords:

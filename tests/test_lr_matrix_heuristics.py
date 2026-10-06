@@ -107,9 +107,11 @@ class TestExtractLimitations:
         assert _extract_limitations("结果稳健。本研究的局限在于样本来自单一高校。") == "本研究的局限在于样本来自单一高校"
 
     def test_future_word_alone_is_not_a_limitation(self):
-        # 任务书前提「局限/未来」实测**只认「局限」**：关键词表为
-        # 局限/limitation/limited/constrained/drawback/caveat，不含「未来」「future」
-        assert _extract_limitations("未来研究可采用纵向追踪设计以检验因果方向。") == ""
+        # s1006-02 配方②二元组扩充后翻正：「未来研究/future research」二元组入列 ⇒
+        # 「未来研究可…」句命中是配方本意（矿源实锤「未来研究需要…」漏检）。
+        # 「未来」单词仍不算：二元组要求「未来研究」连缀，单词「未来」不满足。
+        assert _extract_limitations("未来研究可采用纵向追踪设计以检验因果方向。") == "未来研究可采用纵向追踪设计以检验因果方向"
+        assert _extract_limitations("未来的方向尚不明确。") == ""
 
     def test_no_minimum_length_filter(self):
         # 与 _extract_main_finding 的关键差异：局限分支不做 len<10 过滤
