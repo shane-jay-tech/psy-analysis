@@ -6,13 +6,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import streamlit as st
 
 from src.literature_feed.review_queue_ui import (
     QueueItem,
-    QueueSummary,
     ReviewAction,
     REJECTION_REASON_LABELS,
     build_queue_items,
@@ -24,9 +23,7 @@ from src.literature_feed.review_queue_ui import (
     status_label,
 )
 from src.literature_feed.review_service import (
-    ReviewDecision,
     review_candidate,
-    bulk_review_candidates,
     list_review_events,
 )
 
