@@ -66,6 +66,15 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
+# s1004-14（s930-26 普查档案 2 落地）：数据面模块审计日志装配——幂等（重复装配跳过）、
+# propagate=False（审计行只落盘不上控制台）。失败不阻断 Streamlit 启动。
+try:
+    from src.utils.data_audit_logging import attach_to_data_modules
+
+    attach_to_data_modules()
+except Exception:  # noqa: BLE001
+    pass
+
 from src.ui.accessibility import render_accessibility_support
 from src.ui.design_system import render_design_system
 render_design_system()
