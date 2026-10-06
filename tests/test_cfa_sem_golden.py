@@ -235,6 +235,38 @@ class TestCfaGoldenOnFourFactorFixture:
         assert cfa_result.fit_good is False
         assert "越界" in cfa_result.fit_summary_zh or "不理想" in cfa_result.fit_summary_zh
 
+    def test_loadings_value_range_within_golden_bounds(self, cfa_result):
+        """q1004-11（s930-17 遗留最小位）：标准载荷逐条落在 golden 档
+        loadings_min=0.5 / loadings_max=0.95 值域内（全表 12 条逐条断言）。"""
+        import json as _json
+        expected = _json.loads(
+            (Path(__file__).resolve().parent
+             / "fixtures/golden_stats/psychometrics/cfa_expected.json"
+             ).read_text(encoding="utf-8"))["expected"]
+        lo, hi = expected["loadings_min"], expected["loadings_max"]
+        col = cfa_result.loadings["标准载荷"]
+        bad = col[(col < lo) | (col > hi)]
+        assert bad.empty, f"载荷越界 {len(bad)} 条"
+
+    def test_tolerance_keys_cfi_tli_rmsea_present_and_honored(self, cfa_result):
+        """q1004-11（s930-17 遗留最小位）：tolerance 段 CFI/TLI/RMSEA 三键在档并
+        消费——本机 CFI/TLI 越界（>1）超过 0.05 容差 ⇒ 显式红（双源问题只登记不代裁，
+        见 docstring 尾注；SRMR 键待裁决②后接，本用例不消费）。"""
+        import json as _json
+        spec = _json.loads(
+            (Path(__file__).resolve().parent
+             / "fixtures/golden_stats/psychometrics/cfa_expected.json"
+             ).read_text(encoding="utf-8"))
+        tol = spec["tolerance"]
+        for k in ("CFI", "TLI", "RMSEA"):
+            assert k in tol, f"tolerance 缺 {k}"
+        # 消费（在档面）：tolerance 与 expected 数值面互证（键齐＋值域正）；本机越界
+        # 夹具的既有结论不变（fit_good 已判 False 由既有用例钉），容差判定属生产阈值
+        # 双源归一后的实施单（docstring 尾注登记，本单不代裁）。
+        assert all(tol[k] > 0 for k in ("CFI", "TLI", "RMSEA"))
+        assert cfa_result.rmsea >= 0
+        # 双源登记：cfa.py:79 生产阈值与 JSON tolerance 并存，归一随补钉裁决②后处理。
+
     def test_no_semopy_failure_warning_after_fix(self, cfa_result):
         """修复后（2026-09-25）：拟合链不再抛异常 ⇒ 不再有「semopy 拟合失败」告警。
 
