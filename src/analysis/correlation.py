@@ -18,6 +18,17 @@ class CorrResult:
     ci_high_matrix: Optional[pd.DataFrame] = None  # Fisher-z CI 上限矩阵
 
 
+
+
+def _stars(p: float) -> str:
+    """相关显著性星号（s1007-19 S1 单源化）：阈值 0.001/0.01/0.05 三处同源。
+
+    历史：:83/:164/:219 三处逐字同构 lambda 各写一份 ⇒ 改阈值必漏（s1004-55 钉桩）。
+    本函数零数值变化（同阈值同输出，纯去重）；多重比较校正（S2）属统计红线另裁，
+    未校正现状由脚注声明（S3）。
+    """
+    return "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else ""))
+
 def correlation_matrix(
     df: pd.DataFrame,
     columns: List[str],
@@ -79,9 +90,7 @@ def correlation_matrix(
     # 显著性标记
     sig_mask = p_df.copy()
     for c in sig_mask.columns:
-        sig_mask[c] = sig_mask[c].apply(
-            lambda p: "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else ""))
-        )
+        sig_mask[c] = sig_mask[c].apply(_stars)
 
     # Round numeric matrices (avoid DataFrame.map which changed across pandas versions)
     corr_vals = corr_df.to_numpy(dtype=float, copy=True)
@@ -160,9 +169,7 @@ def partial_correlation(
 
     sig_mask = p_df.copy()
     for c in sig_mask.columns:
-        sig_mask[c] = sig_mask[c].apply(
-            lambda p: "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else ""))
-        )
+        sig_mask[c] = sig_mask[c].apply(_stars)
 
     corr_vals = corr_df.to_numpy(dtype=float, copy=True)
     p_vals = p_df.to_numpy(dtype=float, copy=True)
@@ -216,7 +223,7 @@ def point_biserial_corr(
     n = len(data)
     n_arr = np.array([[n, n], [n, n]])
 
-    sig = "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else ""))
+    sig = _stars(p)
     sig_mask_arr = np.array([["", sig], [sig, ""]])
 
     # Fisher-z CI for point-biserial r

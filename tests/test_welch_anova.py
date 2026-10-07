@@ -45,7 +45,9 @@ class TestWelchANOVA:
         result = welch_anova(df, "score", "group")
         # 3组且p<0.05时应有Games-Howell事后检验
         assert result.post_hoc is not None
-        assert "p (Games-Howell)" in result.post_hoc.columns
+        # s1007-19 案A 改名随动：列内为 pingouin 未校正 p，不再挂 Games-Howell 事后名
+        assert "p (uncorrected)" in result.post_hoc.columns
+        assert "p (Games-Howell)" not in result.post_hoc.columns
 
     def test_less_than_two_groups_raises(self):
         df = pd.DataFrame({

@@ -571,7 +571,7 @@ def welch_anova(
                     "比较": f"{row['A']} vs {row['B']}",
                     "均值差": round(float(row["diff"]), 3),
                     "SE": round(float(row["se"]), 3),
-                    "p (Games-Howell)": round(float(row["pval"]), 4),
+                    "p (uncorrected)": round(float(row["pval"]), 4),  # s1007-19 案A: pingouin pval 为未校正 p, 不再挂 Games-Howell 事后名
                 })
             post_hoc = pd.DataFrame(post_rows)
         except Exception:

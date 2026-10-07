@@ -404,7 +404,12 @@ def _interpret_reliability(r: ReliabilityResult) -> str:
 
 def _interpret_cfa(r: CFAResult) -> str:
     """解释 CFA 结果（含 AVE/CR/HTMT/Fornell-Larcker）"""
-    lines = ["📊 **结果解读：验证性因素分析（CFA）**\n"]
+    # s1007-19 案①（44a0 遗留 5 材料三案之保守案）：降级产物首行改 CFA-exploratory，
+    # 拆掉「降级结果冒充严格 CFA」的名义串味残点（复用 s923-08 is_fallback 哨兵）。
+    title = ("📊 **结果解读：CFA-exploratory（探索性替代分析，非严格 CFA）**\n"
+             if r.is_fallback
+             else "📊 **结果解读：验证性因素分析（CFA）**\n")
+    lines = [title]
 
     if r.is_fallback:
         lines.append(f"⚠ {r.fallback_note}")
