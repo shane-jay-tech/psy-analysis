@@ -335,7 +335,7 @@ def _interpret_regression(r: RegressionResult) -> str:
 
 
 def _interpret_reliability(r: ReliabilityResult) -> str:
-    """解释信度分析结果（覆盖 7 种类型）"""
+    """解释信度分析结果（覆盖 8 种类型）"""
     # 主指标名称映射
     metric_name = {
         "cronbach_alpha": ("Cronbach's α", "α"),

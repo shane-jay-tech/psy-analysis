@@ -488,7 +488,11 @@ SUGGESTED_QUESTIONS_BY_CATEGORY = {
 
 
 def get_suggested_questions(test_type: str = "") -> List[str]:
-    """根据检验类型返回 5-6 条推荐问题。"""
+    """返回 5 条推荐问题（5 类各取 1 条，与检验类型无关）。
+
+    形参 ``test_type`` 现体内未用（死参数），但调用方带参（undergrad_wizard.py:534、
+    tests/test_ai_tutor.py:208），接口兼容故保留不删——s1010-09 钉正。
+    """
     base: List[str] = []
     base.extend(SUGGESTED_QUESTIONS_BY_CATEGORY["method_choice"][:1])
     base.extend(SUGGESTED_QUESTIONS_BY_CATEGORY["effect_size"][:1])
