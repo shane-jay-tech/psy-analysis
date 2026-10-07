@@ -144,12 +144,23 @@ def render_literature_review(tier: str = "beginner") -> None:
     if items:
         st.divider()
         tabs = st.tabs(["📊 主题聚类", "🕳️ Gap 分析", "📝 导出综述", "🚪 完成 → 进入 wizard"])
+        # s1004-19 P1（s930-42 普查落地）：四 tab 各自隔离——任一 tab 渲染器异常
+        # 只在该 tab 内 st.error，不再拖全页红（改前各 renderer try=0）。
         with tabs[0]:
-            _render_themes_tab(items, lr_state)
+            try:
+                _render_themes_tab(items, lr_state)
+            except Exception as exc:
+                st.error(f"主题聚类渲染失败，已保留原有数据，可切其他标签页继续。原因：{exc}")
         with tabs[1]:
-            _render_gaps_tab(upstream, lr_state)
+            try:
+                _render_gaps_tab(upstream, lr_state)
+            except Exception as exc:
+                st.error(f"Gap 分析渲染失败，已保留原有数据，可切其他标签页继续。原因：{exc}")
         with tabs[2]:
-            _render_export_tab(items, lr_state)
+            try:
+                _render_export_tab(items, lr_state)
+            except Exception as exc:
+                st.error(f"导出综述渲染失败，已保留原有数据，可切其他标签页继续。原因：{exc}")
         with tabs[3]:
             _render_finish_tab()
 
@@ -835,8 +846,17 @@ def _render_drop_and_review_section(upstream: Dict[str, Any]) -> None:
 
         if run and uploaded:
             files = [(f.name, f.getvalue()) for f in uploaded]
-            with st.spinner(f"正在解析 {len(files)} 个文件……"):
-                docs = ingest_files(files)
+            # s1004-19 P0（s930-42 普查落地）：ingest 是脏文件常态高概率外部调用面，
+            # 裸奔时任一坏文件拖全页红——包 try 降级为页内 st.error，其余区域不受影响。
+            try:
+                with st.spinner(f"正在解析 {len(files)} 个文件……"):
+                    docs = ingest_files(files)
+            except Exception as exc:
+                st.error(
+                    f"文献解析失败，已放弃本次批量导入（其余功能不受影响）。"
+                    f"请检查文件是否损坏或格式受支持后重试。原因：{exc}"
+                )
+                docs = []
 
             # 解析告警
             for d in docs:
