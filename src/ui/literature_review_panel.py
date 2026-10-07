@@ -106,7 +106,11 @@ def render_literature_review(tier: str = "beginner") -> None:
     _render_header(tier=tier)
 
     # v3.5: 完成度评分（顶部右上角）
-    _render_completeness_badge(lr_state)
+    # s1007-07 P2：低概率外部面兜底——徽章渲染失败不让整页红
+    try:
+        _render_completeness_badge(lr_state)
+    except Exception as exc:
+        st.error(f"完成度徽章渲染失败：{exc}。已跳过徽章，其余功能不受影响。")
 
     # v3.5: 修订研究问题入口（跨 phase 反向修订）
     _render_revise_research_q_button(upstream, lr_state)
@@ -128,7 +132,12 @@ def render_literature_review(tier: str = "beginner") -> None:
             st.session_state["_lr_pending_rescore"] = False
 
     # 三栏布局
-    items = _materialize_items(lr_state.get("literature_items") or [])
+    # s1007-07 P2：解析残余兜底——脏条目解析失败按空列表降级，不让整页红
+    try:
+        items = _materialize_items(lr_state.get("literature_items") or [])
+    except Exception as exc:
+        st.error(f"文献数据解析失败，已按空列表降级：{exc}。可刷新重试或重新导入。")
+        items = []
     if items:
         col_left, col_mid, col_right = st.columns([2, 3, 3])
         with col_left:
