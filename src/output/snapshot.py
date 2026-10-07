@@ -14,7 +14,7 @@ import zipfile
 import io
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -73,8 +73,9 @@ def create_snapshot(
         if config.include_analysis_params:
             params = _extract_params(analysis_results)
             # s923-21：本键必须"相邻两次调用必不同"——tests/test_output_snapshot_roundtrip.py 的
-            # 跨调用不变量直接挂在它身上。本机墙钟粒度 15.625ms（GetSystemTimeAsFileTime），
-            # 连续 datetime.now()/time.time_ns() 同值率 99.998% ⇒ 单靠墙钟撑不起该不变量。
+            # 跨调用不变量直接挂在它身上。本机墙钟（GetSystemTimeAsFileTime）实际粒度受系统
+            # 定时器插值影响并非固定槽宽，连续 datetime.now()/time.time_ns() 同值率实测
+            # 99.945%~99.998%（s924-28 §〇.4/s927-64 两轮口径）⇒ 单靠墙钟撑不起该不变量。
             # 追加 QueryPerformanceCounter（分辨率 100ns、同值率实测 0.000%）的单调尾数提供区分度；
             # 墙钟部分仍是可 fromisoformat 的裸 ISO 串，全仓无本键解析方（load_snapshot 只 json.load）。
             params["snapshot_created"] = f"{datetime.now().isoformat()}+mono{time.perf_counter_ns()}"

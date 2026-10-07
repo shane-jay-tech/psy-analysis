@@ -519,7 +519,6 @@ def generate_paper_aware_qa(
     Returns:
         PaperAwareQAResult
     """
-    from dataclasses import field as _field  # noqa: F401  避免导入错位
 
     # 收集素材
     paper_context = _format_paper_context(paper_text)

@@ -12,15 +12,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Tuple
 
 if TYPE_CHECKING:
     from ..storage.feed_store import FeedStore

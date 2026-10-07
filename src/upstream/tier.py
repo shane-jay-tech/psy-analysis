@@ -10,7 +10,7 @@ AUTO      → 根据首次输入文本启发式判断
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 # ---------------------------------------------------------------------------

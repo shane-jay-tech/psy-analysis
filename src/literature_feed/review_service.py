@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Sequence
+from typing import Sequence
 
 from src.literature_feed.timestamps import utc_now
 

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, Sequence
+from typing import Sequence
 
 
 # 状态 → (图标, 标签)。**单一表**：加一个决策只改这一行。

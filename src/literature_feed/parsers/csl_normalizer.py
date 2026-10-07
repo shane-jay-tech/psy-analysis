@@ -12,7 +12,7 @@ import json
 import re
 import unicodedata
 from datetime import date, datetime
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 from ..fetchers.base import RawArticle
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import html
 import re
-from typing import Any, Dict, List
+from typing import Dict, List
 
 
 _META_TAG_RE = re.compile(

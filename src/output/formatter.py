@@ -3,7 +3,6 @@
 包含效应量强制检查：APA7 要求所有推断统计必须报告效应量。
 """
 
-import pandas as pd
 from typing import Dict, Any, Optional, Tuple
 
 from src.analysis.ttest import TTestResult

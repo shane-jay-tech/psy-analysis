@@ -120,7 +120,6 @@ def run_full_diagnosis(project_root: Optional[Path] = None) -> EnvironmentDiagno
 
     # Playwright
     try:
-        from playwright.sync_api import sync_playwright  # noqa: F401
         diag.items.append(DiagnosisItem("Playwright", "ok", "浏览器 E2E 可用", required=False))
     except ImportError:
         diag.items.append(DiagnosisItem("Playwright", "missing", "浏览器 E2E 不可用（不影响正常使用）", required=False))

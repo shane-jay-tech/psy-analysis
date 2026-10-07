@@ -18,7 +18,6 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from src.utils.app_paths import LEGACY_AUTOSAVE_FILE, LEGACY_META_FILE

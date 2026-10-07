@@ -6,11 +6,10 @@
 
 from __future__ import annotations
 
-import io
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from .draft_bundle import PaperDraftBundle, PaperSection
 

@@ -1,7 +1,6 @@
 """Plotly 交互式图表渲染器 — 用于报告导出和 UI 展示"""
 
 import pandas as pd
-import numpy as np
 
 try:
     import plotly.graph_objects as go
@@ -13,11 +12,9 @@ except Exception:
 from src.visualization.charts import (
     correlation_heatmap,
     interaction_plot,
-    _base_layout,
     FONT,
     TITLE_FONT,
     COLOR_PALETTE,
-    CHART_HEIGHT,
 )
 from src.analysis.meta_analysis import MetaResult
 
