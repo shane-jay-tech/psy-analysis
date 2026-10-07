@@ -350,7 +350,7 @@ def chat_with_tutor_stream(
                         break
                 except (json.JSONDecodeError, AttributeError):
                     continue
-        except (TutorAPIError, Exception) as exc:
+        except Exception as exc:  # TutorAPIError 为 Exception 子类，元组冗余已去（s1010-03）
             # 流式失败 → 回退一次性调用
             full = chat_with_tutor(
                 messages, provider=provider, base_url=base_url,
@@ -399,7 +399,7 @@ def chat_with_tutor_stream(
                     yield chunk
             except json.JSONDecodeError:
                 continue
-    except (TutorAPIError, Exception):
+    except Exception:  # TutorAPIError 为 Exception 子类，元组冗余已去（s1010-03）
         # 回退一次性
         full = chat_with_tutor(
             messages, provider=provider, base_url=base_url,
