@@ -526,6 +526,9 @@ def _migrate_workspace(data: Dict[str, Any]) -> Dict[str, Any]:
 
     版本号高于系统当前版本时，拒绝加载并抛出异常。
     """
+    if not isinstance(data, dict):
+        # s1007-21 隐患①防御：脏载荷（JSON 根非 dict）拒绝加载，给可读错误
+        raise ValueError(f"工作区文件内容损坏（根应为 dict，实为 {type(data).__name__}），已拒绝加载。")
     schema = data.get("_schema", "workspace_v1")
 
     # 规范化旧版本号
@@ -557,6 +560,9 @@ def _migrate_workspace(data: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass
 
+    if not isinstance(data, dict):
+        # s1007-21 隐患①防御：某 migrate_fn 把载荷改成了非 dict（实测 str）——拒绝并报可读错误
+        raise ValueError(f"工作区迁移产生非 dict 载荷（实为 {type(data).__name__}），已拒绝加载。")
     data["_schema"] = CURRENT_SCHEMA
     data["_migrated_from"] = schema
     return data

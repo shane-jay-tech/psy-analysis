@@ -477,3 +477,23 @@ class TestN6_LastPosition:
         state = get_upstream_state(st.session_state)
         assert "last_position" in state
         assert state["last_position"]["phase"] == ""
+
+
+class TestMigrateWorkspaceDirtyPayloadS100721:
+    """s1007-21 隐患①：脏载荷防御（可读 ValueError 取代隐晦 TypeError）。"""
+
+    def test_non_dict_root_rejected(self):
+        from src.utils.workspace import _migrate_workspace
+
+        with pytest.raises(ValueError, match="根应为 dict"):
+            _migrate_workspace("垃圾串载荷")
+
+    def test_migrate_fn_corrupting_to_str_rejected(self, monkeypatch):
+        import src.utils.workspace as ws
+
+        monkeypatch.setattr(
+            ws, "_build_migration_chain",
+            lambda frm, to: [lambda data: "迁移函数产出的脏串"],
+        )
+        with pytest.raises(ValueError, match="非 dict 载荷"):
+            ws._migrate_workspace({"_schema": "v2.5", "k": 1})
