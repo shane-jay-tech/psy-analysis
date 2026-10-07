@@ -106,6 +106,7 @@ def _drain_background_result(session_state: Any) -> None:
     try:
         from src.utils import autosave_bg
     except Exception:
+        logger.debug("autosave: autosave_bg 导入失败，后台结转跳过", exc_info=True)
         return
     res = autosave_bg.drain_result()
     if res is None:
@@ -123,6 +124,7 @@ def flush_background(timeout: float = 10.0):
         from src.utils import autosave_bg
         return autosave_bg.flush(timeout)
     except Exception:
+        logger.debug("autosave: 后台 flush 失败，按已落账处理", exc_info=True)
         return True, 0.0
 
 
@@ -257,4 +259,5 @@ def get_active_workspace_status(session_state: Any) -> AutosaveStatus:
             has_collection=bool(ws.get("figure_collection")),
         )
     except Exception:
+        logger.debug("autosave: 状态构建失败，返回空状态", exc_info=True)
         return AutosaveStatus()

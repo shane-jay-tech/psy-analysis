@@ -12,12 +12,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -177,4 +180,4 @@ def _cleanup_tmp(tmp_dir: str):
     try:
         shutil.rmtree(tmp_dir, ignore_errors=True)
     except Exception:
-        pass
+        logger.debug("pdf_exporter: 临时目录清理失败（不阻塞）", exc_info=True)
