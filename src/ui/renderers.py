@@ -2,6 +2,7 @@
 import base64
 import io
 
+import logging
 import streamlit as st
 import pandas as pd
 
@@ -24,6 +25,8 @@ from src.visualization.paper_export import (
 )
 from src.utils.friendly_errors import render_friendly_error
 from src.output.interpretation import generate_interpretation
+
+logger = logging.getLogger(__name__)
 
 
 def render_assumption(r, label: str):
@@ -307,7 +310,8 @@ def _render_cfa(r: CFAResult):
         try:
             st.dataframe(r.htmt_matrix.style.applymap(_htmt_color, subset=pd.IndexSlice[:, r.htmt_matrix.columns[1:]]),
                          width="stretch")
-        except Exception:
+        except Exception as exc:
+            logger.debug("_render_cfa: 静默回退 %s", exc)
             st.dataframe(r.htmt_matrix, width="stretch")
 
     # 因子协方差
@@ -419,7 +423,8 @@ def _render_ai_item_review(r: AIItemReviewResult):
         try:
             styled = r.items_table.style.apply(_highlight_flagged, axis=1)
             st.dataframe(styled, width="stretch")
-        except Exception:
+        except Exception as exc:
+            logger.debug("_render_ai_item_review: 静默回退 %s", exc)
             st.dataframe(r.items_table, width="stretch")
 
     # ── 标记需修订 ──
@@ -623,8 +628,8 @@ def _render_add_to_collection_button(fig, idx: int, chart_type: str,
                     from src.utils.autosave import trigger_autosave
                     from src.utils.workspace import build_workspace_snapshot
                     trigger_autosave(st.session_state, build_workspace_snapshot)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("_render_add_to_collection_button: 静默回退 %s", exc)
                 st.rerun()
             st.caption(f"💡 当前收藏夹共 {len(coll)} 张图。")
 

@@ -66,8 +66,8 @@ def search_literature(
                 cached = json.loads(cache_file_api.read_text(encoding="utf-8"))
                 if time.time() - cached.get("timestamp", 0) < CACHE_TTL["academic_api"]:
                     api_results = cached.get("results", [])
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("search_literature: 静默回退 %s", exc)
 
         if not api_results:
             try:
@@ -80,7 +80,8 @@ def search_literature(
                     }, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-            except Exception:
+            except Exception as exc:
+                logger.debug("search_literature: 静默回退 %s", exc)
                 api_results = []
 
         if api_results:
@@ -97,8 +98,8 @@ def search_literature(
                 cached = json.loads(cache_file_llm.read_text(encoding="utf-8"))
                 if time.time() - cached.get("timestamp", 0) < CACHE_TTL["llm_generated"]:
                     llm_results = cached.get("results", [])
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("search_literature: 静默回退 %s", exc)
 
         if not llm_results:
             try:
@@ -112,7 +113,8 @@ def search_literature(
                         }, ensure_ascii=False, indent=2),
                         encoding="utf-8",
                     )
-            except Exception:
+            except Exception as exc:
+                logger.debug("search_literature: 静默回退 %s", exc)
                 llm_results = []
 
         if llm_results:
@@ -220,11 +222,12 @@ def _search_crossref(construct_name: str, domain: str = "") -> List[Dict]:
                     },
                     "timestamp": time.time(),
                 })
-            except Exception:
+            except Exception as exc:
+                logger.debug("_search_crossref: 静默回退 %s", exc)
                 continue
 
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_search_crossref: 静默回退 %s", exc)
 
     return results
 
@@ -300,8 +303,8 @@ def _search_via_llm(construct_name: str, domain: str = "") -> List[Dict]:
                 "construct": parsed,
                 "timestamp": time.time(),
             }]
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_search_via_llm: 静默回退 %s", exc)
 
     return []
 
@@ -340,7 +343,8 @@ def verify_by_doi(doi: str) -> Optional[Dict]:
             ),
             "verified": True,
         }
-    except Exception:
+    except Exception as exc:
+        logger.debug("verify_by_doi: 静默回退 %s", exc)
         return None
 
 

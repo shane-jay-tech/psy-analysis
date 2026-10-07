@@ -1,5 +1,6 @@
 """论文写作 UI — 从 app.py 拆分出的独立模块"""
 
+import logging
 import sys
 import os
 
@@ -22,6 +23,8 @@ from src.paper_writer.defense_qa import (
 
 
 from src.utils.i18n import t
+
+logger = logging.getLogger(__name__)
 
 section_order = [
     ("title", t("title")),
@@ -312,8 +315,8 @@ def render_paper_writing_ui():
                     cancel_search_request(lit_pending["cancel_id"])
                     try:
                         lit_pending["future"].cancel()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("render_paper_writing_ui: 静默回退 %s", exc)
                     st.session_state.pop("_lit_search_pending", None)
                     st.warning("已取消文献搜索。")
                     st.rerun()

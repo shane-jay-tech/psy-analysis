@@ -1,5 +1,6 @@
 """实验设计 UI — 从 app.py 拆分出的独立模块"""
 
+import logging
 import sys
 import os
 
@@ -12,6 +13,8 @@ from src.experiment_design import (
     ExperimentDesignEngine, format_power_report,
     design_experiment_llm_async, cancel_design_request, CancelledLLMError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def render_experiment_design_ui():
@@ -145,8 +148,8 @@ def render_experiment_design_ui():
                 cancel_design_request(pending["cancel_id"])
                 try:
                     pending["future"].cancel()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("render_experiment_design_ui: 静默回退 %s", exc)
                 st.session_state.pop("_exp_design_pending", None)
                 st.warning("已取消实验设计增强。")
                 st.rerun()
@@ -385,8 +388,8 @@ def render_experiment_design_ui():
                     )
                 else:
                     st.success(f"✅ 文档完整度良好（仅 {n_missing} 个待补项）")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("render_experiment_design_ui: 静默回退 %s", exc)
 
             if st.button("📄 生成实验程序文档", type="primary",
                          width="stretch", key="exp_protocol_gen"):

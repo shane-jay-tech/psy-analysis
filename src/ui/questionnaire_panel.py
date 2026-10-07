@@ -1,6 +1,7 @@
 """问卷设计页面面板 — 从 app.py 抽取的完整问卷设计流程。"""
 
 import html
+import logging
 import threading
 import time
 
@@ -17,6 +18,8 @@ from src.questionnaire.report_generator import (
 )
 from src.utils.memory_manager import render_memory_manager_ui
 from src.utils.i18n import t
+
+logger = logging.getLogger(__name__)
 
 
 class _DummyContext:
@@ -256,8 +259,8 @@ def render_questionnaire_page():
                 cancel_design_request(pending["cancel_id"])
                 try:
                     pending["future"].cancel()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("render_questionnaire_page: 静默回退 %s", exc)
                 st.session_state.pop("_q_design_pending", None)
                 st.warning("已取消问卷生成。")
                 st.rerun()

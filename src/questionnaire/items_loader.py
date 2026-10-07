@@ -14,9 +14,12 @@
 from __future__ import annotations
 
 import io
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -101,8 +104,8 @@ def _read_text(file_obj) -> str:
         # 复位 cursor（streamlit 重复读时容易踩）
         try:
             file_obj.seek(0)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_read_text: 静默回退 %s", exc)
         raw = file_obj.read()
     elif isinstance(file_obj, (bytes, bytearray)):
         raw = bytes(file_obj)
@@ -133,8 +136,8 @@ def _extract_docx_text(file_obj) -> str:
     if hasattr(file_obj, "seek"):
         try:
             file_obj.seek(0)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_extract_docx_text: 静默回退 %s", exc)
     if isinstance(file_obj, (bytes, bytearray)):
         file_obj = io.BytesIO(bytes(file_obj))
 
@@ -149,8 +152,8 @@ def _extract_docx_text(file_obj) -> str:
         style_name = ""
         try:
             style_name = (para.style.name or "").lower()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_extract_docx_text: 静默回退 %s", exc)
         if "heading 1" in style_name or style_name == "title":
             parts.append("# " + text)
         elif "heading 2" in style_name:

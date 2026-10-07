@@ -15,6 +15,7 @@ v3.7.7 改为「直连模式」：
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time as _time
 from concurrent.futures import ThreadPoolExecutor
@@ -31,6 +32,8 @@ from .llm_engine import (
     _cleanup_cancel_id,
     _is_cancelled,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +208,8 @@ def _parse_research_question(
         parsed.setdefault("summary", research_question)
         parsed.setdefault("primary_construct_reason", "（未提供）")
         return parsed
-    except Exception:
+    except Exception as exc:
+        logger.debug("_parse_research_question: 静默回退 %s", exc)
         return {
             "research_type": "construct_measurement",
             "research_object": research_question[:30],
@@ -1200,7 +1204,8 @@ def _run_llm_critique(
         parsed.setdefault("overall_issues", [])
         parsed.setdefault("summary", "")
         return parsed
-    except Exception as e:
+    except Exception as exc:
+        logger.debug("_run_llm_critique: 静默回退 %s", exc)
         return {
             "items_with_issues": [],
             "overall_issues": [],
@@ -1238,8 +1243,8 @@ def design_questionnaire_direct(
         if progress_callback:
             try:
                 progress_callback(msg, pct)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("report: 静默回退 %s", exc)
 
     # ---- Step 1: 一次性主调用 ----
     report("步骤 1/3：直连 LLM 设计完整问卷（保留完整研究语境）...", 0.10)
@@ -1418,8 +1423,8 @@ def design_questionnaire_direct(
                     if new_text and len(new_text) >= 5:
                         old_item["text"] = new_text
                         old_item["_regenerated"] = True
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_regen_one: 静默回退 %s", exc)
 
         with ThreadPoolExecutor(max_workers=min(len(weak_indices), 5)) as ex:
             list(ex.map(_regen_one, list(weak_indices)))

@@ -13,10 +13,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
+import logging
 import numpy as np
 import pandas as pd
 
 from src.llm_gateway import LLMUnavailableError, llm_chat
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -318,8 +321,8 @@ def ai_content_review(
         if progress_callback:
             try:
                 progress_callback(idx, persona["name_zh"])
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("ai_content_review: 静默回退 %s", exc)
 
         messages = _build_prompt(persona, items, construct_name,
                                  construct_definition, kb_definition,
