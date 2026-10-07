@@ -14,7 +14,7 @@ import pytest
 
 _FEED_PACKAGE_PREFIX = "src.literature_feed"
 
-pytestmark = pytest.mark.online
+pytestmark = pytest.mark.mock  # s1007-24：online 围栏改标 mock（误标订正，可逆）
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "literature_feed"

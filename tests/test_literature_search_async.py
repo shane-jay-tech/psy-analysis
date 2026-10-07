@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-pytestmark = pytest.mark.online
+pytestmark = pytest.mark.mock  # s1007-24：online 围栏改标 mock（误标订正，可逆）
 
 from src.paper_writer.literature_search_async import (
     search_literature_with_online,
