@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 LOCK_FILENAME = ".psy_project.lock"
-DEFAULT_STALE_SECONDS = 600.0  # 10 分钟
+DEFAULT_STALE_SECONDS = 600.0  # 10 分钟——标定域=单进程段最坏时长；与 feed 锁 ttl 6h 的 36:1 属任务体差异非漂移（s1007-18 对照行 #1，标定注释补齐 s1007-35）
 
 
 def locked_user_prompt(resource: str, holder: str = "") -> str:
