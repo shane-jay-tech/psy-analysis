@@ -9,8 +9,8 @@ import math
 import numpy as np
 from scipy.stats import nct, ncf, ncx2, norm
 from scipy.optimize import brentq
-from dataclasses import dataclass, field
-from typing import Callable, Dict, Optional
+from dataclasses import dataclass
+from typing import Callable, Dict
 
 
 @dataclass

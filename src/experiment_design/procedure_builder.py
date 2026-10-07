@@ -6,7 +6,7 @@
 import random
 import itertools
 from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

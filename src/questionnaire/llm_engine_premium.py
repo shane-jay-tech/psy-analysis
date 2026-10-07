@@ -15,17 +15,15 @@ v3.7.7 改为「直连模式」：
 from __future__ import annotations
 
 import json
-import re
 import threading
 import time as _time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional
 
 from .construct_kb import CONSTRUCTS
 from .item_quality import check_item_quality
 from .llm_engine import (
     CancelledLLMError,
-    LLMEngineError,
     LLMResponseParseError,
     _alloc_cancel_id,
     _build_design_dict,

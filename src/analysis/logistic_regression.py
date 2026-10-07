@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
 
 @dataclass

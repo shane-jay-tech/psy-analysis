@@ -1,7 +1,6 @@
 """因素分析：探索性因素分析（EFA）"""
 import pandas as pd
 import numpy as np
-from scipy import stats
 from dataclasses import dataclass
 from typing import Optional, List
 

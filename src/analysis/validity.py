@@ -5,7 +5,7 @@ v3.7 新增模块。EFA 仍在 factor_analysis.py，CFA 仍在 cfa.py（CFA 内�
 import pandas as pd
 import numpy as np
 from scipy import stats
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Dict, List
 
 

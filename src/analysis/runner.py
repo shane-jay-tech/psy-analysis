@@ -8,7 +8,7 @@ import time
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable
 
 from src.parser.intent_resolver import AnalysisPlan
 from src.output.reasoning import generate_reasoning

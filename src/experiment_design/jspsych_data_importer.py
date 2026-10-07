@@ -8,8 +8,7 @@ v6 与 v7 的关键差异已通过自动检测和兼容路径处理。
 import csv
 import json
 import re
-from io import StringIO
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 

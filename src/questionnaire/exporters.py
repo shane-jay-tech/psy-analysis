@@ -2,7 +2,6 @@
 
 import io
 import logging
-import os
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -16,9 +15,8 @@ logger = logging.getLogger(__name__)
 def export_to_docx(design: Dict) -> bytes:
     """生成格式化的 Word 文档，返回 bytes。"""
     from docx import Document
-    from docx.shared import Pt, Inches, Cm, RGBColor
+    from docx.shared import Pt, Cm, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.enum.style import WD_STYLE_TYPE
 
     doc = Document()
 

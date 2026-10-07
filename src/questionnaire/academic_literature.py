@@ -15,7 +15,7 @@ import urllib.request
 import urllib.parse
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 CACHE_DIR = Path(__file__).parent / ".academic_cache"
 CACHE_DIR.mkdir(exist_ok=True)

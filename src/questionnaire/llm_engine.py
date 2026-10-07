@@ -7,14 +7,6 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from functools import lru_cache
 import threading
 
-from openai import (
-    OpenAI,
-    AuthenticationError,
-    RateLimitError,
-    APITimeoutError,
-    APIStatusError,
-    APIConnectionError,
-)
 
 from .construct_kb import CONSTRUCTS
 from .item_templates import ALL_TEMPLATES

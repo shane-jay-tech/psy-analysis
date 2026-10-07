@@ -9,9 +9,7 @@ import random
 
 from .power_analysis import calculate_sample_size, format_power_report, PowerResult
 from .procedure_builder import build_full_procedure, ExperimentProcedure
-from .experiment_templates import (
-    DesignTemplate, get_template, recommend_template, TEMPLATES
-)
+from .experiment_templates import DesignTemplate, recommend_template, TEMPLATES
 
 
 @dataclass

@@ -11,7 +11,7 @@ import hashlib
 import logging
 import re
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict
 
 CACHE_DIR = Path(__file__).parent / ".kb_cache"
 CACHE_DIR.mkdir(exist_ok=True)

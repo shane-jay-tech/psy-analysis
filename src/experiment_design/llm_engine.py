@@ -10,14 +10,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Dict, Optional
 
-from openai import (
-    OpenAI,
-    AuthenticationError,
-    RateLimitError,
-    APITimeoutError,
-    APIStatusError,
-    APIConnectionError,
-)
 
 # 模块级线程池：最大2个并发LLM调用
 _llm_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="exp_llm_engine")

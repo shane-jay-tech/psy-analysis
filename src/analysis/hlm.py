@@ -9,7 +9,7 @@
 import logging
 import numpy as np
 import pandas as pd
-from typing import Optional, Dict, List
+from typing import List
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)

@@ -5,7 +5,7 @@ import pandas as pd
 from src.analysis import thresholds
 import numpy as np
 from scipy import stats
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Dict, List
 
 logger = logging.getLogger(__name__)

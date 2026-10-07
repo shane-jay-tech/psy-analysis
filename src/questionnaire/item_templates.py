@@ -7,8 +7,7 @@ v2.0 重大改进：
   - 领域专用词汇表，确保表达准确
 """
 
-import random
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 # ============================================================
 # 量表格式模板（不变）

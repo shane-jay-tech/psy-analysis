@@ -1,7 +1,7 @@
 """问卷设计核心引擎：解析研究问题 → 匹配构念 → 生成问卷"""
 
 import jieba
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .construct_kb import CONSTRUCTS, CONSTRUCT_KEYWORDS, DOMAIN_KEYWORDS
 from .construct_kb_extended import EXTENDED_CONSTRUCTS

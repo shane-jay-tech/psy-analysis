@@ -31,7 +31,7 @@ import json
 import random
 from dataclasses import dataclass, field as dc_field
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Iterable, Mapping, Sequence
 
 LINEAGE_VERSION = "psy-analysis/field-lineage/v1"
 

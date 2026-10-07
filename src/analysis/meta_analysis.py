@@ -9,7 +9,7 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 import io
 

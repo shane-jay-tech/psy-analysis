@@ -1,6 +1,5 @@
 """SEM 结构方程模型：在 CFA（测量模型）基础上扩展结构路径（潜变量间回归关系）"""
 import pandas as pd
-import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict
 
