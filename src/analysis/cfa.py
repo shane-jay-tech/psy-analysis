@@ -72,10 +72,15 @@ class CFAResult:
 # 超出该容差才算"数值越界"。
 FIT_RANGE_TOLERANCE = 1e-3
 
+# s1007-37 双源归一：三键以 thresholds.py 单源为准（数值与原本地逐位一致，零语义变更）。
+# srmr 留本地：good 档双源数值冲突（本地 0.05 vs thresholds.py SRMR 0.08）待主班裁以谁为准；
+# 裁决②键面已定谳（s930-17：semopy calc_stats 无 SRMR 键，生产 :130 恒 0.0 占位）。
+from src.analysis.thresholds import CFA as _TH_CFA, RMSEA as _TH_RMSEA, TLI as _TH_TLI  # noqa: E402
+
 FIT_THRESHOLDS = {
-    "cfi": {"good": 0.95, "acceptable": 0.90},
-    "tli": {"good": 0.95, "acceptable": 0.90},
-    "rmsea": {"good": 0.05, "acceptable": 0.08},
+    "cfi": {"good": _TH_CFA.good, "acceptable": _TH_CFA.acceptable},
+    "tli": {"good": _TH_TLI.good, "acceptable": _TH_TLI.acceptable},
+    "rmsea": {"good": _TH_RMSEA.good, "acceptable": _TH_RMSEA.acceptable},
     "srmr": {"good": 0.05, "acceptable": 0.08},
 }
 
