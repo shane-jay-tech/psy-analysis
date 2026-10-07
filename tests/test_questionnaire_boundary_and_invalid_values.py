@@ -299,7 +299,7 @@ def test_handle_missing_mean_imputation_expected_fill_value():
     assert "低估标准误" in meta["description_zh"]
 
 
-def test_handle_missing_mean_imputation_does_not_resurrect_out_of_range_values():
+def test_handle_missing_mean_imputation_fills_outlier_contaminated_mean_as_is():
     """现网实况（钉）：插补用的是**含非法值的列均值** ⇒ 非法值把Everyone 的填补值一起带偏。
 
     列 [1, 5, 99999] 的均值 33335.0 会填进缺失位 —— 越界值未参与任何拦截。
