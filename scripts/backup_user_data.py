@@ -6,6 +6,10 @@ data/literature_feed/feed.sqlite into D:/code/backups/psy-analysis/psy-<stamp>.z
 keeping the newest 10 archives. Writing outside the repo is explicitly
 authorized by task 20260904-185801-12f1.
 """
+# 解释器口径（s1007-01 遗留，k1007-147 同笔定谳）：本脚本由计划任务 PsyWeeklyBackup
+# 以全局解释器 D:/Program/python.exe 运行（非 .venv）——imports 七件全标准库、双解释器
+# 同为 3.12.9，切换 .venv 无功能收益且引入「.venv 重建即任务静默失效」新风险
+# （s1007-01 口径盘点定谳：维持现状，切换草案标「不建议执行」）。修改本脚本时勿引入第三方依赖。
 import argparse
 import sqlite3
 import sys
