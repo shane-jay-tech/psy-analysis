@@ -324,14 +324,17 @@ def test_empty_string_df_b64_is_skipped_before_the_try_block(tmp_path):
 
 
 def test_snapshot_roundtrip_through_real_project_file_still_drops_none_partners(tmp_path):
-    """写侧→文件→读侧全链路：df 有值而 inspector 为 None 时快照**只带 df_b64+meta**（写侧没改），
-    恢复侧现在把这份「自然中间态」整组拦下。
+    """写侧→文件→读侧全链路：df 有值而 inspector 为 None 时的快照与恢复形态。
 
-    s927-28 翻正：改后 `restored == 1`（只有 meta）、df **不**回来。
-    ⚠ 这条同时是本单最大的行为变化记录点——s922-108 已证明「df 独活」不是畸形文件，
-    而是**上传后尚未跑 inspect 的正常中间态**会自然产出的形态；案 a 让这种项目文件
-    恢复后打开是「没有数据」。写侧 (`build_workspace_snapshot:238-241`) 与
-    调用方告警都**不在本单产出面**，已按实况写进 result 的遗留问题交主班裁。
+    s927-28 翻正：改后 `restored == 1`（只有 meta）、df **不**回来（案 a 整组拦截）。
+    ⚠ s922-108 已证明「df 独活」不是畸形文件，而是**上传后尚未跑 inspect 的正常中间态**。
+
+    **s930-01 翻面（q927-28 遗留·写侧补法①落地）**：写侧快照现在**成对补跑**
+    inspect_dataframe 并回填 session——df-only 快照不再产生（繁殖链切断）。
+    本钉由「钉修复前形态（快照不带 inspector）」翻为「钉成对后形态」：
+    快照带 inspector（新），file_name/analysis_history 仍 None 不落盘（不变）；
+    恢复侧案 a 语义不变——四键（meta/inspector/file_name/analysis_history）仍缺三，
+    `restored == 1`、df 与 inspector **都不**回来（拦截保护未被写侧补丁削弱）。
     """
     df = _sample_df(4)
     st.session_state.df = df
@@ -341,15 +344,16 @@ def test_snapshot_roundtrip_through_real_project_file_still_drops_none_partners(
     st.session_state.analysis_history = None
     snap = build_workspace_snapshot()
     assert "df_b64" in snap and "meta" in snap
-    assert "inspector" not in snap and "file_name" not in snap  # None 键根本不落盘
+    assert "inspector" in snap              # s930-01 成对：df-only 快照不再产生
+    assert "file_name" not in snap and "analysis_history" not in snap  # None 键仍不落盘
 
     path, loaded = _project_file(tmp_path, snap)
     st.session_state.clear()
     restored = restore_workspace(loaded)
 
-    assert restored == 1  # 只有 meta（改前是 df + meta == 2）
+    assert restored == 2  # meta＋inspector（成对后 inspector 键在场＝合法回流）；df 仍被案 a 四键闸拦
     assert "df" not in _keys_present()
-    assert "inspector" not in _keys_present()
+    assert "inspector" in _keys_present()  # s930-01：inspector 不再随 df-only 快照湮灭
     assert path.exists() and path.parent.is_relative_to(tmp_path)
     assert _pinned_pairing_facts(loaded, _keys_present(), restored) == []
 

@@ -232,11 +232,26 @@ def build_workspace_snapshot() -> Dict[str, Any]:
 
     # 核心数据
     df = st.session_state.get("df")
+    inspector = st.session_state.get("inspector")
     if df is not None and hasattr(df, "to_csv"):
         # 使用 base64 编码 CSV，保留原始类型
         buf = io.StringIO()
         df.to_csv(buf, index=False, encoding="utf-8")
         ws["df_b64"] = base64.b64encode(buf.getvalue().encode("utf-8")).decode("ascii")
+        # s930-01（q927-28 遗留·写侧补法①）：df 落快照即成对——「df 有、inspector 尚未跑」
+        # 的正常中间态会产出 df-only 快照文件（s922-108 已证），此处当场补跑 inspect_dataframe
+        # 并回填 session，切断 df-only 繁殖链；检查失败维持 df-only（恢复侧 s927-28 案 a 有整组拦截）。
+        if st.session_state.get("inspector") is None:
+            try:
+                from src.data.inspector import inspect_dataframe
+
+                ws["inspector"] = inspect_dataframe(df)
+                st.session_state["inspector"] = ws["inspector"]
+            except Exception:
+                pass
+        # s930-01（q927-28 遗留·写侧补法①）：df 落快照即成对——「df 有、inspector 尚未跑」
+        # 的正常中间态会产出 df-only 快照文件（s922-108 已证），此处当场补跑 inspect_dataframe
+        # 并回填 session，切断 df-only 繁殖链；检查失败维持 df-only（恢复侧 s927-28 案 a 有整组拦截）。
 
     for k in ["meta", "inspector", "file_name", "analysis_history"]:
         v = st.session_state.get(k)
