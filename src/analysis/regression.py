@@ -1,9 +1,12 @@
 """回归分析：简单线性 / 多元回归 / 层次回归"""
+import logging
 import pandas as pd
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass, field
 from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -132,8 +135,8 @@ def multiple_regression(
         high_vif = vif[vif["VIF"] > 10]
         if len(high_vif) > 0:
             vif_warning = f"⚠ {', '.join(high_vif['变量'])} 的VIF>10，可能存在严重共线性问题。"
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("multiple_regression: 统计回退 %s", exc)
 
     # Cohen's f²
     r2 = model.rsquared
@@ -312,7 +315,8 @@ def _standardized_beta(model, param_name: str, df: pd.DataFrame, dv: str, ivs: L
         sd_x = df[param_name].std()
         sd_y = df[dv].std()
         return b * sd_x / sd_y if sd_y > 0 else 0.0
-    except Exception:
+    except Exception as exc:
+        logger.debug("_standardized_beta: 统计回退 %s", exc)
         return 0.0
 
 
@@ -325,7 +329,8 @@ def _calc_vif(df: pd.DataFrame) -> pd.DataFrame:
         try:
             vif = variance_inflation_factor(df.values, i)
             vif_data.append({"变量": col, "VIF": round(vif, 2)})
-        except Exception:
+        except Exception as exc:
+            logger.debug("_calc_vif: 统计回退 %s", exc)
             vif_data.append({"变量": col, "VIF": float("nan")})
 
     return pd.DataFrame(vif_data)
@@ -350,7 +355,8 @@ def _compute_diagnostics(
         # 学生化删除残差
         try:
             studentized_resid = influence.resid_studentized_external
-        except Exception:
+        except Exception as exc:
+            logger.debug("_compute_diagnostics: 统计回退 %s", exc)
             studentized_resid = influence.resid_studentized_internal
         leverage = influence.hat_matrix_diag
 
@@ -392,5 +398,6 @@ def _compute_diagnostics(
 
         return diagnostics, high_influence, warnings
 
-    except Exception:
+    except Exception as exc:
+        logger.debug("_compute_diagnostics: 统计回退 %s", exc)
         return None, [], ""

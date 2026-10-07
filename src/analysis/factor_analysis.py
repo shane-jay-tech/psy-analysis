@@ -1,8 +1,11 @@
 """因素分析：探索性因素分析（EFA）"""
+import logging
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
 from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -63,7 +66,8 @@ def exploratory_factor_analysis(
     try:
         kmo_all, kmo_model = calculate_kmo(data)
         kmo_val = round(float(kmo_model), 3)
-    except Exception:
+    except Exception as exc:
+        logger.debug("exploratory_factor_analysis: 统计回退 %s", exc)
         kmo_val = 0.0
 
     try:
@@ -71,7 +75,8 @@ def exploratory_factor_analysis(
         bartlett_chi2 = round(float(chi2), 3)
         bartlett_df = n_items * (n_items - 1) // 2
         bartlett_p = round(float(bart_p), 4)
-    except Exception:
+    except Exception as exc:
+        logger.debug("exploratory_factor_analysis: 统计回退 %s", exc)
         bartlett_chi2 = 0.0
         bartlett_df = 0
         bartlett_p = 1.0
@@ -102,7 +107,8 @@ def exploratory_factor_analysis(
                 fa = FactorAnalyzer(n_factors=n_factors, rotation=rotation, method=method)
                 try:
                     fa.fit(data)
-                except Exception:
+                except Exception as exc:
+                    logger.debug("exploratory_factor_analysis: 统计回退 %s", exc)
                     fa.fit(data.values)
         else:
             raise
@@ -223,7 +229,8 @@ def _parallel_analysis(data: pd.DataFrame, n_items: int, seed: int = 42) -> int:
             fa_r.fit(random_data)
             ev_r, _ = fa_r.get_eigenvalues()
             random_ev[i, :] = ev_r[:n_items]
-        except Exception:
+        except Exception as exc:
+            logger.debug("_parallel_analysis: 统计回退 %s", exc)
             random_ev[i, :] = 1.0
 
     mean_random_ev = random_ev.mean(axis=0)

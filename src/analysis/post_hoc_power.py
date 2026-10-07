@@ -19,9 +19,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+import logging
 import pandas as pd
 
 from src.experiment_design.power_analysis import calculate_sample_size, PowerResult
+
+logger = logging.getLogger(__name__)
 
 
 # 触发阈值（< 此值才给样本量建议；业界惯例 0.80）
@@ -57,8 +60,8 @@ def _extract_n_from_output(output: Dict[str, Any]) -> int:
     if isinstance(desc, pd.DataFrame) and "N" in desc.columns:
         try:
             return int(desc["N"].sum())
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_extract_n_from_output: 统计回退 %s", exc)
     # ttest result.group_stats 也有 N 列
     result = output.get("result")
     if result is not None:
@@ -66,8 +69,8 @@ def _extract_n_from_output(output: Dict[str, Any]) -> int:
         if isinstance(gs, pd.DataFrame) and "N" in gs.columns:
             try:
                 return int(gs["N"].sum())
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_extract_n_from_output: 统计回退 %s", exc)
         # 单样本 t / 配对 t 用 df + 2 / df + 1
         df_attr = getattr(result, "df", None)
         if isinstance(df_attr, (int, float)) and df_attr > 0:
@@ -85,14 +88,14 @@ def _extract_chi_square_n(result) -> int:
         if "观测频数" in ct.columns:
             try:
                 return int(ct["观测频数"].sum())
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("_extract_chi_square_n: 统计回退 %s", exc)
         # 独立性表是 crosstab，直接 sum().sum()
         try:
             arr = ct.select_dtypes(include="number")
             return int(arr.values.sum())
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_extract_chi_square_n: 统计回退 %s", exc)
     return 0
 
 
@@ -110,8 +113,8 @@ def _extract_correlation_n(result) -> int:
                         off_diag.append(arr[i, j])
             if off_diag:
                 return int(min(off_diag))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_extract_correlation_n: 统计回退 %s", exc)
     return 0
 
 
@@ -138,7 +141,8 @@ def _extract_effect_n(test_type: str, output: Dict[str, Any]):
             if eta_f >= 1:
                 eta_f = 0.999
             f_eff = (eta_f / (1.0 - eta_f)) ** 0.5
-        except Exception:
+        except Exception as exc:
+            logger.debug("_extract_effect_n: 统计回退 %s", exc)
             return None, 0, 0
         # 估算组数：从 descriptive 行数
         n_groups = 0
@@ -162,7 +166,8 @@ def _extract_effect_n(test_type: str, output: Dict[str, Any]):
             if arr_abs is None:
                 return None, 0, 0
             r_max = float(arr_abs)
-        except Exception:
+        except Exception as exc:
+            logger.debug("_extract_effect_n: 统计回退 %s", exc)
             return None, 0, 0
         n = _extract_correlation_n(result)
         return r_max, 1, n
@@ -247,7 +252,8 @@ def estimate_post_hoc(output: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     try:
         effect = float(effect)
-    except Exception:
+    except Exception as exc:
+        logger.debug("estimate_post_hoc: 统计回退 %s", exc)
         return None
     # 极小效应（接近 0）算 power 没意义
     if abs(effect) < 1e-4:

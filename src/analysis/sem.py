@@ -1,7 +1,10 @@
 """SEM 结构方程模型：在 CFA（测量模型）基础上扩展结构路径（潜变量间回归关系）"""
+import logging
 import pandas as pd
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict
+
+logger = logging.getLogger(__name__)
 
 try:
     import semopy
@@ -197,8 +200,8 @@ def structural_equation_model(
 
         if r2_dict:
             result.r_squared = r2_dict
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("structural_equation_model: 统计回退 %s", exc)
 
     try:
         path_df = result.path_coefficients
@@ -206,8 +209,8 @@ def structural_equation_model(
             indirect_rows = _compute_indirect_effects(path_df, measurement_model)
             if indirect_rows:
                 result.indirect_effects = pd.DataFrame(indirect_rows)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("structural_equation_model: 统计回退 %s", exc)
 
     return result
 

@@ -1,10 +1,13 @@
 """方差分析：单因素 / 双因素 / 重复测量"""
 
+import logging
 import pandas as pd
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass
 from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -44,8 +47,8 @@ def _eta_sq_ci(f_val, df1, df2, eta_sq, confidence=0.95):
             ci_low = ncp_low / (ncp_low + df1 + df2 + 1)
             ci_high = ncp_high / (ncp_high + df1 + df2 + 1)
             return f"[{round(max(0, ci_low), 3)}, {round(min(1, ci_high), 3)}]"
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_eta_sq_ci: 统计回退 %s", exc)
     return ""
 
 
@@ -393,8 +396,8 @@ def repeated_measures_anova(
             "statistic": round(float(spher[0]), 3),
             "p_value": round(float(spher[1]), 4),
         }
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("repeated_measures_anova: 统计回退 %s", exc)
 
     # GG校正
     corrected_table = None
@@ -411,8 +414,8 @@ def repeated_measures_anova(
                 "校正df2": round(df_error_gg, 2),
                 "校正p": round(float(p_gg), 4),
             }])
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("repeated_measures_anova: 统计回退 %s", exc)
 
     table_rows = [{
         "来源": "时间（重复测量）",
@@ -444,17 +447,18 @@ def repeated_measures_anova(
             elapsed = time.perf_counter() - t0
             if elapsed > 5.0:
                 eta_sq_g_ci += f" (bootstrap耗时{elapsed:.1f}s)"
-        except Exception:
+        except Exception as exc:
+            logger.debug("repeated_measures_anova: 统计回退 %s", exc)
             # bootstrap 失败时回退到近似公式
             try:
                 eta_sq_g_ci = _eta_sq_ci(f_val, df_time, df_error, eta_sq_g)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("repeated_measures_anova: 统计回退 %s", exc)
     else:
         try:
             eta_sq_g_ci = _eta_sq_ci(f_val, df_time, df_error, eta_sq_g)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("repeated_measures_anova: 统计回退 %s", exc)
 
     return ANOVAResult(
         test_type="repeated",
@@ -574,8 +578,8 @@ def welch_anova(
                     "p (uncorrected)": round(float(row["pval"]), 4),  # s1007-19 案A: pingouin pval 为未校正 p, 不再挂 Games-Howell 事后名
                 })
             post_hoc = pd.DataFrame(post_rows)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("welch_anova: 统计回退 %s", exc)
 
     return ANOVAResult(
         test_type="one_way",
@@ -701,8 +705,8 @@ def mixed_anova(
                     "Cohen's d": round(float(row.get("cohen", row.get("hedges", 0))), 3),
                 })
             post_hoc = pd.DataFrame(post_rows)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("mixed_anova: 统计回退 %s", exc)
 
     warning = ""
     if n_subjects < n_between * n_within * 5:
