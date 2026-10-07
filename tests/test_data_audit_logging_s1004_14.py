@@ -47,13 +47,16 @@ def test_log_line_lands_readable(tmp_path):
     lg.propagate = True
 
 
-def test_attach_to_data_modules_wires_three(tmp_path, monkeypatch):
-    """材料案 2 清单：三数据面模块（workspace/autosave/project_manager）全部挂上。"""
+def test_attach_to_data_modules_wires_four(tmp_path, monkeypatch):
+    """材料案 2 清单：四数据面模块（workspace/autosave/project_manager/usage_logger）全部挂上。
+
+    （s1007-23：usage_logger 自 s1002-33 收口后补装入清单。）
+    """
     import importlib
 
     attached = attach_to_data_modules(base_dir=tmp_path)
     assert set(attached) == {"src.utils.workspace", "src.utils.autosave",
-                             "src.utils.project_manager"}
+                             "src.utils.project_manager", "src.utils.usage_logger"}
     for mod_name, flag in attached.items():
         assert flag is True, mod_name
         lg = logging.getLogger(mod_name)

@@ -55,17 +55,18 @@ def attach_data_audit_handler(logger: logging.Logger, log_name: str,
 
 
 def attach_to_data_modules(base_dir: Optional[Path] = None) -> dict:
-    """材料案 2 清单装配：workspace / autosave / project_manager 三数据面模块。
+    """材料案 2 清单装配：workspace / autosave / project_manager / usage_logger 四数据面模块。
 
-    （usage_logger 在材料清单内，但其告警面属 s1002-33 另案——本装配跳过，
-    待另案收口后再补装。）
+    （usage_logger 原 skipped——其告警面 s1002-33 已收口（裁决材料 50b86dd），
+    s1007-23 补装入清单。）
     """
     import importlib
 
     attached = {}
     for mod_name, log_name in (("src.utils.workspace", "workspace_audit"),
                                ("src.utils.autosave", "autosave_audit"),
-                               ("src.utils.project_manager", "project_manager_audit")):
+                               ("src.utils.project_manager", "project_manager_audit"),
+                               ("src.utils.usage_logger", "usage_logger_audit")):
         mod = importlib.import_module(mod_name)
         logger = logging.getLogger(mod_name)
         attached[mod_name] = attach_data_audit_handler(logger, log_name, base_dir)
