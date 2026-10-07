@@ -102,6 +102,7 @@ src/output/              图表、表格与报告
 src/utils/               隐私、导出、存档与日志
 project_templates/       研究设计模板
 demo_projects/           演示项目
+tools/                   开发者工具（unused_import_census 死 import 普查，只报不改）
 tests/                   测试套件
 ```
 
