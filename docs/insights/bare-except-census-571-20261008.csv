@@ -1,0 +1,570 @@
+site|context
+src/analysis/_sklearn_compat.py:32|except (TypeError, ValueError):
+src/analysis/_sklearn_compat.py:63|except Exception:
+src/analysis/_sklearn_compat.py:82|except Exception:
+src/analysis/advanced.py:103|except Exception as exc:
+src/analysis/advanced.py:234|except Exception as exc:
+src/analysis/advanced.py:241|except Exception as exc:
+src/analysis/anova.py:50|except Exception as exc:
+src/analysis/anova.py:399|except Exception as exc:
+src/analysis/anova.py:417|except Exception as exc:
+src/analysis/anova.py:450|except Exception as exc:
+src/analysis/anova.py:455|except Exception as exc:
+src/analysis/anova.py:460|except Exception as exc:
+src/analysis/anova.py:581|except Exception as exc:
+src/analysis/anova.py:708|except Exception as exc:
+src/analysis/assumption_router.py:83|except Exception:
+src/analysis/cfa.py:15|except ImportError:
+src/analysis/cfa.py:234|except (TypeError, ValueError):
+src/analysis/cfa.py:252|except (TypeError, ValueError):
+src/analysis/cfa.py:392|except Exception as exc:
+src/analysis/cfa.py:415|except Exception:
+src/analysis/cfa.py:418|except Exception as e:
+src/analysis/cfa.py:492|except Exception as e:
+src/analysis/cfa.py:552|except Exception as e:
+src/analysis/cfa.py:560|except Exception as e:
+src/analysis/cfa.py:563|except Exception as e:
+src/analysis/cfa.py:573|except Exception as e:
+src/analysis/cfa.py:587|except Exception:
+src/analysis/cfa.py:592|except Exception as e2:
+src/analysis/correlation.py:51|except (ValueError, TypeError):
+src/analysis/correlation.py:165|except Exception as exc:
+src/analysis/effect_size_ci.py:96|except Exception as exc:
+src/analysis/factor_analysis.py:69|except Exception as exc:
+src/analysis/factor_analysis.py:78|except Exception as exc:
+src/analysis/factor_analysis.py:102|except TypeError as e:
+src/analysis/factor_analysis.py:110|except Exception as exc:
+src/analysis/factor_analysis.py:232|except Exception as exc:
+src/analysis/hlm.py:21|except ImportError:
+src/analysis/hlm.py:142|except Exception as e:
+src/analysis/hlm.py:215|except Exception as e:
+src/analysis/hlm.py:251|except Exception as exc:
+src/analysis/manova.py:162|except (KeyError, ZeroDivisionError):
+src/analysis/manova.py:213|except Exception as exc:
+src/analysis/nonparametric.py:58|except Exception as exc:
+src/analysis/nonparametric.py:124|except Exception as exc:
+src/analysis/post_hoc_power.py:63|except Exception as exc:
+src/analysis/post_hoc_power.py:72|except Exception as exc:
+src/analysis/post_hoc_power.py:91|except Exception as exc:
+src/analysis/post_hoc_power.py:97|except Exception as exc:
+src/analysis/post_hoc_power.py:116|except Exception as exc:
+src/analysis/post_hoc_power.py:144|except Exception as exc:
+src/analysis/post_hoc_power.py:169|except Exception as exc:
+src/analysis/post_hoc_power.py:255|except Exception as exc:
+src/analysis/post_hoc_power.py:305|except (ValueError, RuntimeError) as exc:
+src/analysis/regression.py:138|except Exception as exc:
+src/analysis/regression.py:318|except Exception as exc:
+src/analysis/regression.py:332|except Exception as exc:
+src/analysis/regression.py:358|except Exception as exc:
+src/analysis/regression.py:401|except Exception as exc:
+src/analysis/reliability.py:170|except Exception as exc:
+src/analysis/result_card.py:307|except (TypeError, ValueError, IndexError):
+src/analysis/runner.py:413|except Exception as e:
+src/analysis/runner.py:431|except Exception as e:
+src/analysis/runner.py:445|except Exception as e:
+src/analysis/runner.py:462|except Exception as e:
+src/analysis/runner.py:479|except Exception as e:
+src/analysis/runner.py:495|except Exception as e:
+src/analysis/runner.py:519|except Exception as e:
+src/analysis/runner.py:545|except Exception as e:
+src/analysis/runner.py:578|except Exception as e:
+src/analysis/runner.py:594|except Exception as e:
+src/analysis/runner.py:613|except Exception as e:
+src/analysis/runner.py:660|except Exception:
+src/analysis/runner.py:672|except LLMUnavailableError as e:
+src/analysis/runner.py:677|except Exception as e:
+src/analysis/runner.py:697|except Exception as e:
+src/analysis/runner.py:800|except ImportError as e:
+src/analysis/runner.py:807|except Exception as e:
+src/analysis/runner.py:920|except Exception:
+src/analysis/runner.py:930|except Exception:
+src/analysis/runner.py:945|except Exception as e:
+src/analysis/runner.py:961|except Exception:
+src/analysis/runner.py:969|except Exception:
+src/analysis/runner.py:975|except Exception:
+src/analysis/runner.py:981|except Exception:
+src/analysis/runner.py:1060|except Exception:
+src/analysis/runner.py:1069|except Exception:
+src/analysis/runner.py:1075|except Exception:
+src/analysis/sem.py:12|except ImportError:
+src/analysis/sem.py:95|except Exception as e:
+src/analysis/sem.py:120|except Exception as e:
+src/analysis/sem.py:149|except (ValueError, TypeError):
+src/analysis/sem.py:181|except Exception as e:
+src/analysis/sem.py:203|except Exception as exc:
+src/analysis/sem.py:212|except Exception as exc:
+src/analysis/ttest.py:283|except (ValueError, ZeroDivisionError):
+src/analysis/ttest.py:289|except (ValueError, ZeroDivisionError):
+src/analysis/ttest.py:299|except Exception as exc:
+src/analysis/ttest.py:345|except Exception as exc:
+src/data/inspector.py:41|except (ValueError, TypeError):
+src/data/inspector.py:91|except (ValueError, TypeError):
+src/data/loader.py:50|except (UnicodeDecodeError, UnicodeError):
+src/data/loader.py:79|except Exception:
+src/data/loader.py:164|except _json.JSONDecodeError as exc:
+src/data/loader.py:177|except _json.JSONDecodeError:
+src/data/loader.py:196|except Exception:
+src/data/loader.py:299|except ImportError as exc:
+src/data/loader.py:329|except (ValueError, TypeError):
+src/data/loader.py:413|except (ValueError, TypeError):
+src/data/loader.py:447|except Exception:
+src/data/transforms.py:87|except Exception as e:
+src/data/transforms.py:231|except Exception as e:
+src/experiment_design/jspsych_data_importer.py:90|except (UnicodeDecodeError, UnicodeError):
+src/experiment_design/jspsych_data_importer.py:239|except json.JSONDecodeError:
+src/experiment_design/jspsych_data_importer.py:481|except (json.JSONDecodeError, TypeError):
+src/experiment_design/llm_engine.py:90|except LLMUnavailableError as e:
+src/experiment_design/llm_engine.py:92|except LLMResponseParseError:
+src/experiment_design/llm_engine.py:94|except CancelledLLMError:
+src/experiment_design/llm_engine.py:96|except Exception as e:
+src/experiment_design/llm_engine.py:194|except json.JSONDecodeError as e:
+src/experiment_design/power_analysis.py:109|except ValueError as exc:
+src/experiment_design/power_analysis.py:147|except ValueError as exc:
+src/experiment_design/power_analysis.py:205|except ValueError as exc:
+src/experiment_design/power_analysis.py:255|except ValueError as exc:
+src/experiment_design/power_analysis.py:294|except ValueError as exc:
+src/experiment_design/power_analysis.py:328|except ValueError:
+src/experiment_design/power_analysis.py:349|except ValueError as exc:
+src/experiment_design/procedure_builder.py:127|except (ValueError, TypeError):
+src/literature_feed/extract/extractor.py:131|except (TypeError, ValueError):
+src/literature_feed/extract/extractor.py:240|except BudgetExceededError:
+src/literature_feed/extract/extractor.py:242|except Exception as exc:
+src/literature_feed/extract/extractor.py:308|except (TypeError, ValueError):
+src/literature_feed/extract/extractor.py:360|except (TypeError, ValueError):
+src/literature_feed/extract/extractor.py:416|except ExtractionError as exc:
+src/literature_feed/extract/extractor.py:427|except ExtractionError as exc:
+src/literature_feed/extract/extractor.py:465|except BudgetExceededError:
+src/literature_feed/extract/extractor.py:468|except ExtractionError as exc:
+src/literature_feed/extract/grounding.py:51|except (json.JSONDecodeError, ValueError):
+src/literature_feed/extract/grounding.py:62|except (json.JSONDecodeError, ValueError):
+src/literature_feed/fetchers/crossref.py:56|except ImportError as exc:
+src/literature_feed/fetchers/crossref.py:88|except Exception as exc:
+src/literature_feed/fetchers/crossref.py:96|except (TypeError, ValueError):
+src/literature_feed/fetchers/crossref.py:106|except (ValueError, TypeError) as exc:
+src/literature_feed/fetchers/crossref.py:151|except Exception:
+src/literature_feed/fetchers/manual_ingest.py:171|except ImportError:
+src/literature_feed/fetchers/manual_ingest.py:181|except Exception:
+src/literature_feed/fetchers/manual_ingest.py:187|except (ValueError, TypeError):
+src/literature_feed/fetchers/psy_science_official.py:62|except ImportError as exc:
+src/literature_feed/fetchers/psy_science_official.py:84|except Exception as exc:
+src/literature_feed/fetchers/psy_science_official.py:126|except Exception:
+src/literature_feed/fetchers/psy_science_official.py:249|except (TypeError, ValueError):
+src/literature_feed/parsers/csl_normalizer.py:46|except ValueError:
+src/literature_feed/parsers/csl_normalizer.py:53|except ValueError:
+src/literature_feed/parsers/csl_normalizer.py:71|except ValueError:
+src/literature_feed/parsers/csl_normalizer.py:90|except ValueError:
+src/literature_feed/scheduler/daily_runner.py:89|except (TypeError, ValueError):
+src/literature_feed/scheduler/daily_runner.py:259|except LockBusyError:
+src/literature_feed/scheduler/daily_runner.py:443|except FetchError as exc:
+src/literature_feed/scheduler/daily_runner.py:453|except RateLimitedError as exc:
+src/literature_feed/scheduler/daily_runner.py:461|except SchemaChangedError as exc:
+src/literature_feed/scheduler/daily_runner.py:470|except FetchError as exc:
+src/literature_feed/scheduler/daily_runner.py:612|except BudgetExceededError:
+src/literature_feed/scheduler/daily_runner.py:616|except ExtractionError as exc:
+src/literature_feed/scheduler/lock_manager.py:42|except LockBusyError:
+src/literature_feed/scheduler/lock_manager.py:79|except OSError:
+src/literature_feed/scheduler/lock_manager.py:129|except LockBusyError:
+src/literature_feed/scheduler/lock_manager.py:157|except OSError:
+src/literature_feed/scheduler/lock_manager.py:206|except OSError as exc:
+src/literature_feed/scheduler/lock_manager.py:211|except LockBusyError as exc:
+src/literature_feed/scheduler/lock_manager.py:215|except OSError as exc:
+src/literature_feed/scheduler/lock_manager.py:230|except OSError as exc:
+src/literature_feed/scheduler/lock_manager.py:236|except OSError as exc:
+src/literature_feed/scheduler/lock_manager.py:250|except OSError:
+src/literature_feed/scheduler/lock_manager.py:256|except OSError:
+src/literature_feed/scheduler/lock_manager.py:274|except (OSError, ValueError) as exc:
+src/literature_feed/storage/budget_tracker.py:101|except (OSError, json.JSONDecodeError):
+src/literature_feed/storage/budget_tracker.py:116|except Exception:
+src/literature_feed/storage/feed_store.py:197|except Exception:
+src/literature_feed/storage/feed_store.py:351|except ValueError:
+src/literature_feed/storage/feed_store.py:476|except sqlite3.IntegrityError:
+src/literature_feed/storage/feed_store.py:665|except (TypeError, ValueError):
+src/literature_feed/storage/migrations.py:124|except Exception as e:
+src/literature_feed/storage/migrations.py:127|except Exception as e:
+src/literature_feed/trend/domain_weights.py:54|except ImportError as exc:
+src/literature_feed/trend/method_weights.py:52|except ImportError as exc:
+src/literature_feed/trend/scorer.py:46|except ValueError:
+src/literature_feed/trend/scorer.py:99|except (TypeError, ValueError):
+src/literature_feed/trend/scorer.py:150|except (TypeError, ValueError):
+src/literature_feed/trend/scorer.py:172|except (TypeError, ValueError):
+src/literature_feed/trend/scorer.py:187|except (TypeError, ValueError):
+src/literature_feed/trend/trending_weights.py:212|except ImportError as exc:
+src/literature_feed/trend/trending_weights.py:247|except OSError:
+src/literature_feed/trend/trending_weights.py:258|except ImportError:
+src/literature_feed/trend/trending_weights.py:270|except Exception as exc:
+src/literature_feed/trend/trending_weights.py:311|except Exception as exc:
+src/literature_feed/ui/feed_panel.py:238|except (TypeError, ValueError):
+src/literature_feed/ui/feed_panel.py:553|except json.JSONDecodeError:
+src/literature_feed/ui/feed_panel.py:817|except ImportError as exc:
+src/literature_feed/ui/feed_panel.py:863|except ImportError as exc:
+src/literature_review/ingest.py:50|except Exception:
+src/literature_review/ingest.py:111|except UnicodeDecodeError:
+src/literature_review/matrix.py:166|except Exception:
+src/literature_review/matrix.py:198|except (LLMUnavailableError, Exception):
+src/literature_review/matrix.py:227|except json.JSONDecodeError:
+src/literature_review/search.py:101|except Exception:
+src/literature_review/search.py:110|except Exception:
+src/literature_review/search.py:120|except Exception:
+src/literature_review/themes.py:49|except Exception:
+src/literature_review/themes.py:110|except Exception:
+src/literature_review/themes.py:330|except (LLMUnavailableError, Exception):
+src/literature_review/themes.py:352|except Exception:
+src/llm_gateway/active_config.py:45|except (AttributeError, KeyError):
+src/llm_gateway/active_config.py:83|except (OSError, KeyError, UnicodeDecodeError) as exc:
+src/llm_gateway/gateway.py:172|except Exception:
+src/llm_gateway/gateway.py:218|except Exception:
+src/llm_gateway/gateway.py:270|except Exception:
+src/llm_gateway/gateway.py:308|except StopIteration:
+src/llm_gateway/gateway.py:355|except Exception:
+src/llm_gateway/gateway.py:555|except Exception as exc:
+src/llm_gateway/gateway.py:643|except Exception as exc:
+src/llm_gateway/gateway.py:698|except Exception:
+src/llm_gateway/gateway.py:700|except Exception:
+src/llm_gateway/gateway.py:751|except Exception as exc:
+src/llm_gateway/gateway.py:838|except LLMUnavailableError as exc:
+src/llm_gateway/gateway.py:884|except LLMUnavailableError as exc:
+src/llm_gateway/gateway.py:939|except Exception as exc:
+src/llm_gateway/quick_models.py:108|except UnicodeDecodeError:
+src/output/__init__.py:16|except Exception:
+src/output/ai_trace_detector.py:247|except re.error:
+src/output/delivery_package.py:99|except KaleidoMissingError:
+src/output/delivery_package.py:101|except Exception as exc:
+src/output/docx_exporter.py:90|except KaleidoMissingError as exc:
+src/output/docx_exporter.py:98|except Exception as exc:
+src/output/docx_exporter.py:385|except Exception:
+src/output/docx_exporter.py:502|except Exception as e:
+src/output/docx_exporter.py:1200|except Exception:
+src/output/pdf_exporter.py:70|except ImportError:
+src/output/pdf_exporter.py:85|except (FileNotFoundError, subprocess.TimeoutExpired):
+src/output/pdf_exporter.py:103|except ImportError:
+src/output/pdf_exporter.py:129|except Exception as e:
+src/output/pdf_exporter.py:145|except (FileNotFoundError, subprocess.TimeoutExpired):
+src/output/pdf_exporter.py:169|except subprocess.TimeoutExpired:
+src/output/pdf_exporter.py:171|except Exception as e:
+src/output/pdf_exporter.py:182|except Exception:
+src/output/plotly_renderers.py:8|except Exception:
+src/output/snapshot.py:241|except Exception:
+src/output/zip_exporter.py:52|except Exception:
+src/output/zip_exporter.py:111|except Exception:
+src/output/zip_exporter.py:146|except Exception:
+src/output/zip_exporter.py:156|except Exception as e:
+src/paper_writer/ai_tutor.py:266|except (json.JSONDecodeError, KeyError, AttributeError) as e:
+src/paper_writer/ai_tutor.py:286|except (json.JSONDecodeError, KeyError, IndexError) as e:
+src/paper_writer/ai_tutor.py:294|except Exception:
+src/paper_writer/ai_tutor.py:351|except (json.JSONDecodeError, AttributeError):
+src/paper_writer/ai_tutor.py:400|except json.JSONDecodeError:
+src/paper_writer/defense_qa.py:253|except (KeyError, ValueError, IndexError):
+src/paper_writer/defense_qa.py:274|except Exception:
+src/paper_writer/defense_qa.py:449|except (_json.JSONDecodeError, ValueError):
+src/paper_writer/defense_qa.py:550|except Exception as exc:
+src/paper_writer/literature_crawler.py:128|except (urllib.error.URLError, json.JSONDecodeError, OSError) as e:
+src/paper_writer/literature_crawler.py:199|except (urllib.error.URLError, json.JSONDecodeError, OSError) as e:
+src/paper_writer/literature_crawler.py:423|except Exception:
+src/paper_writer/literature_crawler.py:450|except Exception:
+src/paper_writer/literature_crawler.py:524|except Exception:
+src/paper_writer/literature_crawler.py:589|except Exception:
+src/paper_writer/literature_crawler.py:627|except Exception:
+src/paper_writer/literature_crawler.py:730|except OSError:
+src/paper_writer/literature_crawler.py:788|except Exception:
+src/paper_writer/literature_crawler.py:839|except Exception:
+src/paper_writer/literature_crawler.py:902|except (json.JSONDecodeError, KeyError, OSError):
+src/paper_writer/literature_manager.py:1530|except ImportError:
+src/paper_writer/literature_manager.py:1558|except Exception:
+src/paper_writer/literature_manager.py:1669|except Exception:
+src/paper_writer/literature_manager.py:1713|except Exception:
+src/paper_writer/literature_search_async.py:114|except Exception:
+src/paper_writer/paper_engine.py:758|except (LLMUnavailableError, Exception):
+src/paper_writer/paper_engine.py:867|except (LLMUnavailableError, Exception):
+src/paper_writer/paper_engine.py:920|except Exception:
+src/paper_writer/paper_engine.py:1058|except Exception as e:
+src/paper_writer/section_writers.py:601|except (ValueError, TypeError):
+src/paper_writer/section_writers.py:1015|except Exception:
+src/parser/intent_resolver.py:107|except Exception:
+src/parser/intent_resolver.py:118|except ValueError:
+src/parser/intent_resolver.py:123|except ValueError:
+src/questionnaire/academic_literature.py:90|except Exception:
+src/questionnaire/academic_literature.py:103|except Exception:
+src/questionnaire/academic_literature.py:373|except Exception:
+src/questionnaire/ai_content_review.py:113|except json.JSONDecodeError:
+src/questionnaire/ai_content_review.py:158|except (TypeError, ValueError):
+src/questionnaire/ai_content_review.py:324|except Exception as exc:
+src/questionnaire/ai_content_review.py:340|except LLMUnavailableError as exc:
+src/questionnaire/ai_content_review.py:345|except Exception as exc:
+src/questionnaire/ai_content_review.py:372|except (TypeError, ValueError):
+src/questionnaire/design_engine.py:73|except LLMEngineError as e:
+src/questionnaire/design_engine.py:76|except Exception as e:
+src/questionnaire/design_engine.py:135|except Exception:
+src/questionnaire/design_engine.py:227|except Exception:
+src/questionnaire/dimensions_paste_parser.py:90|except ValueError:
+src/questionnaire/dimensions_paste_parser.py:95|except ValueError:
+src/questionnaire/exporters.py:292|except Exception as exc:
+src/questionnaire/import_cleaning.py:93|except (ValueError, TypeError):
+src/questionnaire/intent_recognizer.py:216|except Exception:
+src/questionnaire/intent_recognizer.py:264|except Exception:
+src/questionnaire/intent_recognizer.py:323|except Exception:
+src/questionnaire/items_loader.py:107|except Exception as exc:
+src/questionnaire/items_loader.py:123|except UnicodeDecodeError:
+src/questionnaire/items_loader.py:133|except ImportError as exc:
+src/questionnaire/items_loader.py:139|except Exception as exc:
+src/questionnaire/items_loader.py:155|except Exception as exc:
+src/questionnaire/kb_search.py:69|except Exception as exc:
+src/questionnaire/kb_search.py:83|except Exception as exc:
+src/questionnaire/kb_search.py:101|except Exception as exc:
+src/questionnaire/kb_search.py:116|except Exception as exc:
+src/questionnaire/kb_search.py:225|except Exception as exc:
+src/questionnaire/kb_search.py:229|except Exception as exc:
+src/questionnaire/kb_search.py:306|except Exception as exc:
+src/questionnaire/kb_search.py:346|except Exception as exc:
+src/questionnaire/llm_engine.py:102|except Exception:
+src/questionnaire/llm_engine.py:274|except LLMUnavailableError as e:
+src/questionnaire/llm_engine.py:276|except LLMResponseParseError:
+src/questionnaire/llm_engine.py:278|except CancelledLLMError:
+src/questionnaire/llm_engine.py:280|except Exception as e:
+src/questionnaire/llm_engine.py:313|except json.JSONDecodeError as e:
+src/questionnaire/llm_engine.py:319|except json.JSONDecodeError:
+src/questionnaire/llm_engine.py:574|except Exception:
+src/questionnaire/llm_engine.py:682|except CancelledLLMError:
+src/questionnaire/llm_engine.py:685|except Exception as exc:
+src/questionnaire/llm_engine.py:730|except StopIteration:
+src/questionnaire/llm_engine.py:764|except Exception:
+src/questionnaire/llm_engine_premium.py:211|except Exception as exc:
+src/questionnaire/llm_engine_premium.py:645|except json.JSONDecodeError as e:
+src/questionnaire/llm_engine_premium.py:1207|except Exception as exc:
+src/questionnaire/llm_engine_premium.py:1246|except Exception as exc:
+src/questionnaire/llm_engine_premium.py:1426|except Exception as exc:
+src/ui/deliverable_center_panel.py:223|except Exception as e:
+src/ui/deliverable_center_panel.py:248|except Exception as e:
+src/ui/deliverable_center_panel.py:260|except Exception as e:
+src/ui/experiment_design_ui.py:73|except ValueError:
+src/ui/experiment_design_ui.py:151|except Exception as exc:
+src/ui/experiment_design_ui.py:164|except CancelledLLMError:
+src/ui/experiment_design_ui.py:166|except Exception as e:
+src/ui/experiment_design_ui.py:193|except Exception as e:
+src/ui/experiment_design_ui.py:391|except Exception as exc:
+src/ui/experiment_design_ui.py:403|except Exception as e:
+src/ui/export_gate.py:41|except (TypeError, IndexError):
+src/ui/heavy_preload.py:22|except Exception:
+src/ui/heavy_preload.py:32|except Exception:
+src/ui/items_upload_panel.py:69|except ValueError as exc:
+src/ui/items_upload_panel.py:166|except (TypeError, ValueError):
+src/ui/items_upload_panel.py:341|except Exception as exc:
+src/ui/items_upload_panel.py:360|except RuntimeError as exc:
+src/ui/items_upload_panel.py:362|except Exception as exc:
+src/ui/items_upload_panel.py:449|except Exception as exc:
+src/ui/items_upload_panel.py:529|except ValueError:
+src/ui/items_upload_panel.py:580|except Exception as exc:
+src/ui/items_upload_panel.py:608|except Exception as exc:
+src/ui/literature_entry_panel.py:37|except Exception as _feed_err:
+src/ui/literature_entry_panel.py:45|except Exception as _review_err:
+src/ui/literature_review_panel.py:112|except Exception as exc:
+src/ui/literature_review_panel.py:129|except Exception as exc:
+src/ui/literature_review_panel.py:138|except Exception as exc:
+src/ui/literature_review_panel.py:161|except Exception as exc:
+src/ui/literature_review_panel.py:166|except Exception as exc:
+src/ui/literature_review_panel.py:171|except Exception as exc:
+src/ui/literature_review_panel.py:243|except Exception:
+src/ui/literature_review_panel.py:326|except Exception as exc:
+src/ui/literature_review_panel.py:715|except Exception as exc:
+src/ui/literature_review_panel.py:770|except Exception:
+src/ui/literature_review_panel.py:863|except Exception as exc:
+src/ui/literature_review_queue_panel.py:211|except Exception as e:
+src/ui/navigation.py:39|except ValueError:
+src/ui/onboarding.py:43|except Exception:
+src/ui/onboarding.py:55|except Exception:
+src/ui/onboarding.py:69|except Exception:
+src/ui/onboarding.py:244|except Exception as e:
+src/ui/pages/privacy_gate.py:38|except Exception:
+src/ui/paper_writing_ui.py:115|except Exception as e:
+src/ui/paper_writing_ui.py:292|except Exception as e:
+src/ui/paper_writing_ui.py:318|except Exception as exc:
+src/ui/paper_writing_ui.py:336|except CancelledSearchError:
+src/ui/paper_writing_ui.py:338|except Exception as e:
+src/ui/paper_writing_ui.py:463|except Exception as e:
+src/ui/paper_writing_ui.py:558|except Exception as e:
+src/ui/project_panel.py:42|except Exception:
+src/ui/project_panel.py:63|except Exception as e:
+src/ui/project_panel.py:87|except Exception as e:
+src/ui/project_panel.py:104|except Exception as e:
+src/ui/project_panel.py:134|except ProjectLockedError as exc:
+src/ui/project_panel.py:154|except ValueError:
+src/ui/project_panel.py:178|except ProjectLockedError as exc:
+src/ui/project_panel.py:200|except ProjectLockedError as exc:
+src/ui/project_panel.py:225|except ProjectLockedError as exc:
+src/ui/project_panel.py:251|except ProjectLockedError as exc:
+src/ui/project_panel.py:277|except Exception as e:
+src/ui/project_panel.py:297|except Exception as e:
+src/ui/questionnaire_import_panel.py:58|except Exception as e:
+src/ui/questionnaire_panel.py:262|except Exception as exc:
+src/ui/questionnaire_panel.py:278|except CancelledLLMError:
+src/ui/questionnaire_panel.py:280|except Exception as e:
+src/ui/questionnaire_panel.py:352|except Exception as legacy_e:
+src/ui/questionnaire_panel.py:880|except Exception as e:
+src/ui/quick_entries.py:608|except Exception as exc:
+src/ui/quick_entries.py:722|except Exception as exc:
+src/ui/renderers.py:313|except Exception as exc:
+src/ui/renderers.py:331|except (ValueError, TypeError):
+src/ui/renderers.py:426|except Exception as exc:
+src/ui/renderers.py:564|except Exception as e:
+src/ui/renderers.py:631|except Exception as exc:
+src/ui/renderers.py:674|except KaleidoMissingError as e:
+src/ui/renderers.py:676|except Exception as e:
+src/ui/session_reset.py:147|except Exception:
+src/ui/session_reset.py:153|except Exception:
+src/ui/startup_checks.py:25|except Exception:
+src/ui/startup_checks.py:39|except Exception:
+src/ui/template_center_panel.py:213|except Exception as e:
+src/ui/undergrad_wizard.py:128|except Exception as exc:
+src/ui/undergrad_wizard.py:215|except Exception as exc:
+src/ui/undergrad_wizard.py:284|except Exception as exc:
+src/ui/undergrad_wizard.py:455|except Exception as e:
+src/ui/undergrad_wizard.py:590|except Exception:
+src/ui/undergrad_wizard.py:603|except TutorAPIError as e:
+src/ui/undergrad_wizard.py:606|except Exception as e:
+src/ui/undergrad_wizard.py:853|except Exception as e:
+src/ui/undergrad_wizard.py:982|except Exception as exc:
+src/ui/undergrad_wizard.py:1086|except ValueError as exc:
+src/ui/undergrad_wizard.py:1088|except Exception as exc:
+src/ui/undergrad_wizard.py:1148|except Exception as exc:
+src/ui/undergrad_wizard.py:1399|except Exception as e:
+src/ui/undergrad_wizard.py:1514|except ValueError as ve:
+src/ui/undergrad_wizard.py:1538|except Exception as e:
+src/ui/undergrad_wizard.py:1658|except Exception as e:
+src/ui/undergrad_wizard.py:1725|except KaleidoMissingError:
+src/ui/undergrad_wizard.py:1728|except Exception:
+src/ui/undergrad_wizard.py:2060|except Exception as exc:
+src/ui/undergrad_wizard.py:2101|except Exception:
+src/ui/undergrad_wizard.py:2614|except Exception as e:
+src/ui/undergrad_wizard.py:3041|except Exception:
+src/ui/undergrad_wizard.py:3210|except Exception as e:
+src/ui/undergrad_wizard.py:3278|except Exception as exc:
+src/ui/undergrad_wizard.py:3571|except Exception as e:
+src/ui/undergrad_wizard.py:3636|except Exception as exc:
+src/ui/upstream_panel.py:137|except Exception:
+src/ui/upstream_panel.py:648|except Exception:
+src/upstream/feasibility_check.py:68|except Exception:
+src/upstream/feasibility_check.py:408|except Exception:
+src/upstream/feasibility_check.py:453|except (LLMUnavailableError, Exception):
+src/upstream/feasibility_check.py:519|except (LLMUnavailableError, Exception):
+src/upstream/routing.py:142|except RouteNotFoundError:
+src/upstream/routing.py:157|except ValueError:
+src/upstream/socratic_benchmark.py:131|except (LLMUnavailableError, Exception):
+src/upstream/socratic_benchmark.py:141|except statistics.StatisticsError:
+src/upstream/socratic_benchmark.py:158|except Exception:
+src/upstream/socratic_benchmark.py:180|except json.JSONDecodeError:
+src/upstream/socratic_engine.py:289|except Exception as exc:
+src/upstream/socratic_engine.py:291|except LLMUnavailableError:
+src/upstream/socratic_engine.py:450|except LLMUnavailableError:
+src/upstream/socratic_engine.py:452|except Exception as exc:
+src/upstream/socratic_engine.py:466|except Exception as exc:
+src/upstream/tier.py:75|except Exception:
+src/upstream/tier.py:83|except Exception:
+src/upstream/tier.py:97|except Exception:
+src/upstream/topic_funnel.py:252|except Exception as exc:
+src/upstream/topic_funnel.py:269|except Exception as exc:
+src/upstream/topic_funnel.py:330|except Exception as exc:
+src/upstream/topic_funnel.py:339|except Exception as exc:
+src/upstream/topic_funnel.py:405|except ImportError:
+src/upstream/topic_funnel_kb.py:394|except Exception:
+src/upstream/topic_funnel_kb.py:449|except Exception:
+src/utils/archive_manager.py:104|except (json.JSONDecodeError, OSError):
+src/utils/archive_manager.py:138|except (json.JSONDecodeError, OSError):
+src/utils/autosave.py:99|except Exception:
+src/utils/autosave.py:108|except Exception:
+src/utils/autosave.py:126|except Exception:
+src/utils/autosave.py:162|except Exception:
+src/utils/autosave.py:182|except Exception:
+src/utils/autosave.py:195|except Exception:
+src/utils/autosave.py:213|except Exception:
+src/utils/autosave.py:261|except Exception:
+src/utils/autosave_bg.py:95|except Exception:
+src/utils/concurrency.py:34|except Exception:
+src/utils/concurrency.py:59|except Exception:
+src/utils/data_audit_logging.py:32|except Exception:
+src/utils/env_check.py:36|except importlib.metadata.PackageNotFoundError:
+src/utils/env_check.py:84|except Exception as e:
+src/utils/env_check.py:110|except importlib.metadata.PackageNotFoundError:
+src/utils/env_check.py:222|except Exception as e:
+src/utils/env_check.py:239|except Exception as e:
+src/utils/environment_diagnosis.py:68|except ImportError:
+src/utils/environment_diagnosis.py:76|except ImportError:
+src/utils/environment_diagnosis.py:83|except ImportError:
+src/utils/environment_diagnosis.py:90|except ImportError:
+src/utils/environment_diagnosis.py:118|except (ImportError, AttributeError, OSError, ValueError, NotImplementedError):
+src/utils/environment_diagnosis.py:124|except ImportError:
+src/utils/evidence_quality.py:150|except (ValueError, TypeError):
+src/utils/evidence_quality.py:315|except (ValueError, TypeError):
+src/utils/feedback_logger.py:168|except Exception:
+src/utils/figure_collection.py:179|except Exception:
+src/utils/friendly_errors.py:297|except Exception:
+src/utils/i18n.py:263|except Exception:
+src/utils/instance_lock.py:54|except ProcessLookupError:
+src/utils/instance_lock.py:56|except PermissionError:
+src/utils/instance_lock.py:83|except Exception:
+src/utils/instance_lock.py:114|except FileExistsError:
+src/utils/instance_lock.py:118|except FileNotFoundError:
+src/utils/instance_lock.py:126|except OSError:
+src/utils/instance_lock.py:146|except OSError:
+src/utils/llm_timer.py:29|except Exception:
+src/utils/llm_timer.py:76|except Exception:
+src/utils/llm_timer.py:86|except BaseException as e:
+src/utils/memory_manager.py:34|except Exception:
+src/utils/memory_manager.py:158|except OSError:
+src/utils/memory_manager.py:188|except Exception:
+src/utils/next_step_engine.py:68|except (AttributeError, TypeError):
+src/utils/next_step_engine.py:97|except AttributeError:
+src/utils/next_step_engine.py:111|except AttributeError:
+src/utils/perf_logger.py:34|except Exception as e:
+src/utils/perf_logger.py:63|except Exception:
+src/utils/perf_logger.py:76|except (json.JSONDecodeError, ValueError):
+src/utils/pipeline_manager.py:48|except Exception:
+src/utils/pipeline_manager.py:112|except Exception as e:
+src/utils/pipeline_manager.py:149|except Exception:
+src/utils/pipeline_manager.py:204|except Exception as e:
+src/utils/privacy_ethics.py:178|except OSError as e:
+src/utils/privacy_ethics.py:192|except OSError:
+src/utils/project_manager.py:114|except ProjectLockedError as exc:
+src/utils/project_manager.py:160|except Exception:
+src/utils/project_manager.py:164|except OSError:
+src/utils/project_manager.py:181|except OSError:
+src/utils/project_manager.py:203|except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError):
+src/utils/project_manager.py:303|except Exception:
+src/utils/project_manager.py:351|except Exception:
+src/utils/project_manager.py:364|except Exception:
+src/utils/project_manager.py:386|except Exception:
+src/utils/project_manager.py:399|except Exception:
+src/utils/recent_files.py:51|except Exception:
+src/utils/recent_files.py:62|except Exception:
+src/utils/recent_files.py:86|except Exception:
+src/utils/recent_files.py:91|except Exception:
+src/utils/recent_files.py:138|except Exception:
+src/utils/recent_files.py:176|except Exception:
+src/utils/usage_logger.py:85|except OSError as exc:
+src/utils/usage_logger.py:121|except OSError as exc:
+src/utils/usage_logger.py:147|except OSError as exc:
+src/utils/usage_logger.py:161|except OSError:
+src/utils/usage_logger.py:175|except (OSError, json.JSONDecodeError) as exc:
+src/utils/usage_logger.py:196|except OSError:
+src/utils/usage_logger.py:210|except (OSError, json.JSONDecodeError) as exc:
+src/utils/usage_logger.py:255|except ImportError:
+src/utils/usage_logger.py:275|except OSError:
+src/utils/usage_logger.py:281|except OSError as exc:
+src/utils/user_prefs.py:63|except (json.JSONDecodeError, OSError):
+src/utils/user_prefs.py:87|except (OSError, TypeError, ValueError):
+src/utils/user_prefs.py:91|except OSError:
+src/utils/user_prefs.py:155|except OSError:
+src/utils/workspace.py:250|except Exception:
+src/utils/workspace.py:328|except Exception:
+src/utils/workspace.py:406|except Exception:
+src/utils/workspace.py:549|except (ValueError, TypeError):
+src/utils/workspace.py:557|except Exception:
+src/utils/workspace.py:651|except Exception:
+src/utils/workspace.py:703|except Exception:
+src/utils/workspace.py:732|except Exception:
+src/utils/workspace.py:751|except Exception:
+src/utils/workspace.py:776|except Exception:
+src/utils/workspace.py:866|except (ValueError, TypeError):
+src/utils/workspace_state.py:237|except Exception:
+src/visualization/charts.py:47|except Exception:
+src/visualization/paper_export.py:67|except ImportError:
+src/visualization/paper_export.py:89|except Exception as exc:
+src/visualization/paper_export.py:324|except Exception as e:

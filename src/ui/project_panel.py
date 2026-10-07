@@ -11,10 +11,13 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
+import logging
 import streamlit as st
 
 from src.utils import project_manager as pm
 from src.utils.instance_lock import ProjectLockedError, locked_user_prompt
+
+logger = logging.getLogger(__name__)
 
 
 def _show_locked_banner(exc: ProjectLockedError) -> None:
@@ -39,8 +42,8 @@ def _save_active_then_load(target_id: str):
         try:
             ws = build_workspace_snapshot()
             pm.save_workspace(active_id, ws)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_save_active_then_load: 静默回退 %s", exc)
 
     # 2. 清空当前 session（保留用户全局设置；v4.6 LLM 配置改为 quick_model_id 单键）
     preserved = {
@@ -60,7 +63,8 @@ def _save_active_then_load(target_id: str):
     if target_ws:
         try:
             restore_workspace(target_ws)
-        except Exception as e:
+        except Exception as exc:
+            logger.debug("_save_active_then_load: 静默回退 %s", exc)
             # s1002-16（s924-62 遗留1）：静默 pass 改可观测横幅——
             # 恢复失败（如 FutureSchemaError 拒载）必须让用户看见，不再静默降级成空态。
             # 非重抛：维持「主流程不炸」的既有口径（拒载硬闸属人工裁决面）。
@@ -84,7 +88,8 @@ def ensure_active_project_on_first_visit():
         if ws:
             try:
                 restore_workspace(ws)
-            except Exception as e:
+            except Exception as exc:
+                logger.debug("ensure_active_project_on_first_visit: 静默回退 %s", exc)
                 # s1002-16（s924-62 遗留1）：静默 pass 改可观测横幅——
                 # 恢复失败（如 FutureSchemaError 拒载）必须让用户看见，不再静默降级成空态。
                 # 非重抛：维持「主流程不炸」的既有口径（拒载硬闸属人工裁决面）。
@@ -101,7 +106,8 @@ def ensure_active_project_on_first_visit():
         if ws:
             try:
                 restore_workspace(ws)
-            except Exception as e:
+            except Exception as exc:
+                logger.debug("ensure_active_project_on_first_visit: 静默回退 %s", exc)
                 # s1002-16（s924-62 遗留1）：静默 pass 改可观测横幅——
                 # 恢复失败（如 FutureSchemaError 拒载）必须让用户看见，不再静默降级成空态。
                 # 非重抛：维持「主流程不炸」的既有口径（拒载硬闸属人工裁决面）。
