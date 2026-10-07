@@ -12,12 +12,12 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Dict, List, Optional
 
 from src.paper_writer.ai_tutor import (
     ChatMessage,
-    TutorAPIError,
     TutorContext,
     build_tutor_messages,
     build_tutor_system_prompt,
@@ -28,6 +28,8 @@ from src.upstream.topic_funnel_kb import (
     match_examples_by_semantics,
     render_examples_for_prompt,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -284,8 +286,8 @@ def ask_socratic_stream(
             if on_chunk:
                 try:
                     on_chunk(chunk)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("on_chunk 回调失败（流式输出不中断）: %s", exc)
     except LLMUnavailableError:
         return get_fallback_question(stage, topic=topic_hint)
 
@@ -447,8 +449,9 @@ def _safe_chat(
         return response.content
     except LLMUnavailableError:
         return None
-    except Exception:
+    except Exception as exc:
         # 兜底：网关导入失败也降级（极端兼容）
+        logger.warning("网关链路失败，降级直连 tutor: %s", exc)
         try:
             return chat_with_tutor(
                 msgs,
@@ -460,7 +463,8 @@ def _safe_chat(
                 timeout=llm_config.get("timeout", 30),
                 requests_module=requests_module,
             )
-        except (TutorAPIError, Exception):
+        except Exception as exc:
+            logger.warning("直连 tutor 兜底亦失败（返回 None）: %s", exc)
             return None
 
 

@@ -1,0 +1,298 @@
+# psy 裸 except 长尾带分型清单（s1010-15 登记面，1-4 带 87 件 195 处）
+
+- 日期：2026-10-08 ｜ 性质：**登记批——只分型不改码**（分批纪律）；执行腿=s1010-36（broad 面收敛，两夜窗）
+- 口径锚复现全对平：总数 571/131 件 ✓；长尾 1-4 带 **87 件 195 处** ✓（直方图 1处:29 件/2处:25/3处:16/4处:17 ✓）；upstream 2 件 10 处另单实做 ✓
+- 分型规则（静态，不逐处深挖）：`typed 合理`=具名异常类型；`broad 需收敛`=except Exception 或裸 except；`pass 形真吞错`=except 行带 pass 或下一行 pass
+- **分型总账：typed 合理 90 ／ broad 需收敛 54 ／ pass 形真吞错 51（合计 195）**
+- 系列闭环：571＝168(批#1)＋59(#3)＋46(#4)＋39(#5)＋54(#6)＋10(upstream 本单)＋195(本单登记面) ✓
+- 登记面外另册（5+ 带文件 9 件 119 处，勿混入长尾）：analysis/cfa.py 13、analysis/runner.py 27、literature_feed/scheduler/lock_manager.py 12、llm_gateway/gateway.py 13、paper_writer/literature_crawler.py 11、questionnaire/llm_engine.py 12、utils/project_manager.py 10、utils/usage_logger.py 10、utils/workspace.py 11
+
+## 逐件清单（file ｜ typed/broad/pass ｜ 处行号）
+
+- **src/analysis/_sklearn_compat.py**（3 处：broad1/pass形2）
+  - :32 [broad需收敛] `except Exception:`
+  - :63 [pass形真吞错] `except Exception:`
+  - :82 [pass形真吞错] `except Exception:`
+- **src/analysis/advanced.py**（3 处：broad3）
+  - :100 [broad需收敛] `except Exception:`
+  - :230 [broad需收敛] `except Exception:`
+  - :236 [broad需收敛] `except Exception:`
+- **src/analysis/assumption_router.py**（1 处：pass形1）
+  - :83 [pass形真吞错] `except Exception:`
+- **src/analysis/correlation.py**（2 处：typed1/broad1）
+  - :48 [typed合理] `except (ValueError, TypeError):`
+  - :162 [broad需收敛] `except Exception:`
+- **src/analysis/effect_size_ci.py**（1 处：broad1）
+  - :93 [broad需收敛] `except Exception:`
+- **src/analysis/hlm.py**（4 处：typed3/broad1）
+  - :18 [typed合理] `except ImportError:`
+  - :139 [typed合理] `except Exception as e:`
+  - :212 [typed合理] `except Exception as e:`
+  - :248 [broad需收敛] `except Exception:`
+- **src/analysis/manova.py**（2 处：typed1/broad1）
+  - :159 [typed合理] `except (KeyError, ZeroDivisionError):`
+  - :210 [broad需收敛] `except Exception:`
+- **src/analysis/nonparametric.py**（2 处：broad2）
+  - :55 [broad需收敛] `except Exception:`
+  - :120 [broad需收敛] `except Exception:`
+- **src/analysis/reliability.py**（1 处：broad1）
+  - :167 [broad需收敛] `except Exception:`
+- **src/analysis/result_card.py**（1 处：pass形1）
+  - :307 [pass形真吞错] `except (TypeError, ValueError, IndexError):`
+- **src/analysis/ttest.py**（4 处：typed2/broad2）
+  - :280 [typed合理] `except (ValueError, ZeroDivisionError):`
+  - :286 [typed合理] `except (ValueError, ZeroDivisionError):`
+  - :296 [broad需收敛] `except Exception:`
+  - :341 [broad需收敛] `except Exception:`
+- **src/data/inspector.py**（2 处：pass形2）
+  - :42 [pass形真吞错] `except (ValueError, TypeError):`
+  - :92 [pass形真吞错] `except (ValueError, TypeError):`
+- **src/data/transforms.py**（2 处：typed2）
+  - :87 [typed合理] `except Exception as e:`
+  - :231 [typed合理] `except Exception as e:`
+- **src/experiment_design/jspsych_data_importer.py**（3 处：typed3）
+  - :91 [typed合理] `except (UnicodeDecodeError, UnicodeError):`
+  - :240 [typed合理] `except json.JSONDecodeError:`
+  - :482 [typed合理] `except (json.JSONDecodeError, TypeError):`
+- **src/experiment_design/procedure_builder.py**（1 处：typed1）
+  - :127 [typed合理] `except (ValueError, TypeError):`
+- **src/literature_feed/extract/grounding.py**（2 处：pass形1/typed1）
+  - :51 [pass形真吞错] `except (json.JSONDecodeError, ValueError):`
+  - :62 [typed合理] `except (json.JSONDecodeError, ValueError):`
+- **src/literature_feed/fetchers/manual_ingest.py**（3 处：typed2/broad1）
+  - :171 [typed合理] `except ImportError:`
+  - :181 [broad需收敛] `except Exception:`
+  - :187 [typed合理] `except (ValueError, TypeError):`
+- **src/literature_feed/fetchers/psy_science_official.py**（4 处：typed2/broad1/pass形1）
+  - :62 [typed合理] `except ImportError as exc:`
+  - :84 [typed合理] `except Exception as exc:`
+  - :126 [broad需收敛] `except Exception:`
+  - :249 [pass形真吞错] `except (TypeError, ValueError):`
+- **src/literature_feed/parsers/csl_normalizer.py**（4 处：typed4）
+  - :46 [typed合理] `except ValueError:`
+  - :53 [typed合理] `except ValueError:`
+  - :71 [typed合理] `except ValueError:`
+  - :90 [typed合理] `except ValueError:`
+- **src/literature_feed/storage/budget_tracker.py**（2 处：typed1/broad1）
+  - :101 [typed合理] `except (OSError, json.JSONDecodeError):`
+  - :116 [broad需收敛] `except Exception:`
+- **src/literature_feed/storage/feed_store.py**（4 处：broad1/typed3）
+  - :197 [broad需收敛] `except Exception:`
+  - :351 [typed合理] `except ValueError:`
+  - :476 [typed合理] `except sqlite3.IntegrityError:`
+  - :665 [typed合理] `except (TypeError, ValueError):`
+- **src/literature_feed/storage/migrations.py**（2 处：typed2）
+  - :124 [typed合理] `except Exception as e:`
+  - :127 [typed合理] `except Exception as e:`
+- **src/literature_feed/trend/domain_weights.py**（1 处：typed1）
+  - :54 [typed合理] `except ImportError as exc:`
+- **src/literature_feed/trend/method_weights.py**（1 处：typed1）
+  - :52 [typed合理] `except ImportError as exc:`
+- **src/literature_feed/ui/feed_panel.py**（4 处：typed3/pass形1）
+  - :238 [typed合理] `except (TypeError, ValueError):`
+  - :553 [pass形真吞错] `except json.JSONDecodeError:`
+  - :817 [typed合理] `except ImportError as exc:`
+  - :863 [typed合理] `except ImportError as exc:`
+- **src/literature_review/ingest.py**（2 处：broad1/typed1）
+  - :50 [broad需收敛] `except Exception:`
+  - :111 [typed合理] `except UnicodeDecodeError:`
+- **src/literature_review/matrix.py**（3 处：broad1/typed2）
+  - :166 [broad需收敛] `except Exception:`
+  - :198 [typed合理] `except (LLMUnavailableError, Exception):`
+  - :227 [typed合理] `except json.JSONDecodeError:`
+- **src/literature_review/search.py**（3 处：pass形2/broad1）
+  - :101 [pass形真吞错] `except Exception:`
+  - :110 [broad需收敛] `except Exception:`
+  - :120 [pass形真吞错] `except Exception:`
+- **src/literature_review/themes.py**（4 处：broad1/pass形2/typed1）
+  - :49 [broad需收敛] `except Exception:`
+  - :110 [pass形真吞错] `except Exception:`
+  - :330 [typed合理] `except (LLMUnavailableError, Exception):`
+  - :352 [pass形真吞错] `except Exception:`
+- **src/llm_gateway/active_config.py**（2 处：typed2）
+  - :45 [typed合理] `except (AttributeError, KeyError):`
+  - :83 [typed合理] `except (OSError, KeyError, UnicodeDecodeError) as exc:`
+- **src/llm_gateway/quick_models.py**（1 处：typed1）
+  - :108 [typed合理] `except UnicodeDecodeError:`
+- **src/output/__init__.py**（1 处：broad1）
+  - :16 [broad需收敛] `except Exception:`
+- **src/output/ai_trace_detector.py**（1 处：typed1）
+  - :247 [typed合理] `except re.error:`
+- **src/output/delivery_package.py**（2 处：typed2）
+  - :99 [typed合理] `except KaleidoMissingError:`
+  - :101 [typed合理] `except Exception as exc:`
+- **src/output/plotly_renderers.py**（1 处：broad1）
+  - :9 [broad需收敛] `except Exception:`
+- **src/output/snapshot.py**（1 处：broad1）
+  - :241 [broad需收敛] `except Exception:`
+- **src/output/zip_exporter.py**（4 处：pass形3/typed1）
+  - :52 [pass形真吞错] `except Exception:`
+  - :111 [pass形真吞错] `except Exception:`
+  - :146 [pass形真吞错] `except Exception:`
+  - :156 [typed合理] `except Exception as e:`
+- **src/paper_writer/defense_qa.py**（4 处：typed3/broad1）
+  - :253 [typed合理] `except (KeyError, ValueError, IndexError):`
+  - :274 [broad需收敛] `except Exception:`
+  - :449 [typed合理] `except (_json.JSONDecodeError, ValueError):`
+  - :551 [typed合理] `except Exception as exc:`
+- **src/paper_writer/literature_manager.py**（4 处：pass形2/broad2）
+  - :1531 [pass形真吞错] `except ImportError:`
+  - :1559 [broad需收敛] `except Exception:`
+  - :1670 [pass形真吞错] `except Exception:`
+  - :1714 [broad需收敛] `except Exception:`
+- **src/paper_writer/literature_search_async.py**（1 处：pass形1）
+  - :114 [pass形真吞错] `except Exception:`
+- **src/paper_writer/paper_engine.py**（4 处：pass形3/typed1）
+  - :758 [pass形真吞错] `except (LLMUnavailableError, Exception):`
+  - :867 [pass形真吞错] `except (LLMUnavailableError, Exception):`
+  - :920 [pass形真吞错] `except Exception:`
+  - :1058 [typed合理] `except Exception as e:`
+- **src/paper_writer/section_writers.py**（2 处：pass形2）
+  - :601 [pass形真吞错] `except (ValueError, TypeError):`
+  - :1015 [pass形真吞错] `except Exception:`
+- **src/parser/intent_resolver.py**（3 处：pass形1/typed2）
+  - :107 [pass形真吞错] `except Exception:`
+  - :118 [typed合理] `except ValueError:`
+  - :123 [typed合理] `except ValueError:`
+- **src/questionnaire/academic_literature.py**（3 处：pass形2/broad1）
+  - :90 [pass形真吞错] `except Exception:`
+  - :103 [broad需收敛] `except Exception:`
+  - :373 [pass形真吞错] `except Exception:`
+- **src/questionnaire/design_engine.py**（4 处：typed2/broad1/pass形1）
+  - :73 [typed合理] `except LLMEngineError as e:`
+  - :76 [typed合理] `except Exception as e:`
+  - :135 [broad需收敛] `except Exception:`
+  - :227 [pass形真吞错] `except Exception:`
+- **src/questionnaire/dimensions_paste_parser.py**（2 处：typed2）
+  - :90 [typed合理] `except ValueError:`
+  - :95 [typed合理] `except ValueError:`
+- **src/questionnaire/exporters.py**（1 处：typed1）
+  - :294 [typed合理] `except Exception as exc:`
+- **src/questionnaire/import_cleaning.py**（1 处：typed1）
+  - :93 [typed合理] `except (ValueError, TypeError):`
+- **src/questionnaire/intent_recognizer.py**（3 处：broad3）
+  - :216 [broad需收敛] `except Exception:`
+  - :264 [broad需收敛] `except Exception:`
+  - :323 [broad需收敛] `except Exception:`
+- **src/ui/deliverable_center_panel.py**（3 处：typed3）
+  - :223 [typed合理] `except Exception as e:`
+  - :248 [typed合理] `except Exception as e:`
+  - :260 [typed合理] `except Exception as e:`
+- **src/ui/export_gate.py**（1 处：pass形1）
+  - :41 [pass形真吞错] `except (TypeError, IndexError):`
+- **src/ui/heavy_preload.py**（2 处：pass形2）
+  - :22 [pass形真吞错] `except Exception:`
+  - :32 [pass形真吞错] `except Exception:`
+- **src/ui/literature_entry_panel.py**（2 处：typed2）
+  - :37 [typed合理] `except Exception as _feed_err:`
+  - :45 [typed合理] `except Exception as _review_err:`
+- **src/ui/literature_review_queue_panel.py**（1 处：typed1）
+  - :211 [typed合理] `except Exception as e:`
+- **src/ui/navigation.py**（1 处：typed1）
+  - :39 [typed合理] `except ValueError:`
+- **src/ui/onboarding.py**（4 处：pass形3/typed1）
+  - :43 [pass形真吞错] `except Exception:`
+  - :55 [pass形真吞错] `except Exception:`
+  - :69 [pass形真吞错] `except Exception:`
+  - :244 [typed合理] `except Exception as e:`
+- **src/ui/pages/privacy_gate.py**（1 处：pass形1）
+  - :38 [pass形真吞错] `except Exception:`
+- **src/ui/questionnaire_import_panel.py**（1 处：typed1）
+  - :58 [typed合理] `except Exception as e:`
+- **src/ui/quick_entries.py**（2 处：typed2）
+  - :608 [typed合理] `except Exception as exc:`
+  - :722 [typed合理] `except Exception as exc:`
+- **src/ui/session_reset.py**（2 处：pass形2）
+  - :147 [pass形真吞错] `except Exception:`
+  - :153 [pass形真吞错] `except Exception:`
+- **src/ui/startup_checks.py**（2 处：pass形1/broad1）
+  - :25 [pass形真吞错] `except Exception:`
+  - :39 [broad需收敛] `except Exception:`
+- **src/ui/template_center_panel.py**（1 处：typed1）
+  - :213 [typed合理] `except Exception as e:`
+- **src/ui/upstream_panel.py**（2 处：pass形2）
+  - :137 [pass形真吞错] `except Exception:`
+  - :648 [pass形真吞错] `except Exception:`
+- **src/upstream/feasibility_check.py**（4 处：broad2/typed1/pass形1）
+  - :68 [broad需收敛] `except Exception:`
+  - :408 [broad需收敛] `except Exception:`
+  - :453 [typed合理] `except (LLMUnavailableError, Exception):`
+  - :519 [pass形真吞错] `except (LLMUnavailableError, Exception):`
+- **src/upstream/routing.py**（2 处：typed1/pass形1）
+  - :142 [typed合理] `except RouteNotFoundError:`
+  - :157 [pass形真吞错] `except ValueError:`
+- **src/upstream/socratic_benchmark.py**（4 处：typed3/broad1）
+  - :131 [typed合理] `except (LLMUnavailableError, Exception):`
+  - :141 [typed合理] `except statistics.StatisticsError:`
+  - :158 [broad需收敛] `except Exception:`
+  - :180 [typed合理] `except json.JSONDecodeError:`
+- **src/upstream/tier.py**（3 处：broad3）
+  - :75 [broad需收敛] `except Exception:`
+  - :83 [broad需收敛] `except Exception:`
+  - :97 [broad需收敛] `except Exception:`
+- **src/upstream/topic_funnel_kb.py**（2 处：broad2）
+  - :394 [broad需收敛] `except Exception:`
+  - :449 [broad需收敛] `except Exception:`
+- **src/utils/archive_manager.py**（2 处：typed2）
+  - :106 [typed合理] `except (json.JSONDecodeError, OSError):`
+  - :140 [typed合理] `except (json.JSONDecodeError, OSError):`
+- **src/utils/autosave_bg.py**（1 处：broad1）
+  - :95 [broad需收敛] `except Exception:`
+- **src/utils/concurrency.py**（2 处：broad2）
+  - :34 [broad需收敛] `except Exception:`
+  - :59 [broad需收敛] `except Exception:`
+- **src/utils/data_audit_logging.py**（1 处：broad1）
+  - :32 [broad需收敛] `except Exception:`
+- **src/utils/evidence_quality.py**（2 处：typed1/pass形1）
+  - :150 [typed合理] `except (ValueError, TypeError):`
+  - :315 [pass形真吞错] `except (ValueError, TypeError):`
+- **src/utils/feedback_logger.py**（1 处：broad1）
+  - :168 [broad需收敛] `except Exception:`
+- **src/utils/figure_collection.py**（1 处：broad1）
+  - :179 [broad需收敛] `except Exception:`
+- **src/utils/friendly_errors.py**（1 处：pass形1）
+  - :297 [pass形真吞错] `except Exception:`
+- **src/utils/i18n.py**（1 处：broad1）
+  - :263 [broad需收敛] `except Exception:`
+- **src/utils/llm_timer.py**（3 处：pass形1/broad1/typed1）
+  - :29 [pass形真吞错] `except Exception:`
+  - :76 [broad需收敛] `except Exception:`
+  - :86 [typed合理] `except BaseException as e:`
+- **src/utils/memory_manager.py**（3 处：broad1/pass形2）
+  - :35 [broad需收敛] `except Exception:`
+  - :159 [pass形真吞错] `except OSError:`
+  - :189 [pass形真吞错] `except Exception:`
+- **src/utils/next_step_engine.py**（3 处：pass形1/typed2）
+  - :68 [pass形真吞错] `except (AttributeError, TypeError):`
+  - :97 [typed合理] `except AttributeError:`
+  - :111 [typed合理] `except AttributeError:`
+- **src/utils/perf_logger.py**（3 处：typed2/pass形1）
+  - :34 [typed合理] `except Exception as e:`
+  - :63 [pass形真吞错] `except Exception:`
+  - :76 [typed合理] `except (json.JSONDecodeError, ValueError):`
+- **src/utils/pipeline_manager.py**（4 处：broad2/typed2）
+  - :48 [broad需收敛] `except Exception:`
+  - :112 [typed合理] `except Exception as e:`
+  - :149 [broad需收敛] `except Exception:`
+  - :204 [typed合理] `except Exception as e:`
+- **src/utils/privacy_ethics.py**（2 处：typed1/pass形1）
+  - :179 [typed合理] `except OSError as e:`
+  - :193 [pass形真吞错] `except OSError:`
+- **src/utils/user_prefs.py**（4 处：typed3/pass形1）
+  - :63 [typed合理] `except (json.JSONDecodeError, OSError):`
+  - :87 [typed合理] `except (OSError, TypeError, ValueError):`
+  - :91 [pass形真吞错] `except OSError:`
+  - :155 [typed合理] `except OSError:`
+- **src/utils/workspace_state.py**（1 处：broad1）
+  - :237 [broad需收敛] `except Exception:`
+- **src/visualization/charts.py**（1 处：broad1）
+  - :49 [broad需收敛] `except Exception:`
+- **src/visualization/paper_export.py**（3 处：typed3）
+  - :67 [typed合理] `except ImportError:`
+  - :89 [typed合理] `except Exception as exc:`
+  - :324 [typed合理] `except Exception as e:`
+
+## 后续执行腿
+
+- **s1010-36（备用，broad 面收敛执行腿）**：取本清单 broad 需收敛 54 处为执行面，分两夜窗逐件改窄/补痕＋定向测试；pass 形 51 处与 s1010-38 全域索引（126 处横切面）对接处置；typed 90 处维持不动。
+- 本清单行号快照=2026-10-08 时点，各批执行时以开工 grep 复核为准（行漂移按锚点复核条款留痕）。

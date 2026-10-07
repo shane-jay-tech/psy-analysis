@@ -11,10 +11,13 @@
 from __future__ import annotations
 
 import copy
+import logging
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -324,8 +327,8 @@ def _force_save(
     if save_workspace_fn is not None:
         try:
             save_workspace_fn(session_state, project_id)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("阶段切换注入保存 save_workspace_fn 失败（漏斗推进不受阻）: %s", exc)
         return
 
     # 默认路径：调 autosave.trigger_autosave(session_state, build_workspace_snapshot, force=True)
@@ -333,9 +336,9 @@ def _force_save(
         from src.utils.autosave import trigger_autosave
         from src.utils.workspace import build_workspace_snapshot
         trigger_autosave(session_state, build_workspace_snapshot, force=True)
-    except Exception:
+    except Exception as exc:
         # 静默失败：autosave 故障不应阻塞漏斗推进
-        pass
+        logger.warning("autosave 强制保存失败（漏斗推进不受阻）: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +402,7 @@ def _deserialize_stages(stages: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str
     """反序列化分支的 stages（把 dict 转回 ChatMessage）。"""
     try:
         from src.paper_writer.ai_tutor import ChatMessage
-    except Exception:
+    except ImportError:
         ChatMessage = None
     out: Dict[str, Dict[str, Any]] = {}
     for sid, sdata in (stages or {}).items():
