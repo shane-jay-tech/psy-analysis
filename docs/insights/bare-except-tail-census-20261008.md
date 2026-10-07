@@ -296,3 +296,9 @@
 
 - **s1010-36（备用，broad 面收敛执行腿）**：取本清单 broad 需收敛 54 处为执行面，分两夜窗逐件改窄/补痕＋定向测试；pass 形 51 处与 s1010-38 全域索引（126 处横切面）对接处置；typed 90 处维持不动。
 - 本清单行号快照=2026-10-08 时点，各批执行时以开工 grep 复核为准（行漂移按锚点复核条款留痕）。
+
+## 执行态（s1010-36 回写）
+
+- **窗 1（2026-10-08 倒序班 sweep-20261008-0200rev）**：analysis 面 9 件 14 处已收敛——12 处 broad 补 logger.debug（except Exception as exc，热循环用 debug 防刷屏）＋`_sklearn_compat.py:32` 改窄 `(TypeError, ValueError)`（inspect 探测面）；控制流语义零变更；定向测试 36 passed（effect_size_ci/nonparametric/reliability 系）。commit 见 s1010-36 result。
+- **窗 2 待办（40 处）**：intent_recognizer 3、tier 3、nonparametric 外其余面 34 处（清单见上表 broad 标记，剔除 analysis 面已收 14）；执行时以开工 grep 复核行号，统计回退路径统一保 broad＋补 debug、导入卫兵改窄 ImportError、回调/降级面补 logger。
+- pass 形 51 处不在本执行腿范围（归 s1010-38 索引对接处置）。

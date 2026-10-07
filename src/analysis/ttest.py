@@ -1,10 +1,13 @@
 """t 检验：独立样本 / 配对样本 / 单样本"""
 
+import logging
 import pandas as pd
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass
 from typing import Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -293,7 +296,8 @@ def _cohens_d_ci(d: float, n1: int, n2: int, confidence: float = 0.95) -> Tuple[
             if d_low_val > d_high_val:
                 d_low_val, d_high_val = d_high_val, d_low_val
         return d_low_val, d_high_val
-    except Exception:
+    except Exception as exc:
+        logger.debug("效应量 CI 计算失败，返回 None: %s", exc)
         return None, None
 
 
@@ -338,5 +342,6 @@ def _cohens_d_ci_one_sample(d: float, n: int, confidence: float = 0.95):
         if d_low_val > d_high_val:
             d_low_val, d_high_val = d_high_val, d_low_val
         return d_low_val, d_high_val
-    except Exception:
+    except Exception as exc:
+        logger.debug("效应量 CI 计算失败，返回 None: %s", exc)
         return None, None

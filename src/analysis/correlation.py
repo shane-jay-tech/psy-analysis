@@ -1,10 +1,13 @@
 """相关分析：Pearson / Spearman"""
 
+import logging
 import pandas as pd
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -159,7 +162,8 @@ def partial_correlation(
                         p = pc["p-val"].values[0]
                     corr_arr[i, j] = r
                     p_arr[i, j] = p
-                except Exception:
+                except Exception as exc:
+                    logger.debug("pairwise 相关计算失败，置 NaN: %s", exc)
                     corr_arr[i, j] = np.nan
                     p_arr[i, j] = np.nan
 

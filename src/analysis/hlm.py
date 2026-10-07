@@ -6,10 +6,13 @@
 若 MixedLM 不可用，提供基于组均值的近似方法。
 """
 
+import logging
 import numpy as np
 import pandas as pd
 from typing import Optional, Dict, List
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 try:
     from statsmodels.regression.mixed_linear_model import MixedLM
@@ -245,7 +248,8 @@ def _compute_icc(df: pd.DataFrame, dv: str, group_col: str) -> float:
         var_between = float(result.cov_re.values[0]) if hasattr(result.cov_re, 'values') else float(result.cov_re.iloc[0, 0])
         var_within = float(result.scale)
         return var_between / (var_between + var_within) if (var_between + var_within) > 0 else 0.0
-    except Exception:
+    except Exception as exc:
+        logger.debug("MixedLM ICC 失败，回退 ANOVA 法: %s", exc)
         return _compute_icc_anova(df, dv, group_col)
 
 

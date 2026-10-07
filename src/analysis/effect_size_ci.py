@@ -13,9 +13,12 @@ from __future__ import annotations
 
 from typing import Tuple, Optional
 
+import logging
 import numpy as np
 from scipy import stats
 from scipy.optimize import brentq
+
+logger = logging.getLogger(__name__)
 
 
 def fisher_z_ci(
@@ -90,7 +93,8 @@ def chi_square_v_ci(
             if f_lo * f_hi > 0:
                 return 0.0  # 任意一边同号都截断到 0
             return brentq(lambda x: _ncp_at(target_p, x), lo, hi, maxiter=300)
-        except Exception:
+        except Exception as exc:
+            logger.debug("NCP 边界求根失败，返回 None: %s", exc)
             return None
 
     upper_search = max(chi_sq * 4 + 100, df + 100)

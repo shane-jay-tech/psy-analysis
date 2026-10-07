@@ -1,9 +1,12 @@
 """高级分析：ANCOVA / 中介效应 / 调节效应"""
+import logging
 import pandas as pd
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass, field
 from typing import Optional, List, Callable
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -97,7 +100,8 @@ def _adjusted_means(clean, dv, iv, covs):
             model = sm.OLS(y, X).fit()
             X_mean = sm.add_constant(pd.DataFrame([clean[covs].mean()], columns=covs))
             adj_mean = model.predict(X_mean).iloc[0]
-        except Exception:
+        except Exception as exc:
+            logger.debug("OLS 调整均值失败，回退组均值: %s", exc)
             adj_mean = g_data[dv].mean()
 
         rows.append({
@@ -227,13 +231,15 @@ def mediation_analysis(
             try:
                 ma = sm.OLS(z_sample[med], sm.add_constant(z_sample[x])).fit()
                 boot_a[med] = ma.params[x]
-            except Exception:
+            except Exception as exc:
+                logger.debug("bootstrap 路径a 失败，该中介记 0: %s", exc)
                 boot_a[med] = 0.0
 
         # 路径b
         try:
             mb = sm.OLS(z_sample[y], sm.add_constant(z_sample[[x] + mediators])).fit()
-        except Exception:
+        except Exception as exc:
+            logger.debug("bootstrap 路径b 失败，跳过本次重采样: %s", exc)
             continue
 
         boot_total = 0.0

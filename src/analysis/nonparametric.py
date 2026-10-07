@@ -1,9 +1,12 @@
 """非参数检验：Mann-Whitney U / Wilcoxon符号秩 / Kruskal-Wallis H / Friedman"""
+import logging
 import pandas as pd
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass
 from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,7 +55,8 @@ def mann_whitney(df: pd.DataFrame, dv: str, iv: str,
     method = "exact" if use_exact else "auto"
     try:
         u_stat, p_val = stats.mannwhitneyu(g1, g2, alternative="two-sided", method=method)
-    except Exception:
+    except Exception as exc:
+        logger.debug("exact 法不可用，回退默认 mannwhitneyu: %s", exc)
         u_stat, p_val = stats.mannwhitneyu(g1, g2, alternative="two-sided")
 
     if use_exact:
@@ -117,7 +121,8 @@ def wilcoxon_signed_rank(df: pd.DataFrame, col1: str, col2: str,
         try:
             w_stat, p_val = stats.wilcoxon(x, y, method="exact")
             warning = f"✅ 使用精确Wilcoxon符号秩检验（n={n}）。"
-        except Exception:
+        except Exception as exc:
+            logger.debug("精确 Wilcoxon 不可用，回退渐近近似: %s", exc)
             w_stat, p_val = stats.wilcoxon(x, y)
             warning = f"⚠ 精确检验不可用（n={n}），使用渐近近似。"
     else:

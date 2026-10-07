@@ -1,9 +1,12 @@
 """MANOVA / MANCOVA：多元方差分析（多个因变量的组间差异检验）"""
+import logging
 import pandas as pd
 import numpy as np
 from scipy import stats
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -207,5 +210,6 @@ def _box_m_test(df: pd.DataFrame, dvs: List[str], iv: str) -> Optional[Dict[str,
             "df": int(df_chi),
             "p": round(float(p_val), 4),
         }
-    except Exception:
+    except Exception as exc:
+        logger.debug("MANOVA 统计量计算失败，返回 None: %s", exc)
         return None

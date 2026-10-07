@@ -1,4 +1,5 @@
 """信度分析：Cronbach's α / 分半信度 / McDonald's ω / 组合信度 CR / ICC / 重测 / κ"""
+import logging
 import pandas as pd
 
 from src.analysis import thresholds
@@ -6,6 +7,8 @@ import numpy as np
 from scipy import stats
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -164,7 +167,8 @@ def mcdonald_omega(df: pd.DataFrame, items: list,
         idx = rng.choice(n_cases, size=n_cases, replace=True)
         try:
             boot_omegas.append(_compute_omega(data.iloc[idx]))
-        except Exception:
+        except Exception as exc:
+            logger.debug("bootstrap omega 计算失败，跳过该次: %s", exc)
             continue
     if boot_omegas:
         ci_lower = float(np.percentile(boot_omegas, 2.5))

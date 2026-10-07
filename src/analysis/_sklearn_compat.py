@@ -29,7 +29,7 @@ def _supports_legacy_kwarg(fn) -> bool:
         return "force_all_finite" in params or any(
             p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
         )
-    except Exception:
+    except (TypeError, ValueError):
         return True  # 探测不了就当它支持 → 不打补丁（保守）
 
 
