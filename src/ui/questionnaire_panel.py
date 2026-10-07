@@ -3,7 +3,6 @@
 import html
 import logging
 import threading
-import time
 
 import streamlit as st
 

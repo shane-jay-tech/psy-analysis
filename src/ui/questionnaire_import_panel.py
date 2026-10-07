@@ -11,7 +11,6 @@ import pandas as pd
 import streamlit as st
 
 from src.questionnaire.import_cleaning import (
-    ColumnClassification,
     ScaleDimension,
     CleaningResult,
     classify_columns,

@@ -446,7 +446,6 @@ def _render_ai_item_review(r: AIItemReviewResult):
 
     # ── Markdown 报告下载 ──
     if r.summary_markdown:
-        from datetime import datetime
         fname_safe = (r.construct_name or "construct").replace("/", "_").replace(" ", "_")
         st.download_button(
             "📥 下载预审报告（Markdown）",

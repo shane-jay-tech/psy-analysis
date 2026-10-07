@@ -20,11 +20,9 @@ from src.upstream.feasibility_check import (
 )
 from src.upstream.tier import ResearchTier, get_active_tier, set_active_tier
 from src.upstream.topic_funnel import (
-    MAX_STAGE,
     MIN_STAGE,
     STAGES,
     advance_stage,
-    archive_current_branch_and_restart,
     complete_funnel,
     delete_branch,
     get_funnel_history,

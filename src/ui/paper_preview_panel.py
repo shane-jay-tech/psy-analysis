@@ -13,7 +13,6 @@ import streamlit as st
 from src.paper_writer.draft_bundle import PaperDraftBundle, PaperSection
 from src.paper_writer.section_diff import SectionDiff, compute_section_diff
 from src.paper_writer.bundle_export import (
-    ExportMeta,
     bundle_to_markdown,
     bundle_to_export_result,
     validate_bundle_for_export,
