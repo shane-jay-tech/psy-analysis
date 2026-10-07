@@ -112,6 +112,10 @@ def check_sphericity(data: pd.DataFrame, alpha: float = 0.05) -> AssumptionResul
     """
     Mauchly 球形检验（用于重复测量ANOVA）。
     data: 每列为一个测量时间点
+
+    形态契约（s1007-25）：data 必须是**纯数值宽表**（每列=一个测量时间点，全数值 dtype）——
+    混入组名列等非数值列会在 np.cov 处抛 TypeError；长表（含组名列）请先 pivot 成宽表再传入。
+    例：df宽 = df长.pivot_table(index="被试", columns="时间点", values="得分")。
     """
     n, k = data.shape
     if k < 2:

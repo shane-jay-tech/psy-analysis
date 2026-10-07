@@ -276,3 +276,18 @@ def test_known_issues_note_line_still_carries_the_pointer_phrase():
     assert len(hits) == 1, f"法数注记行不唯一：{[i for i, _ in hits]}"
     line = hits[0][1]
     assert "src/analysis" in line, "注记的「精确清单以代码为准」活口句被删 ⇒ 需同步改写本套件说明"
+
+
+def test_check_sphericity_rejects_long_form_group_column():
+    """s1007-25 坏形态用例：混入组名列（非数值宽表违例）→ TypeError（形态契约钉）。"""
+    import pytest
+    import pandas as pd
+    from src.analysis.assumptions import check_sphericity
+
+    bad = pd.DataFrame({
+        "t1": [1.0, 2.0, 3.0],
+        "t2": [2.0, 3.0, 4.0],
+        "组名": ["a", "b", "a"],  # 长表残留列＝契约违例
+    })
+    with pytest.raises(TypeError):
+        check_sphericity(bad)
