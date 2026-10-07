@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Sequence
+
+from src.literature_feed.timestamps import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +34,6 @@ class RejectionReason(str, Enum):
 
 
 VALID_STATUSES = {"pending", "approved", "rejected", "deferred", "merged"}
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def review_candidate(
@@ -65,7 +62,7 @@ def review_candidate(
     ).fetchone()
     old_status = dict(old_row)["status"] if old_row else None
 
-    now = _utc_now()
+    now = utc_now()
 
     with store.transaction():
         conn.execute(

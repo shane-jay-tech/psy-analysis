@@ -14,6 +14,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 from ..parsers.csl_normalizer import crossref_to_raw
+from ..timestamps import utc_now
 from .base import (
     FetchError,
     FetchResult,
@@ -131,7 +132,7 @@ class CrossrefFetcher(SourceFetcher):
                 ra.container_title = self.config.journal_name
             articles.append(ra)
             raw_records.append({
-                "fetched_at": _utc_now(),
+                "fetched_at": utc_now(),
                 "source_id": self.source_id,
                 "issn": issn,
                 "url": _build_request_url(url, params),
@@ -168,11 +169,6 @@ def _default_since(days_back: int = 60) -> str:
     today = date.today()
     earlier = date.fromordinal(max(1, today.toordinal() - days_back))
     return earlier.isoformat()
-
-
-def _utc_now() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _build_request_url(base: str, params: List[tuple]) -> str:

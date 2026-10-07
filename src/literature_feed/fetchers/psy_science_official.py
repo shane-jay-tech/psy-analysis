@@ -14,11 +14,11 @@ from __future__ import annotations
 import hashlib
 import re
 import time
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..parsers.csl_normalizer import coerce_authors, normalize_iso_date
 from ..parsers.meta_tag_parser import extract_keywords_from_meta, parse_citation_meta
+from ..timestamps import utc_now
 from .base import (
     FetchError,
     FetchResult,
@@ -149,7 +149,7 @@ class PsyScienceOfficialFetcher(SourceFetcher):
             if ra:
                 articles.append(ra)
                 raw_records.append({
-                    "fetched_at": _utc_now(),
+                    "fetched_at": utc_now(),
                     "source_id": self.source_id,
                     "url": url,
                     "html_hash": hashlib.sha256(html_text.encode("utf-8")).hexdigest(),
@@ -266,7 +266,3 @@ def _first(values: Optional[List[str]]) -> Optional[str]:
         if v:
             return v.strip()
     return None
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
