@@ -291,6 +291,7 @@ _METHOD_ASSUMPTIONS: Dict[str, tuple] = {
         _ph("残差同方差性（异方差诊断）"),
     ),
     # ---- logistic 族（注意：不假设因变量或残差正态）----
+    # 欠账分型（s1007-26/s927-24）：三法 _ph 占位＝设计内「声明不适用」，非欠账；因变量二分类/类别数守卫已实装（logistic_regression.py:50-59）。
     "binary_logistic": (
         _ph("连续自变量与 logit 线性（Box-Tidwell）"),
         _ph("自变量间无严重多重共线性"),
@@ -335,6 +336,7 @@ _METHOD_ASSUMPTIONS: Dict[str, tuple] = {
         _ph("残差同方差性（按层级分别核查）"),
     ),
     # ---- SEM 族 ----
+    # 欠账分型（s1007-26/s927-24 类 I）：「样本量充足」existing 已实装（sem.py:71 n_obs<指标数×5 告警，覆盖断言 tests/test_sem_chisq_existing_coverage_s1007_26.py）——注册表接线待案①。
     "sem": (
         _ph("观测变量多元正态性"),
         _ph("样本量充足（常见口径 ≥ 10–20 × 自由参数）"),
@@ -353,6 +355,7 @@ _METHOD_ASSUMPTIONS: Dict[str, tuple] = {
         _ph("两组方差齐性与线性关系"),
     ),
     # ---- 卡方族 ----
+    # 欠账分型（s1007-26/s927-24 类 I）：「期望频数充足」existing 已实装（chi_square.py:47-52 expected<5 告警＋Fisher 建议，覆盖断言同上测试件）——注册表接线待案①。
     "chi_square_gof": (
         _ph("期望频数充足（各单元格期望 ≥ 5）"),
         _ph("观测间相互独立"),
