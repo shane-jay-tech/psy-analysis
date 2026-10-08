@@ -45,9 +45,11 @@ class TestWelchANOVA:
         result = welch_anova(df, "score", "group")
         # 3组且p<0.05时应有Games-Howell事后检验
         assert result.post_hoc is not None
-        # s1007-19 案A 改名随动：列内为 pingouin 未校正 p，不再挂 Games-Howell 事后名
-        assert "p (uncorrected)" in result.post_hoc.columns
-        assert "p (Games-Howell)" not in result.post_hoc.columns
+        # s1008-01 复算订正（钉桩同笔翻正）：pingouin pval=studentized_range.sf(√2·|t|,ng,df)
+        # 本为 GH 族校正后 p，s1007-19 案A"uncorrected"改名前提不成立，还原真名；
+        # 案B 补 Holm 列不落＝对已族校正 p 再 Holm 属双重校正
+        assert "p (Games-Howell)" in result.post_hoc.columns
+        assert "p (uncorrected)" not in result.post_hoc.columns
 
     def test_less_than_two_groups_raises(self):
         df = pd.DataFrame({

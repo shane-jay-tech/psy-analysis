@@ -745,7 +745,7 @@ def export_csv(output: dict):
             buf.write(result.p_matrix.to_csv())
             buf.write("\n# 显著性标记\n")
             buf.write(result.sig_mask.to_csv())
-            buf.write("\n# 注: 星号阈值为 0.001/0.01/0.05, 未做多重比较校正 (s1007-19/S3)\n")
+            buf.write("\n# 注: 星号阈值为 0.001/0.01/0.05, 基于矩阵内 Holm 校正后 p (s1008-01/S2)\n")
 
         elif isinstance(result, ChiSquareResult):
             buf.write("\n# 卡方检验结果\n")

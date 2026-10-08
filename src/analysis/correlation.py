@@ -27,10 +27,42 @@ def _stars(p: float) -> str:
     """相关显著性星号（s1007-19 S1 单源化）：阈值 0.001/0.01/0.05 三处同源。
 
     历史：:83/:164/:219 三处逐字同构 lambda 各写一份 ⇒ 改阈值必漏（s1004-55 钉桩）。
-    本函数零数值变化（同阈值同输出，纯去重）；多重比较校正（S2）属统计红线另裁，
-    未校正现状由脚注声明（S3）。
+    s1008-01/S2 起：矩阵面（correlation_matrix/partial_correlation）传入本函数前
+    已做族内 Holm 校正（见 _stars_matrix_holm）；本函数阈值语义零改动。
     """
     return "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else ""))
+
+
+def _stars_matrix_holm(p_df: pd.DataFrame) -> pd.DataFrame:
+    """相关矩阵星号（s1008-01/S2 校正化）：矩阵内 k(k−1)/2 族 Holm 校正后再打星。
+
+    材料：docs/insights/gh-label-corr-stars-20261004.md s1004-55 §三 S2 案
+    （用户 2026-10-08 拍板三件全落）。族＝上三角非 NaN p（行主序定序）；
+    对角线（p=0 自身相关）与 NaN 元不入族，各按原值打星/空串（零阈值改动，
+    星号阈值仍 0.001/0.01/0.05）。Holm 选型对齐全仓 mc_method 缺省
+    （runner.py:735，44a0:45）。点二列（族大小=1，Holm 恒等）不走本函数，
+    维持单 p 单星（材料 s1004-55 §一明示无校正问题）。
+    """
+    from statsmodels.stats.multitest import multipletests
+
+    n = len(p_df)
+    idx = [
+        (i, j)
+        for i in range(n)
+        for j in range(i + 1, n)
+        if pd.notna(p_df.iloc[i, j])
+    ]
+    adj = p_df.astype(float).copy()
+    if idx:
+        pvals = [float(p_df.iloc[i, j]) for i, j in idx]
+        _, p_holm, _, _ = multipletests(pvals, method="holm")
+        for (i, j), pa in zip(idx, p_holm):
+            adj.iloc[i, j] = pa
+            adj.iloc[j, i] = pa
+    sig = adj.copy()
+    for c in sig.columns:
+        sig[c] = sig[c].apply(_stars)
+    return sig
 
 def correlation_matrix(
     df: pd.DataFrame,
@@ -90,10 +122,8 @@ def correlation_matrix(
     p_df = pd.DataFrame(p_arr, index=valid_cols, columns=valid_cols)
     n_df = pd.DataFrame(n_arr, index=valid_cols, columns=valid_cols)
 
-    # 显著性标记
-    sig_mask = p_df.copy()
-    for c in sig_mask.columns:
-        sig_mask[c] = sig_mask[c].apply(_stars)
+    # 显著性标记（s1008-01/S2：k(k−1)/2 族 Holm 校正后再打星，阈值零改动）
+    sig_mask = _stars_matrix_holm(p_df)
 
     # Round numeric matrices (avoid DataFrame.map which changed across pandas versions)
     corr_vals = corr_df.to_numpy(dtype=float, copy=True)
@@ -171,9 +201,7 @@ def partial_correlation(
     p_df = pd.DataFrame(p_arr, index=columns, columns=columns)
     n_df = pd.DataFrame(n_arr, index=columns, columns=columns)
 
-    sig_mask = p_df.copy()
-    for c in sig_mask.columns:
-        sig_mask[c] = sig_mask[c].apply(_stars)
+    sig_mask = _stars_matrix_holm(p_df)  # s1008-01/S2：族内 Holm 校正后再打星
 
     corr_vals = corr_df.to_numpy(dtype=float, copy=True)
     p_vals = p_df.to_numpy(dtype=float, copy=True)

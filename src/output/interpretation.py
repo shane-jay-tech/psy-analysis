@@ -161,12 +161,13 @@ def _interpret_anova(r: ANOVAResult, test_type: str) -> str:
         lines.append(f"\n📏 **效应量：{r.effect_size_name} = {r.effect_size:.3f}**")
         lines.append(_interpret_eta_sq(r.effect_size))
 
-        # 事后检验
+        # 事后检验（s1008-01/Tukey 文案层：声明 p 已族校正——_tukey_hsd 用 studentized
+        # range 分布 p=studentized_range.sf(q,k,df_error)，⭐ 为校正后显著，非裸 0.05 星）
         if r.post_hoc is not None and not r.post_hoc.empty:
-            lines.append("\n🔍 **事后多重比较（Tukey HSD）：**")
+            lines.append("\n🔍 **事后多重比较（Tukey HSD，p 已做族内校正）：**")
             sig_pairs = r.post_hoc[r.post_hoc["p (Tukey HSD)"] < 0.05]
             for _, row in sig_pairs.iterrows():
-                lines.append(f"  • {row['比较']}：p={row['p (Tukey HSD)']:.4f} ⭐")
+                lines.append(f"  • {row['比较']}：p(校正后)={row['p (Tukey HSD)']:.4f} ⭐")
 
     elif test_type == "two_way_anova":
         lines.append(

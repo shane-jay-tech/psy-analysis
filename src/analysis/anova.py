@@ -575,7 +575,10 @@ def welch_anova(
                     "比较": f"{row['A']} vs {row['B']}",
                     "均值差": round(float(row["diff"]), 3),
                     "SE": round(float(row["se"]), 3),
-                    "p (uncorrected)": round(float(row["pval"]), 4),  # s1007-19 案A: pingouin pval 为未校正 p, 不再挂 Games-Howell 事后名
+                    # s1008-01 复算订正：pingouin pval=studentized_range.sf(√2·|t|,ng,df)，
+                    # 与 Tukey 同族公式，本为 GH 族校正后 p——44a0"未校正"前提被复算推翻，
+                    # s1007-19 案A"uncorrected"误标还原真名；案B 补 Holm 列不落＝避免双重校正
+                    "p (Games-Howell)": round(float(row["pval"]), 4),
                 })
             post_hoc = pd.DataFrame(post_rows)
         except Exception as exc:

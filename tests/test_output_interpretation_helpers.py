@@ -48,3 +48,25 @@ def test_generate_interpretation_handles_missing_unknown_and_descriptive_results
     assert missing
     assert "Custom" in unknown
     assert "10" in descriptive and "3.2" in descriptive
+
+
+def test_tukey_posthoc_header_declares_family_correction():
+    """s1008-01/Tukey 文案层钉桩：⭐ 须声明为族校正后显著（非裸 0.05 星）。"""
+    import numpy as np
+
+    from src.analysis.anova import ANOVAResult, one_way_anova
+
+    rng = np.random.default_rng(1)
+    df = pd.DataFrame(
+        {
+            "score": np.concatenate(
+                [rng.normal(0, 1, 20), rng.normal(2, 1, 20), rng.normal(4, 1, 20)]
+            ),
+            "group": ["A"] * 20 + ["B"] * 20 + ["C"] * 20,
+        }
+    )
+    result = one_way_anova(df, "score", "group")
+    assert result.post_hoc is not None
+    text = interpretation._interpret_anova(result, "one_way_anova")
+    assert "p 已做族内校正" in text
+    assert "p(校正后)=" in text
