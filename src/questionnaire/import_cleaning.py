@@ -118,11 +118,13 @@ def compute_dimension_scores(
 ) -> pd.DataFrame:
     """计算各维度得分（均分）。
 
-    r5 B1（2026-09-27 用户裁决）：**越界值不再当有效分数**——先把落在
-    `[dim.min_score, dim.max_score]` 之外的值（录入串位、哨兵 99 之类）置为 NaN，
-    再做反向计分。改前 `reverse_score(99, 5, 1) = 6 - 99 = -93` 会被直接平均进维度分，
-    把均分拽成负数（"越界静默变成有效分数"）。越界单元格按列计数写进
-    `out_of_range_counts`，供清洗日志与报告显式播报，不静默吞掉。
+    案 a（决议#17，2026-10-09 用户裁决「非法输入直接报错不静默」；c47f 案 a 原文
+    「reverse_score 前按字典量尺做越界校验并抛错」）：越界值在计分前**直接抛
+    ValueError**——错误信息含列名、量表域、越界数与首处行索引，**不含原始值**。
+    历史：r5 B1（2026-09-27）曾裁 mask+count（置 NaN＋out_of_range_counts 播报）；
+    本裁决升格为最严案，mask 路径退役（counts 仍先记账再抛，供上层日志留痕）。
+    清洗管道（clean_questionnaire）先行整行剔除无效样本 ⇒ 正常管道流不受扰；
+    直调计分入口遇脏数据即抛＝「静默计分」面终结。
     """
     scored = pd.DataFrame(index=df.index)
     for dim in dimensions:
@@ -137,7 +139,11 @@ def compute_dimension_scores(
             if n_out:
                 if out_of_range_counts is not None:
                     out_of_range_counts[item] = out_of_range_counts.get(item, 0) + n_out
-                col_data = col_data.mask(out_of_range)
+                raise ValueError(
+                    f"越界值校验失败（案 a，决议#17）：列 {item} 存在 {n_out} 个"
+                    f"量表域 [{lo:g}, {hi:g}] 之外的取值"
+                    f"（首个位置：行索引 {out_of_range.idxmax()}）——非法输入不静默计分"
+                )
             if item in dim.reverse_items:
                 col_data = reverse_score(col_data, dim.max_score, dim.min_score)
             dim_df[item] = col_data
