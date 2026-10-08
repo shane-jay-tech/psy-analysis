@@ -17,6 +17,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+import logging
 
 LOCK_FILENAME = ".psy_project.lock"
 DEFAULT_STALE_SECONDS = 600.0  # 10 分钟——标定域=单进程段最坏时长；与 feed 锁 ttl 6h 的 36:1 属任务体差异非漂移（s1007-18 对照行 #1，标定注释补齐 s1007-35）
@@ -118,6 +119,7 @@ def project_lock(lock_dir, *, stale_seconds: float = DEFAULT_STALE_SECONDS):
             except FileNotFoundError:
                 continue  # 锁刚被持有者释放：直接重试获取
             if age > stale_seconds and (holder_pid is None or not _pid_alive(holder_pid)):
+                logging.warning('project_lock: stale lock override on %s (holder=%s, age=%.0fs)', lock_path, holder_pid, age)
                 # 陈旧锁：先挪走再删，避免双夺取竞态
                 moved = f"{lock_path}.stale-{uuid.uuid4().hex[:8]}"
                 try:
