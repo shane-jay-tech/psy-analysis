@@ -120,7 +120,7 @@ def reliability_guidance(construct: dict) -> str:
         "- 状态型构念（如焦虑、心情）的重测信度预期较低，属正常现象\n\n"
         "**分半信度：**\n"
         "- 将题目按奇偶序号分为两半，计算Spearman-Brown校正后的相关系数\n"
-        "- ≥ 0.70 为可接受"
+        f"- ≥ {thresholds.SPLIT_HALF.acceptable} 为可接受（s1014-02 收口：原裸字面 0.70 漏网处）"
     )
 
 
