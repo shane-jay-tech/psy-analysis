@@ -108,6 +108,19 @@ def feed_sandbox(monkeypatch, tmp_path):
     monkeypatch.setattr(feed_paths, "DB_PATH", root / "feed.sqlite")
     monkeypatch.setattr(
         feed_paths, "TRENDING_WEIGHTS_PATH", root / "trending_weights.yaml")
+    # s930-04（s927-41 遗留·案 A）：`src/literature_feed/__init__.py:10-18` 在**包导入期**
+    # 把指向生产库的 DB_PATH 等常量复制成了包级副本——fixture 原先只重指 feed_paths 上的
+    # 属性、没重指包里那份副本 ⇒ 裸跑时守卫 :122 抓到 `src.literature_feed.DB_PATH` 仍指
+    # 生产库而拒跑（8 errors）。此处把 sys.modules 里包对象的副本同步重指沙盒。
+    import src.literature_feed as _feed_pkg
+
+    monkeypatch.setattr(_feed_pkg, "DATA_ROOT", root, raising=False)
+    monkeypatch.setattr(_feed_pkg, "DB_PATH", root / "feed.sqlite", raising=False)
+    monkeypatch.setattr(_feed_pkg, "JSONL_RAW_DIR", root / "raw", raising=False)
+    monkeypatch.setattr(_feed_pkg, "LOCK_DIR", root / "locks", raising=False)
+    monkeypatch.setattr(_feed_pkg, "DOMAIN_WEIGHTS_PATH", root / "domain_weights.yaml", raising=False)
+    monkeypatch.setattr(_feed_pkg, "BUDGET_PATH", root / "budget.yaml", raising=False)
+    monkeypatch.setattr(_feed_pkg, "FETCH_LOCK_FILE", root / "fetch.lock", raising=False)
 
     prod_db = (
         pathlib.Path(_ROOT) / "data" / "literature_feed" / "feed.sqlite"

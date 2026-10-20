@@ -101,13 +101,12 @@ def test_notes_face_swaps_in_a_literature_dict_without_complaining():
 
 # ─────────────────────── search 面：一条脏 year 整表弃（现状钉桩） ───────────────────────
 def test_search_rescore_one_dirty_year_drops_entire_table():
-    """现状：`search.py:230` 的直转对 [好, 脏, 好] 抛 ValueError ⇒ 三条全弃（完成标准 3）。
-
-    修复后（A 案跳过并告警）本例应翻红成「产出 2 条」。
-    """
+    """**s930-02 翻面**：容错落地后 [好, 脏, 好] 不再整表弃——产出 2 条＋脏行 logger 标注
+    （原「现状钉」断言 pytest.raises(ValueError)，其 docstring 自述「修复后（A 案跳过并告警）
+    本例应翻红成产出 2 条」——本翻面即该预告的兑现）。"""
     rows = [_good_lit(1, "2019"), _good_lit(2, "约 2019"), _good_lit(3, "2020")]
-    with pytest.raises(ValueError):
-        rescore_existing_items(rows, "压力与绩效", None)
+    out = rescore_existing_items(rows, "压力与绩效", None)
+    assert [r["key"] for r in out] == ["k1", "k3"], f"脏行跳过好行保留：{[r['key'] for r in out]}"
 
 
 @pytest.mark.parametrize("empty", [[], None])
@@ -143,7 +142,7 @@ def test_search_rescore_non_dict_element_raises_too():
         ("panel.py:757 _materialize_items", lambda: lrp._materialize_items(["非dict"]), True,
          lambda: lrp._materialize_items([_good_lit(1), _good_lit(2, "约 2019")]), False),
         ("search.py:230 rescore_existing_items", lambda: rescore_existing_items(["非dict"], "", None), True,
-         lambda: rescore_existing_items([_good_lit(1), _good_lit(2, "约 2019")], "", None), True),
+         lambda: rescore_existing_items([_good_lit(1), _good_lit(2, "约 2019")], "", None), False),  # s930-02:dirty 格 True→False＝容错落地(与 panel 行同款)
         ("notes.py:157 notes_from_dict_list", lambda: notes_from_dict_list(["非dict"]), False,
          lambda: notes_from_dict_list([{"note_id": 123, "content": "脏数字"}]), False),
     ],
@@ -177,8 +176,9 @@ def test_literature_item_from_dict_is_the_common_raise_source():
     """
     with pytest.raises(ValueError):
         LiteratureItem.from_dict({"key": "k", "year": "约 2019"})
-    with pytest.raises(ValueError):
-        rescore_existing_items([{"key": "k", "year": "约 2019"}], "", None)
+    # s930-02 翻面：rescore 面已被容错层包住（同源性判据改为单跑 models 直调，见
+    # test_litreview_dirty_row_tolerance_s93002.py）；此处改钉「不再抛、产出 0 条」。
+    assert rescore_existing_items([{"key": "k", "year": "约 2019"}], "", None) == []
 
 
 if __name__ == "__main__":  # pragma: no cover

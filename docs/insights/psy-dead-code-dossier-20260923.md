@@ -101,3 +101,17 @@ collect-only 例数（`-q --collect-only | rg -c "::"`）：
 1. 两处符号的删或接**均未执行**（本单只读取证，且案 A 的第一步要动在途禁碰件 `app.py`）⇒ 落 partial 交主班裁决。
 2. 需裁决三问：① `generate_design_summary` 是接 UI 还是接受"永久只作 report 的对照物"？② 是否授权修 summary 的两处在册钉桩缺陷（措辞分叉／空节残留）——修它＝行为改动，超出执行手授权。③ `get_test_name_zh` 删除前，`app_pages_text.py:169-197` 的双语硬编码文案是否并入 i18n 单一来源？
 3. 建议主班把 §3.1"拆看守"这一面写进台账再判案 A —— s922-15 那 6 例是**成对钉桩**，删一侧会让 `generate_design_report` 的文案看守静默退化（绿灯还在、覆盖面没了），比直接少 6 例更危险。
+
+---
+
+## ⚠ 勘误横幅（2026-10-02 追加，s930-38；append-only，正文一字未改）
+
+> 三处数字经现值复核订正（s927-46 遗留点名；取证命令与现值输出逐条在档）：
+>
+> | # | 原文（s923-07 时点） | 现值（2026-10-02 复核） | 取证命令 |
+> |---|---|---|---|
+> | 1 | 「两处在册钉桩」 | **一处**（tests/test_questionnaire_design.py:125 起「s922-15 钉桩：generate_design_summary」唯一区块；另一处 66cc9ff 已闭合——`git log --all --grep 66cc9ff` 零命中＝该 sha 面已不在任何可达历史） | `grep -rn "generate_design_summary" tests/test_questionnaire_design.py` → 11 命中/1 区块 |
+> | 2 | 「测试引用 15 行」 | **18 行／16 处调用**（grep 计数 31 处含 summary 泛词，其中 generate_design_summary 精确引用 11 行＋上下文断言行合计 18 行/16 调用位——q927-46 复核值为准） | `grep -rn "generate_design_summary" tests/ \| wc -l` |
+> | 3 | 「41 passed」 | **22 passed + 2 warnings**（tests/test_questionnaire_design.py 定向单跑 @ 2026-10-02；该件现含 22 枚 def test——用例数本身与 passed 一致） | `python -m pytest tests/test_questionnaire_design.py -q` |
+>
+> **勿按原文三数引用**；数字不自相矛盾声明：本横幅三值＝本次复核值，与原文差值系 HEAD 推进（s922-15 钉桩并入＋用例增补）非笔误。

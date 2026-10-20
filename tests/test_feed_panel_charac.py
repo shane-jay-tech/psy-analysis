@@ -16,20 +16,10 @@ import pytest
 import src.literature_feed.ui.feed_panel as fp
 
 
-class FakeState(dict):
-    def get(self, key, default=None):
-        return super().get(key, default)
-
-
-class _Ctx:
-    def __init__(self, host, label="", kind="ctx"):
-        self.host, self.label, self.kind = host, label, kind
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
+# s930-15：FakeState/_Ctx/收集桶基座抽至 tests/_feed_st_harness.py（s927-58 遗留
+# 「单点抽出」）；button/columns/dataframe 三核心方法语义已分叉由本件覆写保留，
+# markdown/warning/divider/__getattr__ 与基座同款（子类覆写同语义冗余无害）。
+from tests._feed_st_harness import FakeState, FeedStBase, _Ctx  # noqa: F401
 
 
 class _ColConfig:
@@ -38,9 +28,9 @@ class _ColConfig:
         return ("text", label, k)
 
 
-class FakeSt:
+class FakeSt(FeedStBase):
     def __init__(self, clicked=()):
-        self.session_state = FakeState()
+        super().__init__()
         self.clicked = set(clicked)
         self.titles, self.captions, self.markdowns = [], [], []
         self.errors, self.warnings, self.successes, self.infos, self.toasts = [], [], [], [], []

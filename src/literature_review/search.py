@@ -8,7 +8,11 @@ import re
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
+import logging
+
 from .models import LiteratureItem
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +231,16 @@ def rescore_existing_items(
     if not items_dict:
         return []
     # 转 LiteratureItem，重排，再转回 dict
-    items_obj = [LiteratureItem.from_dict(d) for d in items_dict]
+    # s930-02（s927-29 遗留·孪生漂移闭合）：单条脏值不再拖垮整表（与文献侧
+    # _materialize_items 的 s927-29 A 案同语义：只兜解析/转换层，好行照常产出，
+    # 脏行走 logger 显式标注不静默消失）。
+    items_obj = []
+    for idx, d in enumerate(items_dict):
+        try:
+            items_obj.append(LiteratureItem.from_dict(d))
+        except (ValueError, TypeError) as exc:  # 只兜脏数字；非 dict 等编程错误照旧抛
+            name = (d.get("title") or d.get("key") or "?") if isinstance(d, dict) else "?"
+            logger.warning("rescore_existing_items 第 %s 条脏行已跳过（「%s」%s）", idx, name, exc)
     items_obj = rank_by_relevance(items_obj, research_q, candidate_vars)
     return [it.to_dict() for it in items_obj]
 

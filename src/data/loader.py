@@ -94,7 +94,14 @@ def load_excel(file_path: str, sheet_name=None, usecols=None) -> Tuple[pd.DataFr
 
 
 def load_spss(file_path: str) -> Tuple[pd.DataFrame, dict]:
-    """加载SPSS .sav文件，应用值标签"""
+    """加载SPSS .sav文件，应用值标签
+
+    user_missing 语义钉死（s1007-09；实证见 docs/insights/spss-missing-codes-20261005.md，
+    pyreadstat 1.3.5）：本函数未传 user_missing，走**默认 False ＝ 应用用户缺失定义置 NaN**——
+    与字面相反；True 才是「保留原值」。
+    误用反模式：若为「保留 99」而传 True，下游 missing_pct 会反向
+    （默认路径 99 计缺失 25%；True 保留 99 反而 0%）。变更本参数属统计语义变更，须主班裁。
+    """
     import pyreadstat
 
     df, meta_py = pyreadstat.read_sav(file_path)

@@ -78,6 +78,7 @@ def build_delivery_package(spec: DeliverySpec) -> bytes:
                 )
             else:
                 fig_count = 0
+                fig_failed: List[str] = []
                 for i, fig_spec in enumerate(spec.figures, start=1):
                     fig = fig_spec.get("fig")
                     if fig is None:
@@ -97,10 +98,19 @@ def build_delivery_package(spec: DeliverySpec) -> bytes:
                         fig_count += 1
                     except KaleidoMissingError:
                         break
-                    except Exception:
-                        logger.debug("图表导出失败: %s", filename, exc_info=True)
+                    except Exception as exc:
+                        # s1004-31（0e66 遗留）：逐图失败不得 debug 级静默——
+                        # warning＋点名＋清单，其余图继续；inventory 行同步可见。
+                        logger.warning("图表导出失败已跳过: %s（%s）", filename, exc)
+                        fig_failed.append(filename)
                         continue
-                inventory.append(f"📁 图表集/（共 {fig_count} 张论文版 PNG，{spec.figure_palette} 配色）")
+                failed_note = (
+                    f"，{len(fig_failed)} 张失败跳过：{'、'.join(fig_failed)}"
+                    if fig_failed else ""
+                )
+                inventory.append(
+                    f"📁 图表集/（共 {fig_count} 张论文版 PNG{failed_note}，{spec.figure_palette} 配色）"
+                )
         else:
             inventory.append("📁 图表集/（未收藏图表 — 请在分析后点击「📌 加入论文图表集」）")
 

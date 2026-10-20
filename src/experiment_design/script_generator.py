@@ -168,7 +168,7 @@ def _gen_between_subjects(
     ]
 
     conditions_js_array = ", ".join(
-        f'{{id: {c["id"]}, name: "{c["name"]}", label: "{c["label"]}"}}'
+        f'{{id: {c["id"]}, name: "{escape_js_string(c["name"])}", label: "{c["label"]}"}}'
         for c in cond_json
     )
 
@@ -404,13 +404,13 @@ def _gen_within_subjects(
     from .procedure_builder import generate_balanced_latin_square
     square = generate_balanced_latin_square(n_conditions)
     orders_json = ", ".join(
-        "[{}]".format(", ".join(f'"{cond_list[j-1]}"' for j in row))
+        "[{}]".format(", ".join(f'"{escape_js_string(cond_list[j-1])}"' for j in row))
         for row in square
     )
     all_orders = f"[{orders_json}]"
 
     conditions_js_array = ", ".join(
-        f'{{id: {c["id"]}, name: "{c["name"]}", label: "{c["label"]}"}}'
+        f'{{id: {c["id"]}, name: "{escape_js_string(c["name"])}", label: "{c["label"]}"}}'
         for c in cond_json
     )
 
@@ -737,7 +737,7 @@ def convert_items_to_jspsych_likert(items: List[Dict]) -> str:
     """
     questions = []
     for item in items:
-        q = f'{{prompt: "{item.get("text", "")}", labels: ["完全不同意", "不同意", "不确定", "同意", "完全同意"], name: "Q{item.get("index", 0)}", required: true}}'
+        q = f'{{prompt: "{escape_js_string(item.get("text", ""))}", labels: ["完全不同意", "不同意", "不确定", "同意", "完全同意"], name: "Q{item.get("index", 0)}", required: true}}'
         questions.append(q)
     return "[\n    " + ",\n    ".join(questions) + "\n]"
 
@@ -746,6 +746,8 @@ def convert_instructions_to_jspsych(instructions: List[Dict]) -> str:
     """将指导语列表转换为 jsPsych instructions 插件的 pages 数组"""
     pages = []
     for inst in instructions:
-        text = inst.get("text", "").replace("\n", "\\n").replace('"', '\\"')
+        # s1004-26（pd01 遗留）：只转 " 与换行不够——\ 必须最先、反引号/${/</> 全族
+        # 走 _JS_STRING_SUBS（escape_js_string），与四上下文转义函数并轨。
+        text = escape_js_string(inst.get("text", ""))
         pages.append(f'"{text}"')
     return "[\n    " + ",\n    ".join(pages) + "\n]"

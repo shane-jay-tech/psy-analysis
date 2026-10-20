@@ -99,7 +99,7 @@ def _interpret_ttest(r: TTestResult, test_type: str) -> str:
             direction = "上升" if r.mean_diff > 0 else "下降"
             lines.append(f"\n✅ **结论：存在显著差异**")
             lines.append(
-                f"处理后得分显著{direction}（均值差={r.mean_diff:.3f}），"
+                f"第二次测量得分显著{direction}（相对第一次测量，均值差={r.mean_diff:.3f}），"
                 f"t({r.df})={r.t_statistic:.3f}, p={r.p_value:.4f}。"
             )
         else:
@@ -625,7 +625,7 @@ def _interpret_cohens_d(d: float) -> str:
     elif d < 0.8:
         return "属于中等效应量（APA 惯例：0.5 为中等）。"
     else:
-        return "属于大效应量（APA 惯例：0.8 以上为大），差异具有明显的实际意义。"
+        return "属于大效应量（APA 惯例：0.8 以上为大），通常对应较大的实际效应；实际意义仍需结合领域背景判断。"
 
 
 def _interpret_eta_sq(eta: float) -> str:

@@ -39,15 +39,10 @@ LEGACY_WRONG_KEYS = ("articles_new", "constructs", "methods")
 
 
 # ───────────────────────────── 假 st / 假 store ─────────────────────────────
-class _Ctx:
-    def __init__(self, host, label="", kind="ctx"):
-        self.host, self.label, self.kind = host, label, kind
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
+# s930-15：_Ctx 与收集桶基座抽至 tests/_feed_st_harness.py（s927-58 遗留「单点抽出」）；
+# button（恒 False 零副作用口径）/columns（int 断言）/dataframe（list 形状）三核心语义
+# 已分叉，由本件覆写保留。本件无 session_state 面（不继承 FakeState 需求）。
+from tests._feed_st_harness import FeedStBase, _Ctx  # noqa: F401
 
 
 class _ColConfig:
@@ -56,23 +51,15 @@ class _ColConfig:
         return ("checkbox", k)
 
 
-class FakeSt:
+class FakeSt(FeedStBase):
     def __init__(self):
-        self.markdowns: List[str] = []
+        super().__init__()
         self.dataframes: List[List[Dict[str, Any]]] = []
-        self.warnings: List[str] = []
-        self.dividers = 0
         self.buttons: List[str] = []
         self.column_config = _ColConfig()
 
-    def markdown(self, msg, **k):
-        self.markdowns.append(msg)
 
-    def warning(self, msg, **k):
-        self.warnings.append(msg)
 
-    def divider(self, **k):
-        self.dividers += 1
 
     def columns(self, n=1, **k):
         assert isinstance(n, int), "feed_panel 只按 int 请求列，勿在此扩面"

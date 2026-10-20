@@ -78,7 +78,9 @@ def plotly_figs_to_figure_items(
         KaleidoMissingError, to_paper_png,
     )
     items: List[FigureItem] = []
-    for caption, fig in plotly_specs:
+    failed: List[str] = []
+    total = len(plotly_specs)
+    for idx, (caption, fig) in enumerate(plotly_specs, start=1):
         try:
             png = to_paper_png(
                 fig, palette=palette,
@@ -93,9 +95,20 @@ def plotly_figs_to_figure_items(
                 exc,
             )
             break  # 图形依赖不可用，停止后续生成
-        except Exception:
-            logger.debug("docx_exporter: 图表导出失败", exc_info=True)
+        except Exception as exc:
+            # s1004-31（0e66 遗留）：逐图失败不得静默——warning＋点名＋计数，其余图继续
+            failed.append(str(caption))
+            logger.warning(
+                "docx_exporter: 图表「%s」导出失败已跳过（第 %d/%d 张），其余图表继续。原因：%s",
+                caption, idx, total, exc,
+            )
             continue
+    if failed:
+        # fig_count 可比对出口：成功 M/总数 N 一眼可对（0e66 指出 docx 路径原缺此口）
+        logger.warning(
+            "docx_exporter: 图表导出完成 %d/%d 张成功，失败 %d 张已跳过：%s",
+            len(items), total, len(failed), "、".join(failed),
+        )
     return items
 
 
@@ -799,7 +812,14 @@ def build_experiment_protocol_docx(design, *, researcher: str = "", date: str = 
 
     _add_paragraph(doc, "（一）伦理与保密", level=2)
     ethics = _v("ethics", "")
-    if ethics:
+    if isinstance(ethics, (list, tuple)):
+        # s930-06（s928-01 遗留·类型口径归一）：真实 ExperimentDesign.ethics 是
+        # List[str]（design_engine.py:66），喂 _add_paragraph_with_inline_format 的
+        # re.finditer 会 TypeError——归一为逐条列表段（str 路径行为不变）。
+        if ethics:
+            for item in ethics:
+                _add_paragraph_with_inline_format(doc, str(item))
+    elif ethics:
         _add_paragraph_with_inline_format(doc, ethics)
     else:
         _add_paragraph_with_inline_format(doc, (

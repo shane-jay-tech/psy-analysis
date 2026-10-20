@@ -133,18 +133,19 @@ def test_no_stale_alert_record_is_emitted_exactly_at_the_boundary(tmp_path, capl
 
 
 def test_just_past_the_line_reports_zero_minutes(tmp_path, caplog):
-    """现状钉桩：`age_min = int(age / 60)` 向下截断 ⇒ 刚过线时告警文案是 "stale for 0 min"。
+    """刚过线时告警文案可见性钉（s930-09 翻面）。
 
-    只在 ttl < 60 时可达（生产默认 21600 不可能取到 0），所以这不是理论形态：
-    任何把 ttl 配成分钟级以下的部署，日志第一句就是 0 分钟。
-    本班**不修**（属行为/文案改动），登记为现状。若实现改成 `round()` 或 `math.ceil()` 本用例必红。
+    原现状钉：`age_min = int(age / 60)` 向下截断 ⇒ 刚过线告警文案是 "stale for 0 min"
+    （误导——实际只过了 1 秒却报 0 分钟）。s930-09 落地文案修正：<1 分钟改显式秒数
+    `stale for {int(age)}s (<1 min)`——钉由「钉 0 min 现状」翻为「钉秒级文案」，
+    可见性意图保持（刚过线即有告警且时长如实）。
     """
     mgr, _path = _locked(tmp_path, 1)
 
     with caplog.at_level("WARNING"):
         assert mgr.is_stale(now=BASE_MTIME + 1.5) is True
     fired = [r.getMessage() for r in caplog.records if "stale_lock" in r.getMessage()]
-    assert len(fired) == 1 and "stale for 0 min" in fired[0]
+    assert len(fired) == 1 and "stale for 1s (<1 min)" in fired[0], fired
 
 
 # ───────────────────────── 短路面（不取时钟就不该算术） ─────────────────────────

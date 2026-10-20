@@ -6,7 +6,7 @@
 本件走的是**xml 属性级比对**（任务书指定），不做图像比对、不引新依赖。
 
 ════════ 为什么这条单最容易写出"说谎的断言"（本件的核心口径）════════
-源码 `:24-29` 写的是 `Cm(21) / Cm(29.7) / Cm(2.54) / Cm(3.18)` 四个**十进制意图值**，
+源码页面设置常量段（Cm(21) / Cm(29.7) / Cm(2.54) / Cm(3.18) 四值所在）写的是四个**十进制意图值**，
 但 OOXML 的 `w:pgSz` / `w:pgMar` / `w:ind` 存的是 **twips（1/20 磅）整数** ⇒
 落盘产物**不可能**逐位等于源码字面量。实测（本机 .venv，python-docx 1.2.0）：
 
@@ -44,7 +44,7 @@ from docx.shared import Cm, Pt
 from src.questionnaire import exporters
 from src.questionnaire.exporters import export_to_docx
 
-# ── 源码 :24-29 的四个"意图值"（完成标准要求内联的字面量）────────────────────
+# ── 源码页面设置常量段的四个"意图值"（完成标准要求内联的字面量）────────────────────
 INTENT_PAGE_WIDTH_CM = 21
 INTENT_PAGE_HEIGHT_CM = 29.7
 INTENT_MARGIN_TB_CM = 2.54
@@ -100,7 +100,7 @@ def _style_xml(styles_xml: str, style_id: str) -> str:
 
 # ═══════ 1. 意图值 vs 读回值：量化这件事本身要钉住 ═══════
 def test_page_geometry_readback_matches_intent_only_within_twips_granularity(artifact) -> None:
-    """`:24-29` 的四个十进制数**读不回精确值**——只有 2.54（整英寸）能逐位回来。"""
+    """页面设置常量段的四个十进制数**读不回精确值**——只有 2.54（整英寸）能逐位回来。"""
     section = artifact["doc"].sections[0]
 
     assert section.page_width.cm == pytest.approx(INTENT_PAGE_WIDTH_CM, abs=TWIPS_GRANULARITY_CM)
@@ -142,10 +142,10 @@ def test_sectpr_xml_attributes_are_the_authoritative_geometry_snapshot(artifact)
 
 # ═══════ 3. 页眉页脚不是我们设的：别把模板继承当成自己的功劳 ═══════
 def test_header_footer_and_gutter_are_inherited_not_set_by_the_exporter(artifact) -> None:
-    """`header=720 / footer=720 / gutter=0` **不出自** `:24-29`——那 6 行只设了页宽高与四边距。
+    """`header=720 / footer=720 / gutter=0` **不出自**页面设置常量段——那一段只设了页宽高与四边距。
 
     这三项是 python-docx 默认模板带进来的。钉它的目的是防一类误判：
-    有人照着"版式已全量钉桩"这句话去改 `:24-29`，会以为页眉距离也在管辖内，其实不在。
+    有人照着"版式已全量钉桩"这句话去改页面设置常量段，会以为页眉距离也在管辖内，其实不在。
     """
     source = open(exporters.__file__, encoding="utf-8").read()
     assert "header_distance" not in source and "footer_distance" not in source and "gutter" not in source
@@ -158,7 +158,7 @@ def test_header_footer_and_gutter_are_inherited_not_set_by_the_exporter(artifact
 
 # ═══════ 4. 字号/行距数值族（半磅单位）═══════
 def test_normal_and_heading_size_and_line_spacing_family(artifact) -> None:
-    """`:32-41` 的字号族：`w:sz` 存**半磅** ⇒ 12pt 写 24、22/16/14pt 写 44/32/28；行距 1.8 写 432。"""
+    """字号常量段（w:sz 半磅族）：`w:sz` 存**半磅** ⇒ 12pt 写 24、22/16/14pt 写 44/32/28；行距 1.8 写 432。"""
     styles_xml = artifact["styles_xml"]
 
     normal = _style_xml(styles_xml, "Normal")
@@ -209,7 +209,7 @@ def test_heading_szcs_follows_sz_after_s92410(artifact) -> None:
 
 # ═══════ 6. 正文级版式数值：封面段与缩进的量化 ═══════
 def test_cover_paragraph_and_indent_family_numbers(artifact) -> None:
-    """`Pt(60)`（:49）与 `Cm(0.74)`（:87/:100/:110/:115/:162）、`Cm(1)`（:148）—— 同样都是"存不下的小数"。
+    """`Pt(60)` 与 `Cm(0.74)`、`Cm(1)`（符号锚＝三枚字面量本身，散布源码各调用点）—— 同样都是"存不下的小数"。
 
     `w:before` 单位是 1/20 磅 ⇒ Pt(60) = **1200**（整数，无损）；
     `w:firstLine` / `w:left` 单位是 twips ⇒ Cm(0.74) = **420**（读回 0.740833 cm）、

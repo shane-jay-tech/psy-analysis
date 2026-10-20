@@ -290,12 +290,24 @@ class TestV52CacheManagement:
 # 6. ZIP 导出结构验证（离线，不需要浏览器）
 # ---------------------------------------------------------------------------
 
+def _zip_exporter_importable() -> bool:
+    """s1004-33：真环境判据——importlib.util.find_spec 失败才 skip。
+
+    旧判据「src/output/zip_exporter.py 文件在不在」不是环境判据：模块被改名/删除
+    这类回归会被吞成静默 skip（6784 遗留）。find_spec 检验「模块可否导入」，
+    与用例体内 `from src.output.zip_exporter import …` 的真实依赖同源。
+    """
+    import importlib.util
+
+    return importlib.util.find_spec("src.output.zip_exporter") is not None
+
+
 class TestV52ZipStructure:
     """ZIP 导出结构验证（离线验证，不需要真实 Streamlit）。"""
 
     @pytest.mark.skipif(
-        not Path(__file__).resolve().parent.parent.joinpath("src/output/zip_exporter.py").exists(),
-        reason="zip_exporter module not found",
+        not _zip_exporter_importable(),
+        reason="src.output.zip_exporter import failed (environment, s1004-33)",
     )
     def test_zip_contains_tables_directory(self, tmp_path):
         """验证导出 ZIP 包含 tables/ 目录。"""
@@ -339,8 +351,8 @@ class TestV52ZipStructure:
             assert isinstance(manifest, list)
 
     @pytest.mark.skipif(
-        not Path(__file__).resolve().parent.parent.joinpath("src/output/zip_exporter.py").exists(),
-        reason="zip_exporter module not found",
+        not _zip_exporter_importable(),
+        reason="src.output.zip_exporter import failed (environment, s1004-33)",
     )
     def test_zip_tables_have_csv_and_md(self, tmp_path):
         """验证 tables/ 中有 CSV 和 MD 格式。"""

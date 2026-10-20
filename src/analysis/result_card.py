@@ -17,6 +17,7 @@ from typing import Any, Optional
 import pandas as pd
 
 from .method_catalog import get_card_builder_id, resolve_method_id
+from .effect_size_ci import fisher_z_ci
 
 
 @dataclass
@@ -49,7 +50,15 @@ class AnalysisResultCard:
         if self.plain_language_summary:
             lines.append(f"\n**通俗解释**：{self.plain_language_summary}")
         if self.effect_sizes:
-            es_parts = [f"{e['name']}={e['value']:.3f}" for e in self.effect_sizes if 'value' in e]
+            es_parts = []
+            for e in self.effect_sizes:
+                if 'value' not in e:
+                    continue
+                part = f"{e['name']}={e['value']:.3f}"
+                lo, hi = e.get('ci_low'), e.get('ci_high')
+                if lo is not None and hi is not None:
+                    part += f"（95% CI [{lo:.3f}, {hi:.3f}]）"
+                es_parts.append(part)
             if es_parts:
                 lines.append(f"\n**效应量**：{', '.join(es_parts)}")
         if self.warnings:
@@ -147,6 +156,17 @@ def _build_descriptive(card: AnalysisResultCard, output: dict):
         card.plain_language_summary = "描述统计展示了数据的基本分布特征。"
 
 
+def _cohen_d_magnitude(abs_d: float) -> str:
+    """Cohen (1988) 基准：|d|≥0.8 大、≥0.5 中、≥0.2 小、其余微小。"""
+    if abs_d >= 0.8:
+        return "大"
+    if abs_d >= 0.5:
+        return "中"
+    if abs_d >= 0.2:
+        return "小"
+    return "微小"
+
+
 def _build_independent_ttest(card: AnalysisResultCard, output: dict):
     result = output.get("result")
     if not result:
@@ -163,14 +183,40 @@ def _build_independent_ttest(card: AnalysisResultCard, output: dict):
 
     if t_val is not None and p_val is not None:
         sig = "显著" if p_val < 0.05 else "不显著"
-        apa = f"独立样本 t 检验结果表明，{iv}对{dv}的影响{sig}"
+        apa = f"独立样本 t 检验结果表明，按{iv}分组的两组在{dv}上的差异{sig}"
         if df is not None:
             apa += f"，t({df:.0f}) = {t_val:.3f}, p = {p_val:.3f}"
         else:
             apa += f"，t = {t_val:.3f}, p = {p_val:.3f}"
+        # 各组样本量（来自 group_stats 的 N 列）
+        group_stats = getattr(result, "group_stats", None)
+        ns = []
+        if group_stats is not None and "N" in getattr(group_stats, "columns", []):
+            ns = [int(row["N"]) for _, row in group_stats.iterrows()]
+        if ns:
+            apa += f"（n = {'，'.join(str(v) for v in ns)}）"
+        # 均值差及其置信区间
+        md_val = getattr(result, "mean_diff", None)
+        md_lo = getattr(result, "ci_lower", None)
+        md_hi = getattr(result, "ci_upper", None)
+        if md_val is not None and md_lo is not None and md_hi is not None:
+            apa += f"，均值差 = {md_val:.3f}, 95% CI [{md_lo:.3f}, {md_hi:.3f}]"
         if d is not None:
             apa += f", Cohen's d = {d:.3f}"
-            card.effect_sizes.append({"name": "Cohen's d", "value": float(d)})
+            es_entry: dict[str, Any] = {"name": "Cohen's d", "value": float(d)}
+            d_lo = getattr(result, "effect_size_ci_lower", None)
+            d_hi = getattr(result, "effect_size_ci_upper", None)
+            if d_lo is not None and d_hi is not None:
+                apa += f", 95% CI [{d_lo:.3f}, {d_hi:.3f}]"
+                es_entry["ci_low"] = float(d_lo)
+                es_entry["ci_high"] = float(d_hi)
+            card.effect_sizes.append(es_entry)
+            card.technical_notes.append(
+                f"效应量解读（Cohen, 1988）：|d| = {abs(d):.3f} 属{_cohen_d_magnitude(abs(d))}效应"
+                "（|d|≥0.2 小、≥0.5 中、≥0.8 大）。"
+            )
+        if getattr(result, "is_welch", False):
+            card.technical_notes.append("因方差异质，采用 Welch 校正 t 检验（自由度为校正值）。")
         card.apa_text = apa + "。"
         card.plain_language_summary = f"两组在{dv}上的差异{'达到统计显著水平' if p_val < 0.05 else '未达到统计显著水平'}。"
     else:
@@ -202,7 +248,20 @@ def _build_paired_ttest(card: AnalysisResultCard, output: dict):
             apa += f"，t = {t_val:.3f}, p = {p_val:.3f}"
         if d is not None:
             apa += f", Cohen's d = {d:.3f}"
-            card.effect_sizes.append({"name": "Cohen's d", "value": float(d)})
+            es_entry = {"name": "Cohen's d", "value": float(d)}
+            d_lo = getattr(result, "effect_size_ci_lower", None)
+            d_hi = getattr(result, "effect_size_ci_upper", None)
+            if d_lo is not None and d_hi is not None:
+                apa += f", 95% CI [{d_lo:.3f}, {d_hi:.3f}]"
+                es_entry["ci_low"] = float(d_lo)
+                es_entry["ci_high"] = float(d_hi)
+            card.effect_sizes.append(es_entry)
+            card.technical_notes.append(
+                f"效应量解读（Cohen, 1988）：|d| = {abs(d):.3f} 属{_cohen_d_magnitude(abs(d))}效应"
+                "（|d|≥0.2 小、≥0.5 中、≥0.8 大）。"
+            )
+        if df is not None:
+            card.technical_notes.append(f"配对样本量 n = {int(df) + 1}（由 df = n−1 反推）。")
         card.apa_text = apa + "。"
         card.plain_language_summary = f"两次测量之间的差异{'达到统计显著水平' if p_val < 0.05 else '未达到统计显著水平'}。"
     else:
@@ -236,7 +295,23 @@ def _build_one_way_anova(card: AnalysisResultCard, output: dict):
             apa += f"，F = {f_val:.3f}, p = {p_val:.3f}"
         if eta2 is not None:
             apa += f", η² = {eta2:.3f}"
-            card.effect_sizes.append({"name": "η²", "value": float(eta2)})
+            es_entry = {"name": "η²", "value": float(eta2)}
+            es_ci = getattr(result, "effect_size_ci", None)
+            if es_ci:
+                try:
+                    lo, hi = float(es_ci[0]), float(es_ci[1])
+                    if lo == lo and hi == hi:  # 非 NaN
+                        apa += f", 95% CI [{lo:.3f}, {hi:.3f}]"
+                        es_entry["ci_low"] = lo
+                        es_entry["ci_high"] = hi
+                except (TypeError, ValueError, IndexError):
+                    pass
+            card.effect_sizes.append(es_entry)
+            mag = "大" if eta2 >= 0.14 else ("中" if eta2 >= 0.06 else ("小" if eta2 >= 0.01 else "微小"))
+            card.technical_notes.append(
+                f"效应量解读（Cohen, 1988）：η² = {eta2:.3f} 属{mag}效应"
+                "（η²≥0.01 小、≥0.06 中、≥0.14 大）。"
+            )
         card.apa_text = apa + "。"
         card.plain_language_summary = f"不同{iv}组别在{dv}上的差异{'达到统计显著水平' if p_val < 0.05 else '未达到统计显著水平'}。"
     else:
@@ -246,10 +321,86 @@ def _build_one_way_anova(card: AnalysisResultCard, output: dict):
         card.warnings.append("缺少效应量（η²），建议补充")
 
 
+def _build_corr_matrix_card(card: "AnalysisResultCard", result: Any, method_zh: str, stat_name: str) -> None:
+    """相关矩阵结果的逐对结果卡：每对给出 r、p、95% CI、n（数值源=correlation 矩阵自身）。"""
+    corr_matrix = result.corr_matrix
+    p_matrix = getattr(result, "p_matrix", None)
+    ci_lo_m = getattr(result, "ci_low_matrix", None)
+    ci_hi_m = getattr(result, "ci_high_matrix", None)
+    n_matrix = getattr(result, "n_matrix", None)
+    cols = list(corr_matrix.columns)
+
+    pairs: list[dict[str, Any]] = []
+    for i in range(len(cols)):
+        for j in range(i + 1, len(cols)):
+            a, b = str(cols[i]), str(cols[j])
+            r_val = corr_matrix.iloc[i, j]
+            if pd.isna(r_val):
+                continue
+            p_val = p_matrix.iloc[i, j] if p_matrix is not None else None
+            lo = ci_lo_m.iloc[i, j] if ci_lo_m is not None else None
+            hi = ci_hi_m.iloc[i, j] if ci_hi_m is not None else None
+            n_val = n_matrix.iloc[i, j] if n_matrix is not None else None
+            entry: dict[str, Any] = {
+                "name": f"{stat_name}({a}, {b})",
+                "value": float(r_val),
+            }
+            if lo is not None and not pd.isna(lo) and hi is not None and not pd.isna(hi):
+                entry["ci_low"] = float(lo)
+                entry["ci_high"] = float(hi)
+            card.effect_sizes.append(entry)
+            pairs.append({
+                "var1": a, "var2": b, "r": float(r_val),
+                "p": (None if p_val is None or pd.isna(p_val) else float(p_val)),
+                "ci_low": (None if lo is None or pd.isna(lo) else float(lo)),
+                "ci_high": (None if hi is None or pd.isna(hi) else float(hi)),
+                "n": (None if n_val is None or pd.isna(n_val) else int(n_val)),
+            })
+
+    if not pairs:
+        card.warnings.append(f"{method_zh}相关矩阵无有效变量对")
+        return
+
+    def _pair_apa(pr: dict[str, Any]) -> str:
+        s = f"{pr['var1']}与{pr['var2']}：{stat_name} = {pr['r']:.3f}"
+        if pr["p"] is not None:
+            s += f", p = {pr['p']:.3f}"
+        if pr["ci_low"] is not None:
+            s += f", 95% CI [{pr['ci_low']:.3f}, {pr['ci_high']:.3f}]"
+        if pr["n"] is not None:
+            s += f"（n = {pr['n']}）"
+        return s
+
+    sig_pairs = [pr for pr in pairs if pr["p"] is not None and pr["p"] < 0.05]
+    headline = sig_pairs[0] if sig_pairs else pairs[0]
+    ns = {pr["n"] for pr in pairs if pr["n"] is not None}
+    apa = f"{method_zh}相关分析（{len(pairs)} 对变量）表明，{_pair_apa(headline)}"
+    if sig_pairs and abs(headline["r"]) > 0:
+        apa += "，即该对变量间存在显著关联"
+    if len(pairs) > 1:
+        apa += f"；其余 {len(pairs) - 1} 对逐一见效应量行"
+    card.apa_text = apa + "。"
+    if ns:
+        if len(ns) == 1:
+            card.technical_notes.append(f"各变量对样本量 n = {ns.pop()}。")
+        else:
+            card.technical_notes.append(f"各变量对样本量不一（成对删除），n 取值 {sorted(ns)}。")
+    card.technical_notes.append("相关系数即效应量；大小解读视学科惯例，psy 场景常用 |r|≥0.5 强、≥0.3 中、≥0.1 弱。")
+    card.plain_language_summary = (
+        f"共检验 {len(pairs)} 对变量的相关，其中 {len(sig_pairs)} 对达到统计显著水平"
+        f"（最强一对 {headline['var1']}与{headline['var2']}：{stat_name} = {headline['r']:.3f}）。"
+    )
+
+
 def _build_pearson_corr(card: AnalysisResultCard, output: dict):
     result = output.get("result")
     if not result:
         card.warnings.append("相关分析未产生结果")
+        return
+
+    # runner 的 pearson_corr 产出相关矩阵（逐对 r/p/CI/n），走逐对卡
+    if getattr(result, "corr_matrix", None) is not None and hasattr(result.corr_matrix, "iloc"):
+        _build_corr_matrix_card(card, result, "Pearson", "r")
         return
 
     r_val = getattr(result, "r", None) or getattr(result, "correlation", None)
@@ -267,12 +418,23 @@ def _build_pearson_corr(card: AnalysisResultCard, output: dict):
         apa = f"Pearson 相关分析表明，{var1}与{var2}之间存在{sig}的{strength}{direction}相关"
         if n is not None:
             apa += f"，r({n-2}) = {r_val:.3f}, p = {p_val:.3f}"
+            r_lo, r_hi = fisher_z_ci(float(r_val), int(n))
+            if r_lo is not None and r_hi is not None:
+                apa += f", 95% CI [{r_lo:.3f}, {r_hi:.3f}]"
         else:
             apa += f"，r = {r_val:.3f}, p = {p_val:.3f}"
         card.apa_text = apa + "。"
-        card.effect_sizes.append({"name": "r", "value": float(r_val)})
+        r_entry: dict[str, Any] = {"name": "r", "value": float(r_val)}
+        if n is not None:
+            r_lo, r_hi = fisher_z_ci(float(r_val), int(n))
+            if r_lo is not None and r_hi is not None:
+                r_entry["ci_low"] = r_lo
+                r_entry["ci_high"] = r_hi
+        card.effect_sizes.append(r_entry)
         card.effect_sizes.append({"name": "r²", "value": float(r_val ** 2)})
-        card.plain_language_summary = f"{var1}和{var2}之间呈{strength}{direction}相关关系（{'显著' if p_val < 0.05 else '不显著'}）。"
+        card.plain_language_summary = (
+            f"{var1}和{var2}之间呈{strength}{direction}相关关系（{'显著' if p_val < 0.05 else '不显著'}）。"
+        )
     else:
         card.warnings.append("相关分析结果缺少关键统计量")
 
@@ -375,7 +537,7 @@ def _build_mediation(card: AnalysisResultCard, output: dict):
         if total and total != 0:
             ratio = abs(indirect / total)
             card.effect_sizes.append({"name": "中介效应占比", "value": float(ratio)})
-            card.plain_language_summary = f"{x}对{y}的影响中，约 {ratio*100:.1f}% 通过{m}传递。"
+            card.plain_language_summary = f"{x}与{y}的总效应中，约 {ratio*100:.1f}% 通过{m}传递。"
         else:
             card.plain_language_summary = f"{m}在{x}与{y}之间{'存在' if sig == '显著' else '不存在'}显著中介效应。"
     else:
@@ -412,7 +574,7 @@ def _build_moderation(card: AnalysisResultCard, output: dict):
             apa += f", ΔR² = {r2_change:.4f}"
             card.effect_sizes.append({"name": "ΔR²", "value": float(r2_change)})
         card.apa_text = apa + "。"
-        card.plain_language_summary = f"{w}{'显著调节' if sig == '显著' else '未显著调节'}{x}对{y}的影响。"
+        card.plain_language_summary = f"{w}{'显著调节' if sig == '显著' else '未显著调节'}{x}与{y}的关系。"
     else:
         card.warnings.append("调节效应分析结果缺少交互项统计量")
 
@@ -548,13 +710,13 @@ def _build_ancova(card: AnalysisResultCard, output: dict):
 
     if f_val is not None and p_val is not None:
         sig = "显著" if p_val < 0.05 else "不显著"
-        apa = f"协方差分析（控制{', '.join(covariates)}后）结果表明，{iv}对{dv}的影响{sig}"
+        apa = f"协方差分析（控制{', '.join(covariates)}后）结果表明，调整后{iv}各组在{dv}上的差异{sig}"
         apa += f"，F = {f_val:.3f}, p = {p_val:.3f}"
         if eta2 is not None:
             apa += f", η²p = {eta2:.3f}"
             card.effect_sizes.append({"name": "η²p", "value": float(eta2)})
         card.apa_text = apa + "。"
-        card.plain_language_summary = f"在控制了{', '.join(covariates)}的影响后，{iv}对{dv}的效应{'显著' if p_val < 0.05 else '不显著'}。"
+        card.plain_language_summary = f"在控制了{', '.join(covariates)}的影响后，{iv}各组在{dv}上的调整后差异{'显著' if p_val < 0.05 else '不显著'}。"
     else:
         card.warnings.append("协方差分析结果缺少关键统计量")
 
@@ -580,7 +742,7 @@ def _build_mann_whitney(card: AnalysisResultCard, output: dict):
 
     if u_val is not None and p_val is not None:
         sig = "显著" if p_val < 0.05 else "不显著"
-        apa = f"Mann-Whitney U 检验结果表明，{iv}对{dv}的影响{sig}，U = {u_val:.1f}"
+        apa = f"Mann-Whitney U 检验结果表明，按{iv}分组的两组在{dv}上的秩差异{sig}，U = {u_val:.1f}"
         if z_val is not None:
             apa += f", Z = {z_val:.3f}"
         apa += f", p = {p_val:.3f}"
@@ -646,7 +808,7 @@ def _build_kruskal_wallis(card: AnalysisResultCard, output: dict):
 
     if h_val is not None and p_val is not None:
         sig = "显著" if p_val < 0.05 else "不显著"
-        apa = f"Kruskal-Wallis 检验结果表明，{iv}对{dv}的影响{sig}"
+        apa = f"Kruskal-Wallis 检验结果表明，按{iv}分组的多组在{dv}上的秩差异{sig}"
         if df is not None:
             apa += f"，H({df}) = {h_val:.3f}, p = {p_val:.3f}"
         else:
@@ -852,6 +1014,11 @@ def _build_spearman_corr(card: AnalysisResultCard, output: dict):
     result = output.get("result")
     if not result:
         card.warnings.append("Spearman 秩相关分析未产生结果")
+        return
+
+    # runner 的 spearman_corr 产出相关矩阵（逐对 ρ/p/CI/n），走逐对卡
+    if getattr(result, "corr_matrix", None) is not None and hasattr(result.corr_matrix, "iloc"):
+        _build_corr_matrix_card(card, result, "Spearman", "r_s")
         return
 
     r_s = getattr(result, "r_s", None) or getattr(result, "rho", None) or getattr(result, "correlation", None)

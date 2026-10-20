@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """src/questionnaire/exporters.py 的 DOCX 主路径 + PDF 降级钉桩（s922-13）。
 
-锚点（2026-09-22 复核，行号零漂移）：`export_to_docx` 在 :13、`export_to_pdf` 在 :259，
-`_set_east_asian_font` 在 :238。补测前 tests/ 对 `export_to_docx` / `export_to_pdf` **符号级 0 命中**
-（`tests/test_questionnaire_export.py` 只 import 了同文件的 `build_questionnaire_pdf`，:110-167 共 7 处），
+锚点（符号锚＝函数名）：`export_to_docx`、`export_to_pdf`，
+`_set_east_asian_font`（符号锚＝函数名）。补测前 tests/ 对 `export_to_docx` / `export_to_pdf` **符号级 0 命中**
+（`tests/test_questionnaire_export.py` 只 import 了同文件的 `build_questionnaire_pdf` 函数体，共 7 处），
 两个主导出函数此前完全没有测试。
 
 依赖实况（本机 .venv 实测，本单**未装任何依赖**）：python-docx 1.2.0 / fpdf / openpyxl / lxml 均在，
@@ -216,7 +216,7 @@ def test_optional_keys_are_all_skippable_and_the_anchors_list_may_be_absent():
 
 
 def test_definition_precedence_matched_construct_then_llm_then_fallback():
-    """构念定义三级回退（:93-98）：matched_construct.definition > llm_definition > 兜底句。"""
+    """构念定义三级回退段（matched_construct 回退链）：matched_construct.definition > llm_definition > 兜底句。"""
     # ① 两者都有 ⇒ 取 matched_construct
     both = paragraphs_of(export_to_docx(minimal_design(
         matched_construct={"definition": "首选定义"}, llm_definition="次选定义")))
@@ -244,7 +244,7 @@ def test_reference_and_established_scale_sections_only_appear_when_supplied():
     assert "已有成熟量表参考" in rich and "成熟量表甲" in rich and "LLM量表乙" in rich
 
 
-# ═════════════════ 二、_set_east_asian_font 的成败两路（:238-251） ═════════════════
+# ═════════════════ 二、_set_east_asian_font 的成败两路（符号锚＝函数名） ═════════════════
 def test_set_east_asian_font_writes_the_eastasia_attribute_and_reuses_rpr():
     """成功路径：没有 rPr 就建一个，有了就复用并只改 w:eastAsia；第二次调用是覆盖不是叠套。"""
     doc = Document(io.BytesIO(export_to_docx(minimal_design())))
@@ -274,7 +274,7 @@ def test_set_east_asian_font_swallows_every_failure_and_returns_none():
         assert _set_east_asian_font(junk, "宋体") is None         # 不抛、返回 None
 
 
-# ═════════════════ 三、export_to_pdf 的降级两路（:259-266，只读模拟） ═════════════════
+# ═════════════════ 三、export_to_pdf 的降级两路（只读模拟） ═════════════════
 def test_export_to_pdf_raises_named_runtime_error_when_no_cjk_font_is_found(monkeypatch):
     """无中文字体 ⇒ RuntimeError 且文案指明是字体问题；**在碰 design 之前**就抛，
     所以 UI 侧 `except Exception` 只会显示「导出失败：<字体文案>」，不会误报成数据问题。"""
@@ -300,9 +300,9 @@ def test_export_to_pdf_propagates_import_error_when_the_renderer_is_missing(monk
 
 def test_pdf_degradation_raises_rather_than_returning_empty_bytes(monkeypatch):
     """口径钉：降级发生在调用方，导出函数本身**只抛不回退空 bytes**。
-    源码契约——`src/ui/questionnaire_panel.py:797` 的 `try` 把两个导出一起包住
-    （docx :799-800 / pdf :807-808），`except Exception as e: st.error(f"❌ 导出失败：{e}")`
-    在 :833-834。哪天有人把降级写进 `export_to_pdf`（返回 b""），UI 就会静默给一个空文件、
+    源码契约——`src/ui/questionnaire_panel.py` 导出包裹 `try` 块把两个导出一起包住
+    （docx/pdf 两路各自的 `except Exception as e: st.error(f"❌ 导出失败：{e}")`
+    （该 try 块的 except 分支内）。哪天有人把降级写进 `export_to_pdf`（返回 b""），UI 就会静默给一个空文件、
     except 分支永远走不到 —— 本例把那一步改成红的。"""
     import src.visualization.fonts as fonts
 

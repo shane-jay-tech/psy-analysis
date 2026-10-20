@@ -344,7 +344,7 @@ def generate_preregistration_from_analysis(
             f"检验力分析：效应量 {pw.get('effect_size', '?')}、"
             f"α = {pw.get('alpha', 0.05)}、"
             f"检验力 1-β = {pw.get('power', 0.80)}，"
-            f"所需样本量 N = {pw.get('required_n', sample_n or '?')}。"
+            f"所需样本量 N = {pw.get('n_total', pw.get('required_n', sample_n or '?'))}。"
         )
 
     return generate_preregistration(
@@ -461,7 +461,7 @@ def _extract_from_design(design: Dict) -> Dict:
                 f"检验力分析：效应量 = {pw.get('effect_size', '?')}、"
                 f"α = {pw.get('alpha', 0.05)}、"
                 f"1-β = {pw.get('power', 0.80)}、"
-                f"所需N = {pw.get('required_n', '?')}。"
+                f"所需N = {pw.get('n_total', pw.get('required_n', '?'))}。"
             )
 
     return extracted

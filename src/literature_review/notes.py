@@ -6,7 +6,11 @@ import re
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
+import logging
+
 from .models import NOTE_TYPES, ReadingNote
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -154,4 +158,15 @@ def notes_to_dict_list(notes: List[ReadingNote]) -> List[Dict[str, Any]]:
 def notes_from_dict_list(data: List[Dict[str, Any]]) -> List[ReadingNote]:
     if not isinstance(data, list):
         return []
-    return [ReadingNote.from_dict(d) for d in data if isinstance(d, dict)]
+    # s930-02（s927-29 遗留·孪生漂移闭合）：单条脏值不再拖垮整表（与文献侧 s927-29 A 案
+    # 同语义：只兜解析/转换层，好行照常产出，脏行走 logger 显式标注不静默消失）。
+    out = []
+    for idx, d in enumerate(data):
+        if not isinstance(d, dict):
+            continue
+        try:
+            out.append(ReadingNote.from_dict(d))
+        except (ValueError, TypeError) as exc:  # 只兜脏数字；非 dict 等编程错误照旧抛
+            name = d.get("title") or d.get("key") or "?"
+            logger.warning("notes_from_dict_list 第 %s 条脏行已跳过（「%s」%s）", idx, name, exc)
+    return out

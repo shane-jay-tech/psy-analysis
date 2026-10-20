@@ -1,4 +1,4 @@
-"""反问质量基准测试（不进入常规 CI）。
+"""反问质量测试：3 例中 2 例为 LLM 基准（--run-benchmark 才跑，不进常规 CI），1 例离线回放默认跑。
 
 跑法：`pytest tests/test_socratic_quality.py --run-benchmark -v`
 

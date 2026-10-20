@@ -201,3 +201,28 @@ def test_queue_item_views_and_history_formatting_all_read_the_same_table():
     out = format_review_event(evt)
 
     assert out["操作"] == "已纳入" and out["原状态"] == "待审核"
+
+
+def test_queue_panel_has_no_dead_bulk_import():
+    """s930-03 防回流钉：literature_review_queue_panel 不得 import 未使用的
+    bulk_review_candidates（s927-30 遗留点名件；AST 口径，import 与使用双向核对）。
+
+    口径收窄说明：该面板另有 4 枚历史死 import（Optional/QueueSummary/ReviewDecision/
+    annotations）**不在本单点名面**，钉只锁 bulk_review_candidates——全文件死 import
+    普查属另单（登记于 s930-03 result 遗留）。
+    """
+    import ast
+    from pathlib import Path
+
+    src = Path("src/ui/literature_review_queue_panel.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            for a in node.names:
+                if (a.asname or a.name) == "bulk_review_candidates":
+                    imported.add("bulk_review_candidates")
+    used = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    used |= {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    dead = imported - used
+    assert not dead, f"bulk_review_candidates 死 import 回流（未使用不得 import）"

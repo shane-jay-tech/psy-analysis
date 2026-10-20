@@ -11,9 +11,9 @@ autouse 夹具给真实历史目录做"名字＋字节数＋mtime_ns"面簿，�
    交叉样本把两面的差别钉死（哪天有人把读取改成按 mtime 排，这条立刻红）。
 2. 「基建无任何单测」半否证，三件事各自不同：
    - `HISTORY_DIR` 常量：`tests/test_benchmark_relay_paths.py:81` 已钉（默认跑，实测 6 passed）；
-   - `_archive_to_history`：`tests/test_socratic_drift_tracker.py:85-97` **有用例**，但整件带
-     `pytestmark = pytest.mark.benchmark`，`tests/conftest.py:65-71` 未传 `--run-benchmark` 时整件跳过
-     （实测 `10 skipped`）⇒ 默认全量里等效没跑；
+   - `_archive_to_history`：`tests/test_socratic_drift_tracker.py:85-97` **有用例且默认全跑**——
+     s923-34 拆分后该件已不带文件级 `pytestmark = pytest.mark.benchmark`（见该件 :6 标记口径注），
+     2026-10-05 实测 `10 passed, 0 skipped` ⇒ 默认全量里在跑（本条订正 d507 时代的 `10 skipped` 旧读数）；
    - `_last_history_entry`：全仓 `tests/` **零引用** ⇒ 这才是真空缺。
    ⇒ 本件**不打 benchmark 标记**（基建与 LLM 无关，不该被基准门禁挡着），并把上面三条现状各钉一处。
 3. 顺带钉出两个现状风险（s922-125 只登记；**s924-65 已修，生产码与本件同笔**）：

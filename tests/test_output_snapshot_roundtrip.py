@@ -78,8 +78,9 @@ def test_returned_bytes_equal_the_file_written_in_the_same_call(out):
     m1, m2 = members(io.BytesIO(blob)), members(io.BytesIO(other))
     assert m1.keys() == m2.keys()
     # ⚠️ 防回归（s923-21）：下面这两条断言的前提是"两次调用的 `snapshot_created` 必然不同"，
-    # 而这个前提**不能**靠 `datetime.now()` 撑——本机实测其粒度 15.625ms
-    # （`time.get_clock_info('time')` → GetSystemTimeAsFileTime），连续调用同值率 99.998%，
+    # 而这个前提**不能**靠 `datetime.now()` 撑——本机墙钟（GetSystemTimeAsFileTime）实际
+    # 粒度受系统定时器插值影响并非固定槽宽（`time.get_clock_info('time')`），连续调用
+    # 同值率实测 99.945%~99.998%（s924-28 §〇.4/s927-64 两轮口径），
     # 80 组相邻 `create_snapshot` 里有 66 组时间戳完全相同 ⇒ 断言当场红（不是回归，是时钟）。
     # 现由 `src/output/snapshot.py` 的 `+mono<perf_counter_ns()>` 尾数提供区分度（同值率实测 0.000%）。
     # ⇒ 谁把那个尾数摘掉／换成 `time.time_ns()`（同源粗时钟，同样 99.998% 同值），本用例立刻红。
@@ -143,3 +144,57 @@ def test_store_and_deflate_both_roundtrip(out, compress):
 
     pd.testing.assert_frame_equal(loaded["data"], DF)
     assert loaded["params"]["n_rows"] == 3
+
+
+def test_snapshot_created_lexicographic_order_does_not_imply_chronology(
+    out, tmp_path, monkeypatch,
+):
+    """反向钉（s930-13，s927-64 案丙）：`snapshot_created` 的**字典序不保证＝时间序**——
+    尾数长度变化可让「后写的值」字典序反而更小，消费方不得用 str 比较判先后，
+    时序判据必须走 ISO 部分的 fromisoformat。全部用确定性 monkeypatch 构造，零真实墙钟依赖。
+
+    构造：两次调用**同一墙钟刻**（真实现同值形态——这正是尾数存在的理由）、
+    尾数 t1=9 位 900000000、t2=10 位 1000000000——字典序 "+mono1000000000" <
+    "+mono900000000"（'1'<'9'）＝后写的反而更小，即字典序与写入序脱钩。
+    """
+    from datetime import datetime as _dt
+
+    import src.output.snapshot as snap_mod
+
+    df = DF
+    same_tick = _dt(2026, 10, 2, 7, 0, 0)
+    times = [same_tick, same_tick]          # 同刻：墙钟同值（尾数存在的理由）
+    monos = [900_000_000, 1_000_000_000]    # 尾数位数不同 ⇒ 字典序逆序
+    calls = {"n": 0}
+
+    class _FrozenDT(_dt):
+        @classmethod
+        def now(cls, tz=None):
+            i = min(calls["n"], 1)
+            return times[i]
+
+    monkeypatch.setattr(snap_mod, "datetime", _FrozenDT)
+    monkeypatch.setattr(snap_mod.time, "perf_counter_ns", lambda: monos[min(calls["n"], 1)])
+    real_ns = snap_mod.time.time_ns
+    monkeypatch.setattr(snap_mod.time, "time_ns", lambda: monos[min(calls["n"], 1)] * 1000)
+
+    b1 = snap_mod.create_snapshot(df.copy(), PARAMS, output_path=str(out))
+    calls["n"] = 1
+    out2 = out.with_name("snap2.zip")
+    b2 = snap_mod.create_snapshot(df.copy(), PARAMS, output_path=str(out2))
+
+    import json
+    import zipfile
+
+    def _created(blob):
+        with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+            return json.loads(zf.read("analysis_params.json"))["snapshot_created"]
+
+    c1, c2 = _created(b1), _created(b2)
+    # 字典序逆序：同刻之下尾数位数让后写的 c2 反而「更小」
+    assert c2 < c1, f"构造失效（应字典序逆序）：{c1} vs {c2}"
+    # 时序判据必须走 fromisoformat：ISO 部分相等（同刻）⇒ 两值代表同一时刻，
+    # str 比较（c2 < c1）会给出「c1 在后」的**错误**结论——这正是本钉要防的依赖。
+    assert _dt.fromisoformat(c1.split("+mono")[0]) == _dt.fromisoformat(c2.split("+mono")[0])
+    # 尾数仍为纯数字（既有不变量保持）
+    assert c1.partition("+mono")[2].isdigit() and c2.partition("+mono")[2].isdigit()

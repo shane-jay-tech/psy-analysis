@@ -149,3 +149,21 @@ $ ls docs/insights/psy-docx-style-unify-design-20260923.md   # 本稿，唯一�
 4. **两条"钉 bug 现状"断言会挡住 P1 的正确修复** — `test_exporters_cjk_font_fallback.py:227` 与 `test_exporters_docx_geometry.py:219` 把"楷体无东亚映射"钉成了期望值 ⇒ 属纪律档 §十二「两笔一体」型（quant `test_bark_channels_resid_q92211.py:56` 同型），改它必须连生产码意图一起交裁决。
 5. `docx_exporter.py` 纯 CRLF／`exporters.py` 纯 LF ⇒ 案乙任何一步的行尾风险都要单独自证（纪律档「行尾逐文件量」条目在本仓的具体命中）。
 6. **例数口径有两种，别混**（本班 s923-20 落地时自纠）：`tests/test_questionnaire_export_docx.py` ＝ **13 个 `def test_` 函数 / 22 条 pytest 收集用例**（`--collect-only -q` 现取），上游 s922-22 说的「22 例」用的是**收集数**、并没有错；本稿第二节引用的 6/7/14 也是收集数。⇒ 后续工单**统一用收集数**，且注明口径。环境：`.venv` python-docx **1.2.0**（本班实测）。
+
+---
+
+## ⚠ 勘误横幅（2026-10-02 追加，s930-39；append-only，正文一字未改）
+
+> **六处被磁盘否证（s927-52 点名，本班逐处现值复核确认）——引用本档 P3/P4 行时以下表为准**：
+>
+> | # | 本档原文 | 磁盘现值 | 取证 |
+> |---|---|---|---|
+> | 1 | P3 提议新增 `LINE_SPACING_REPORT=1.8` | `docx_styles.py` **无此常量**（grep 0 命中）——P3 尚未实施 | `grep -c LINE_SPACING_REPORT src/output/docx_styles.py` → 0 |
+> | 2 | P3 提议新增 `PAGE_WIDTH_CM=21`/`PAGE_HEIGHT_CM=29.7` | 已由**另一路径落地**：`_setup_page` 直接写 `Cm(21)/Cm(29.7)`（s924-26 A4 改版），且 s930-11 已建读回钉（test_docx_page_layout_readback_s93011.py 3 passed）——「补常量」形态已被超越 | s930-11 result |
+> | 3 | 「两处钉断言挡路」 | 现值钉面非挡路：七件 docx 族 **92 passed**（2026-10-02 实跑），P1 的两枚「钉 bug 现状」红是否仍在以单跑为准 | 七件定向命令在档 |
+> | 4 | 「三个测试收集数 20/6/13…」 | 现值漂移：test_fonts=14 def/test_docx_export=13 def/geometry=6 def（用例数随期数增长） | `grep -c "def test" <件>` |
+> | 5 | `paper_writing_ui.py:512` | 现值 **678 行文件**（:512 超界或已漂）——引行号时须重定位 | `wc -l src/ui/paper_writing_ui.py` → 678 |
+> | 6 | `app.py:2284` | 现值 **2413 行文件**（app.py 经多轮收编，行号全档漂移） | `wc -l app.py` → 2413 |
+>
+> **1.8 两义说明**（防混淆）：`exporters.py:38` 的 `1.8`＝**docx 行距倍数**（line_spacing）；`app.py` 旧 :2284 的 `1.8`＝**CSS line-height**（Web 层）——与 s923-19「1.8 还是 1.5」行距裁决相关、**与任何统计量无关**。
+> **请勿按本档 P3/P4 行号与收集数原文引用**；done/s923-19.result.md:92/94 为信箱历史件不回改（同批六处否证见该档）。

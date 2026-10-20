@@ -2057,8 +2057,9 @@ def render_undergrad_wizard():
         from src.utils.workspace import update_last_position
         if isinstance(step, int) and step >= 1:
             update_last_position("wizard", step=step, session_state=st.session_state)
-    except Exception:
-        pass
+    except Exception as exc:
+        # s1007-04：静默点补观测（s1002-19 同款）——仍吞异常，仅留痕
+        logger.warning("向导断点位置记录失败（已跳过，不影响渲染）: %s", exc)
 
     # 总步骤数
     total_steps = 7
@@ -3274,8 +3275,9 @@ def render_undergrad_wizard():
         try:
             from src.ui.onboarding import render_post_demo_highlight
             render_post_demo_highlight()
-        except Exception:
-            pass
+        except Exception as exc:
+            # s1007-04：静默点补观测（s1002-19 同款）——仍吞异常，仅留痕
+            logger.warning("向导亮点提示渲染失败（已跳过，不影响渲染）: %s", exc)
 
         # v2.9: 未完成事项提醒（在交付包卡片之前）
         _render_unfinished_reminders()
