@@ -81,6 +81,37 @@ def test_reverse_score_rejects_missing_items(survey_df):
     assert "q3" in result.description
 
 
+def test_reverse_score_rejects_out_of_range_sentinel(survey_df):
+    """s1023-02 残余面①：哨兵值（999）不得静默产出错向新列（决议#17 同款口径）。"""
+    df = survey_df.copy()
+    df.loc[1, "q2"] = 999
+
+    result = reverse_score(df, ["q2"], scale_max=5, scale_min=1, suffix="_rev")
+
+    assert result.success is False
+    assert result.df is None
+    assert "越界值校验失败" in result.description
+    assert "999" not in result.description  # 错误面不含原始值（对齐计分链口径）
+    assert "[1, 5]" in result.description
+    # 输入帧不被污染、零新列产出
+    assert "q2_rev" not in df.columns
+    assert df.loc[1, "q2"] == 999
+
+
+def test_reverse_score_rejects_out_of_range_before_any_new_column(survey_df):
+    """多列批次：第二列越界即整单拒绝，第一列也不产出（避免半成品）。"""
+    df = survey_df.copy()
+    df.loc[2, "q2"] = -3  # q2 越界；q1 全在域内
+
+    result = reverse_score(df, ["q1", "q2"], scale_max=5, scale_min=1, suffix="_rev")
+
+    assert result.success is False
+    assert result.df is None
+    assert "q2" in result.description
+    assert "q1_rev" not in df.columns
+    assert "q2_rev" not in df.columns
+
+
 def test_recode_bins_uses_default_name_and_includes_lowest_boundary():
     df = pd.DataFrame({"age": [0, 18, 19, 35, "bad"]})
 
@@ -97,6 +128,31 @@ def test_recode_bins_rejects_missing_source_column(survey_df):
 
     assert result.success is False
     assert result.df is None
+
+
+def test_recode_bins_rejects_out_of_bin_sentinel():
+    """s1023-02 残余面②：箱外哨兵值不得被 pd.cut 静默置 NaN（列级分桶缝收口）。"""
+    df = pd.DataFrame({"age": [25, 999]})
+
+    result = recode_bins(df, "age", [0, 18, 35], ["young", "adult"])
+
+    assert result.success is False
+    assert result.df is None
+    assert "越界值校验失败" in result.description
+    assert "999" not in result.description  # 错误面不含原始值
+    assert "[0, 35]" in result.description
+    assert "age_group" not in df.columns  # 输入帧零新列产出
+
+
+def test_recode_bins_still_nan_for_non_numeric_and_in_bin_values():
+    """非数值→NaN 原口径不变；箱内值正常分箱（回归保护）。"""
+    df = pd.DataFrame({"age": [10, 20, "bad"]})
+
+    result = recode_bins(df, "age", [0, 18, 35], ["young", "adult"])
+
+    assert result.success is True
+    assert result.df["age_group"].astype(object).iloc[:2].tolist() == ["young", "adult"]
+    assert pd.isna(result.df.loc[2, "age_group"])
 
 
 def test_recode_map_can_copy_or_replace_and_preserves_unmapped_values(survey_df):

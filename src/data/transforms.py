@@ -112,6 +112,11 @@ def reverse_score(
         scale_max: 量表最大值（如 5 点量表填 5）
         scale_min: 量表最小值（默认 1）
         suffix: 反向计分后新列名后缀（默认 "_R"）
+
+    越界校验（s1023-02，残余面①收口）：与问卷计分链同款口径（决议#17
+    「非法输入直接报错不静默」）——任一列存在量表域 [scale_min, scale_max]
+    之外的非空取值（如哨兵 999）即整单拒绝，零新列产出；NaN/非数值仍按
+    原口径置 NaN，不受影响。
     """
     result = TransformResult(rows_before=len(df))
     missing = [c for c in items if c not in df.columns]
@@ -122,10 +127,28 @@ def reverse_score(
 
     df = df.copy()
     total = scale_max + scale_min
+    # 先整批校验再计算：任一列越界即拒，避免半成品新列
+    numeric_cols: Dict[str, pd.Series] = {}
+    for item in items:
+        col_data = pd.to_numeric(df[item], errors="coerce")
+        out_of_range = col_data.notna() & ((col_data < scale_min) | (col_data > scale_max))
+        n_out = int(out_of_range.sum())
+        if n_out:
+            result.success = False
+            result.df = None
+            result.description = (
+                f"越界值校验失败：列 {item} 存在 {n_out} 个量表域 "
+                f"[{scale_min}, {scale_max}] 之外的取值"
+                f"（首个位置：行索引 {out_of_range.idxmax()}）"
+                f"——反向计分拒绝静默产出错向新列"
+            )
+            return result
+        numeric_cols[item] = col_data
+
     new_cols = []
     for item in items:
         new_name = f"{item}{suffix}"
-        df[new_name] = total - pd.to_numeric(df[item], errors="coerce")
+        df[new_name] = total - numeric_cols[item]
         new_cols.append(new_name)
 
     result.df = df
@@ -149,6 +172,11 @@ def recode_bins(
         bins: 分箱边界，如 [0, 18, 35, 60, 100]
         labels: 各区间标签，如 ["未成年", "青年", "中年", "老年"]
         new_col: 新列名（默认为 col + "_group"）
+
+    箱外校验（s1023-02，残余面②收口）：pd.cut 对箱界之外的非空数值会静默
+    置 NaN（哨兵值如 999 就这样无声消失＝「列级分桶缝」）——现改为：任一
+    非空取值落在 [bins[0], bins[-1]] 之外即整单拒绝，零新列产出；NaN/非
+    数值仍按原口径置 NaN。
     """
     result = TransformResult(rows_before=len(df))
     if col not in df.columns:
@@ -160,8 +188,23 @@ def recode_bins(
     if new_col is None:
         new_col = f"{col}_group"
 
+    col_data = pd.to_numeric(df[col], errors="coerce")
+    lo, hi = float(bins[0]), float(bins[-1])
+    out_of_range = col_data.notna() & ((col_data < lo) | (col_data > hi))
+    n_out = int(out_of_range.sum())
+    if n_out:
+        result.success = False
+        result.df = None
+        result.description = (
+            f"越界值校验失败：列 {col} 存在 {n_out} 个分箱边界 "
+            f"[{lo:g}, {hi:g}] 之外的取值"
+            f"（首个位置：行索引 {out_of_range.idxmax()}）"
+            f"——分箱拒绝静默丢弃（哨兵值请先清洗）"
+        )
+        return result
+
     df[new_col] = pd.cut(
-        pd.to_numeric(df[col], errors="coerce"),
+        col_data,
         bins=bins,
         labels=labels,
         include_lowest=True,
