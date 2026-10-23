@@ -304,11 +304,42 @@ def test_handle_missing_mean_imputation_fills_outlier_contaminated_mean_as_is():
     """现网实况（钉）：插补用的是**含非法值的列均值** ⇒ 非法值把Everyone 的填补值一起带偏。
 
     列 [1, 5, 99999] 的均值 33335.0 会填进缺失位 —— 越界值未参与任何拦截。
+    （r6 起**仅在调用方不传 item_ranges 时**维持本钉语义——无域声明则无从判越界。）
     """
 
     df = pd.DataFrame({"a": [1.0, 5.0, 99999.0, np.nan]})
     out, _ = handle_missing(df, numeric_cols=["a"], strategy="mean_imputation")
     assert out.loc[3, "a"] == 33335.0
+
+
+def test_handle_missing_mean_imputation_intercepts_out_of_range_before_mean():
+    """r6（决议#21 预授权，s1012-02 定谳第 4 口子复现用例）：传入量表域后，
+    越界值在插补前被拦截、不再进均值。
+
+    s1012-02 fixture 原样：A=[1,2,3,NaN]，B=[1,999,2,NaN]，B 域 1-5。
+    修复前 B 缺失位填 334.0（999 进均值实锤）；修复后 999 先归缺失，
+    均值=1.5，缺失位与越界位都填 1.5。
+    """
+    df = pd.DataFrame({"A": [1, 2, 3, np.nan], "B": [1, 999, 2, np.nan]})
+    out, meta = handle_missing(
+        df, numeric_cols=["A", "B"], strategy="mean_imputation",
+        item_ranges={"B": (1, 5)},
+    )
+    assert out.loc[3, "B"] == 1.5            # 修复前 334.0
+    assert out.loc[1, "B"] == 1.5            # 越界位（原 999）也按域内均值回填
+    assert out.loc[3, "A"] == 2.0            # 域内列不受影响：(1+2+3)/3
+    assert meta["oob_intercepted"] == {"B": 1}
+    assert "拦截越界值 1 处" in meta["description_zh"]
+    # 域声明只对声明的列生效：A 无域 ⇒ 照旧
+    assert "A" not in meta["oob_intercepted"]
+
+
+def test_handle_missing_mean_imputation_without_ranges_keeps_legacy_behavior():
+    """向后兼容对照：不传 item_ranges ⇒ 与上方钉桩同款现网行为（零行为变更）。"""
+    df = pd.DataFrame({"A": [1, 2, 3, np.nan], "B": [1, 999, 2, np.nan]})
+    out, meta = handle_missing(df, numeric_cols=["B"], strategy="mean_imputation")
+    assert out.loc[3, "B"] == 334.0          # 999 仍进均值（无域声明无从拦截）
+    assert meta["oob_intercepted"] == {}
 
 
 @pytest.mark.parametrize(

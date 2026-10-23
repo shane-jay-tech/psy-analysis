@@ -26,6 +26,7 @@ def handle_missing(
     numeric_cols: Optional[List[str]] = None,
     strategy: MissingStrategy = "listwise",
     drop_threshold: float = 0.50,
+    item_ranges: Optional[Dict[str, Tuple[float, float]]] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     按指定策略处理缺失值。
@@ -39,9 +40,15 @@ def handle_missing(
             "mean_imputation" — 用列均值填充缺失值
             "drop_column" — 删除缺失比例超过 drop_threshold 的列
         drop_threshold: 删除列的缺失比例阈值（仅 strategy="drop_column" 时生效）
+        item_ranges: {题项: (lo, hi)} 量表取值域（仅 strategy="mean_imputation" 时生效）。
+            r6（决议#21 预授权，s1012-02 第 4 口子）：传入后越界值在插补前先归为缺失，
+            列均值只在域内观测上计算——哨兵值（如 999）不再污染均值。
+            判据与评分链 r5 B1 `detect_invalid_responses` 的 item_ranges 同款；
+            不传时行为与改前逐位一致（向后兼容，既有调用方零改动）。
 
     返回：
-        (处理后的数据框, 处理元信息字典)
+        (处理后的数据框, 处理元信息字典)；mean_imputation 且发生拦截时
+        meta["oob_intercepted"] = {列: 拦截单元格数}。
     """
     if numeric_cols is None:
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -86,12 +93,26 @@ def handle_missing(
 
     elif strategy == "mean_imputation":
         imputed = []
+        oob_intercepted: Dict[str, int] = {}
         for col in numeric_cols:
             if col in result_df.columns and result_df[col].isna().any():
-                mean_val = result_df[col].mean()
-                result_df[col] = result_df[col].fillna(mean_val)
+                series = result_df[col]
+                rng = (item_ranges or {}).get(col)
+                if rng:
+                    # r6（决议#21 预授权，s1012-02 第 4 口子）：插补前拦截越界值——
+                    # 哨兵/越界作答先归为缺失，均值只在域内观测上计算。
+                    # 判据与评分链 r5 B1 detect_invalid_responses 的 item_ranges 同款。
+                    lo, hi = float(rng[0]), float(rng[1])
+                    _num = pd.to_numeric(series, errors="coerce")
+                    _oob = ((_num < lo) | (_num > hi)).fillna(False)
+                    if _oob.any():
+                        series = series.mask(_oob)
+                        oob_intercepted[col] = int(_oob.sum())
+                mean_val = series.mean()
+                result_df[col] = series.fillna(mean_val)
                 imputed.append(col)
         meta["imputed_cols"] = imputed
+        meta["oob_intercepted"] = oob_intercepted
         meta["n_after"] = len(result_df)
         meta["description_zh"] = (
             f"均值插补（Mean Imputation）：对{len(imputed)}个变量"
@@ -99,6 +120,11 @@ def handle_missing(
             "的缺失值用列均值填充。"
             "注意：均值插补会低估标准误，仅建议在缺失比例很低（<5%）时使用。"
         )
+        if oob_intercepted:
+            meta["description_zh"] += (
+                f" 已按量表域在插补前拦截越界值 {sum(oob_intercepted.values())} 处"
+                f"（{', '.join(oob_intercepted)}），均值仅基于域内观测。"
+            )
 
     elif strategy == "drop_column":
         # 删除缺失比例超过阈值的数值列

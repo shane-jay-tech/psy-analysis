@@ -1,7 +1,7 @@
 """核心意图解析器：分词 + 关键词匹配 → AnalysisPlan"""
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import pandas as pd
 from difflib import SequenceMatcher
 
@@ -44,6 +44,10 @@ class AnalysisPlan:
     n_personas: int = 4                    # 模拟专家数
     # v3.9 新增：SEM 结构路径
     structural_paths: Optional[List[str]] = None  # 结构路径如 ["焦虑 ~ 自尊", "孤独 ~ 焦虑 + 自尊"]
+    # r6（决议#21 预授权，s1012-02 第 4 口子）：量表域声明 {题项: (lo, hi)}。
+    # 问卷面/上游传入后，统计链 runner 在 handle_missing(mean_imputation) 插补前
+    # 拦截越界值（哨兵如 999 不再进均值）。默认 None ⇒ 全链路零行为变更。
+    item_ranges: Optional[Dict[str, Tuple[float, float]]] = None
 
 
 def _score_test_types(tokens: list, col_types: dict) -> list:

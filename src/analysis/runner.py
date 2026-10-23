@@ -923,8 +923,11 @@ def run_analysis(df: pd.DataFrame, plan: AnalysisPlan) -> AnalysisResult:
     # ====== 缺失值处理 ======
     try:
         numeric_vars = _collect_numeric_vars(df, plan)
+        # r6（决议#21 预授权，s1012-02 第 4 口子）：plan 若带量表域声明（item_ranges），
+        # 透传给 handle_missing 在 mean_imputation 插补前拦截越界列；缺省 None ⇒ 行为与改前逐位一致。
         analysis_df, missing_meta = handle_missing(
-            df, numeric_cols=numeric_vars, strategy=missing_strategy
+            df, numeric_cols=numeric_vars, strategy=missing_strategy,
+            item_ranges=getattr(plan, "item_ranges", None),
         )
         output["missing_meta"] = missing_meta
     except Exception:
