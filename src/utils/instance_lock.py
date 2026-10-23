@@ -23,9 +23,19 @@ LOCK_FILENAME = ".psy_project.lock"
 DEFAULT_STALE_SECONDS = 600.0  # 10 分钟——标定域=单进程段最坏时长；与 feed 锁 ttl 6h 的 36:1 属任务体差异非漂移（s1007-18 对照行 #1，标定注释补齐 s1007-35）
 
 
-def locked_user_prompt(resource: str, holder: str = "") -> str:
-    """锁定占用的统一用户提示（dab0 同源化）：project_panel 与文献面板共用。"""
-    holder_part = f"（持有者: {holder}）" if holder else ""
+def locked_user_prompt(resource: str, holder: str = "", since: str = "") -> str:
+    """锁定占用的统一用户提示（dab0 同源化）：project_panel 与文献面板共用。
+
+    s1023-05（锁粒度/回退设计稿回退节 2a）：持有者明确化——since 非空时追加
+    「自 <since> 起持有」（ProjectLockedError.holder_since，tz-aware UTC ISO），
+    与既有 holder（pid=x）拼合，落「另一实例（PID x）自 HH:MM 持有」语义。
+    """
+    parts = []
+    if holder:
+        parts.append(f"持有者: {holder}")
+    if since:
+        parts.append(f"自 {since} 起持有")
+    holder_part = f"（{'，'.join(parts)}）" if parts else ""
     return f"🔒 {resource}正被另一实例占用{holder_part}，请关闭对方或稍后重试。"
 
 
@@ -43,6 +53,20 @@ class ProjectLockedError(RuntimeError):
 
 
 _depth_by_path: dict = {}
+# s1023-05（锁粒度/回退设计稿回退节 2c）：陈旧锁接管动作计数——键=锁路径全文字符串。
+# 设计稿原文「补充接管日志计数」：接管属破坏性动作（挪走他锁），计数与 :122 告警日志
+# 同分支累加，供巡检/事后审计读数（takeover_count()）。
+_takeover_counts: dict = {}
+
+
+def takeover_count(lock_path=None) -> int:
+    """陈旧锁接管动作计数（只读）。
+
+    lock_path 传锁文件路径（或其字符串）→ 该路径计数；不传 → 全路径总计。
+    """
+    if lock_path is None:
+        return sum(_takeover_counts.values())
+    return _takeover_counts.get(str(lock_path), 0)
 
 
 def _pid_alive(pid: int) -> bool:
@@ -120,6 +144,7 @@ def project_lock(lock_dir, *, stale_seconds: float = DEFAULT_STALE_SECONDS):
                 continue  # 锁刚被持有者释放：直接重试获取
             if age > stale_seconds and (holder_pid is None or not _pid_alive(holder_pid)):
                 logging.warning('project_lock: stale lock override on %s (holder=%s, age=%.0fs)', lock_path, holder_pid, age)
+                _takeover_counts[key] = _takeover_counts.get(key, 0) + 1  # 回退节 2c 接管计数（含损坏锁 holder=None 形态）
                 # 陈旧锁：先挪走再删，避免双夺取竞态
                 moved = f"{lock_path}.stale-{uuid.uuid4().hex[:8]}"
                 try:

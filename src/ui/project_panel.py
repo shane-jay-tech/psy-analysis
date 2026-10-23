@@ -22,10 +22,12 @@ logger = logging.getLogger(__name__)
 
 def _show_locked_banner(exc: ProjectLockedError) -> None:
     """v5.10 P1 接线：ProjectLockedError → 用户可读的错误横幅（k321/pu1k）。
-    4acb 同源化：文案改走 locked_user_prompt（与文献面板共用），不再自拼。"""
+    4acb 同源化：文案改走 locked_user_prompt（与文献面板共用），不再自拼。
+    s1023-05（锁粒度/回退设计稿回退节 2a）：补持有起始时间，落「另一实例（PID x）自 HH:MM 持有」语义。"""
     pid = exc.args[1] if len(exc.args) > 1 else None
     holder = f"pid={pid}" if isinstance(pid, int) and pid > 0 else ""
-    st.sidebar.error(locked_user_prompt("项目", holder))
+    since = getattr(exc, "holder_since", "") or ""
+    st.sidebar.error(locked_user_prompt("项目", holder, since=since))
 
 
 # --------------------------------------------------------------------------- #

@@ -13,13 +13,15 @@
   `tests/test_lock_alert_log.py` 是**另一把锁**，勿混为抵账」⇒ 本套件按磁盘实况钉，并把这条边界
   一起钉死（见 test_feed_side_alert_hook_is_a_different_lock）。
 
-钉的是「现状」而不是「应该」：
-1. `instance_lock.py` 源内 0 处 `alert`、0 处 warning 级日志调用（连 `logging` 都没 import）；
+原状登记（s922-130 立钉时）与现况：
+1. 告警面：s922-130 立钉时源内 0 告警（连 logging 都没 import）；**1c81986（s1011-03）接线
+   logging.warning 后已非此态**——本面已由「现状断言」改写为「行为断言」（见下 ⚠️ 节）；
 2. 锁粒度＝**目录级**一把锁（`lock_dir / LOCK_FILENAME`，单一固定文件名），不是按项目分锁；
 3. 陈旧锁接管路径**存在**（`age > stale_seconds` + pid 探活 + `os.replace` 挪走再删）。
 
-⚠️ 告警接线落地后本套件会翻红 —— 那是**预期信号**，不是回归：请回写 `KNOWN_ISSUES.md` 的
-P1「多实例项目写入」行（把「余留＝可选告警日志」改为已完成），并把本文件的现状断言改写成行为断言。
+⚠️ 2026-10-24 回写（s1023-05）：告警接线已落地（1c81986，s1011-03），上节两条
+「0 告警」现状断言按本文件自述指令改写为行为断言（warning 三要素＋logging 设施在位）；
+teeth 自证随零探测器一并退役。粒度/消费点/stale 接管要件/600s 窗各钉不变。
 
 零 IO、零子进程、零网络、零 Streamlit：全部是源码文本 + ast 静态判定。
 **不改 src/utils/instance_lock.py，也不改 src/utils/project_manager.py。**
@@ -38,8 +40,6 @@ APP_PATHS_SRC = REPO / "src" / "utils" / "app_paths.py"
 KNOWN_ISSUES = REPO / "KNOWN_ISSUES.md"
 FEED_LOCK_MANAGER_SRC = REPO / "src" / "literature_feed" / "scheduler" / "lock_manager.py"
 
-WARNING_CALL_TOKENS = ("logging.warning", "logger.warning", "log.warning", ".warning(", ".warn(")
-
 
 def _read(path: Path) -> str:
     assert path.exists(), f"锚点文件缺失：{path}"
@@ -47,21 +47,8 @@ def _read(path: Path) -> str:
 
 
 def _alert_hits(text: str) -> list[int]:
-    """返回出现 `alert`（忽略大小写）的行号 —— 现状应为空。"""
+    """返回出现 `alert`（忽略大小写）的行号。"""
     return [n for n, line in enumerate(text.splitlines(), 1) if "alert" in line.lower()]
-
-
-def _warning_hits(text: str) -> list[int]:
-    """返回出现 warning 级日志调用的行号 —— 现状应为空。"""
-    return [n for n, line in enumerate(text.splitlines(), 1) if any(tok in line for tok in WARNING_CALL_TOKENS)]
-
-
-def _logging_import_hits(text: str) -> list[int]:
-    return [
-        n
-        for n, line in enumerate(text.splitlines(), 1)
-        if line.lstrip().startswith("import logging") or line.lstrip().startswith("from logging")
-    ]
 
 
 def _func_node(source: str, name: str) -> ast.FunctionDef:
@@ -77,32 +64,29 @@ def lock_text() -> str:
     return _read(LOCK_SRC)
 
 
-# --------------------------------------------------------------------------- 告警缺口现状
-
+# ------------------------------------------------- 告警接线行为断言（s1023-05 回写）
+# 前史：s922-130 曾钉「0 告警」现状；1c81986（s1011-03）接线 logging.warning 后两条
+# 现状断言翻红（本文件 docstring 自述的预期信号）——s1023-05 按指令改写为行为断言。
 
 def test_instance_lock_source_has_zero_alert_reference(lock_text):
-    """现状基线：instance_lock.py 全文 0 处 `alert`（KNOWN_ISSUES:101「grep alert 零命中」的代码侧镜像）。"""
-    assert _alert_hits(lock_text) == [], "instance_lock.py 出现 alert 字样 ⇒ 告警已接线，须回写 KNOWN_ISSUES P1 行"
+    """告警命名面：接管告警走 stdlib logging.warning（无自造 alert 钩子命名）。"""
+    assert _alert_hits(lock_text) == [], "instance_lock.py 出现 alert 字样 ⇒ 告警命名偏离 stdlib warning 口径"
 
 
-def test_instance_lock_source_has_zero_warning_log_call(lock_text):
-    """现状基线：0 处 logging.warning / logger.warning / .warn( 调用（完成标准 2 的字面口径）。"""
-    assert _warning_hits(lock_text) == [], "instance_lock.py 出现 warning 级日志 ⇒ 告警已接线，回写 KNOWN_ISSUES 并改写本套件"
+def test_stale_override_warning_includes_path_pid_age(lock_text):
+    """行为断言（替代原「0 warning」现状断言）：stale 接管分支必须带 path/holder/age
+    三要素告警（1c81986 契约原文 'stale lock override on %s (holder=%s, age=%.0fs)'）。"""
+    fn_src = ast.get_source_segment(lock_text, _func_node(lock_text, "project_lock")) or ""
+    assert "logging.warning(" in fn_src, "stale 接管分支缺 logging.warning——告警日志面被拆"
+    assert "stale lock override on %s (holder=%s, age=%.0fs)" in fn_src, "告警三要素格式串被改"
 
 
-def test_instance_lock_never_imports_logging(lock_text):
-    """比「无告警调用」更强的一层：模块根本没有日志设施，说明缺口是结构性的而非遗漏一处。"""
-    assert _logging_import_hits(lock_text) == []
-
-
-def test_gap_detector_actually_has_teeth(lock_text):
-    """判别力自证：把一行告警接线注入内存副本，三个探测器必须全部翻红 —— 证明上面三条不是空转。"""
-    mutant = lock_text + "\n    logging.warning(\"lock-alert: stale project_lock takeover\")\n"
-    assert _alert_hits(mutant) != []
-    assert _warning_hits(mutant) != []
-    # 同样的注入若只写日志不调 warning，也必须被 warning 探测器抓到
-    mutant2 = lock_text + "\n    logger.warning(\"takeover\")\n"
-    assert _warning_hits(mutant2) != []
+def test_instance_lock_imports_logging(lock_text):
+    """行为断言（替代原「从不 import logging」现状断言）：日志设施在位。"""
+    assert any(
+        line.lstrip().startswith("import logging") or line.lstrip().startswith("from logging")
+        for line in lock_text.splitlines()
+    ), "instance_lock.py 无日志设施 import——告警日志面被拆"
 
 
 # --------------------------------------------------------------------------- 锁粒度与消费点
