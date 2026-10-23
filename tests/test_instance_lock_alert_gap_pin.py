@@ -178,15 +178,18 @@ def test_default_stale_window_constant_is_pinned(lock_text):
 # --------------------------------------------------------------------------- 文档与「另一把锁」边界
 
 
-def test_known_issues_p1_row_still_declares_alert_residual():
-    """KNOWN_ISSUES 的 P1「多实例项目写入」行仍声明余留＝告警日志，并保留「另一把锁」限定。"""
+def test_known_issues_p1_row_declares_alert_wired_and_rollback_done():
+    """KNOWN_ISSUES 的 P1「多实例项目写入」行现值（s1023-07 刷新）：告警已接线＋回退已细化，
+    余留＝方案 B 粒度收窄，并保留「另一把锁」限定。（s922-130 立钉时钉的是「余留＝告警日志」
+    旧行文；s1023-05 回退落地、s1023-07 行刷新后随行更新本钉。）"""
     row = next(
         (line for line in _read(KNOWN_ISSUES).splitlines() if line.startswith("| P1 | 多实例项目写入 |")),
         None,
     )
     assert row is not None, "P1 行被删除 ⇒ 请同步处置 tests/test_instance_lock_alert_gap_pin.py"
     assert "instance_lock.project_lock" in row
-    assert "余留＝可选告警日志" in row, "余留项被改写 ⇒ 若告警已落地，本套件与工单口径需同步更新"
+    assert "告警日志已接线" in row, "告警接线状态被回退 ⇒ 与 1c81986/s1011-03 事实不符"
+    assert "回退策略已细化" in row, "回退细化状态被回退 ⇒ 与 434b6e6/s1023-05 事实不符"
     assert "另一把锁" in row, "「feed 侧是另一把锁」的限定被删，存在误抵账风险"
 
 

@@ -105,13 +105,24 @@
 
 | 优先级 | 项目 | 当前边界 |
 |---|---|---|
-| P1 | 多实例项目写入 | 已落地两级互斥（线程 RLock＋OS 文件锁，instance_lock.project_lock）；余留＝可选告警日志与锁粒度/回退策略。限定（2026-09-21）：`instance_lock.py` grep alert 零命中＝本行未推进；feed 侧 `lock_manager._alert_once`（d914-19）与 untracked `tests/test_lock_alert_log.py` 是**另一把锁**，勿混为抵账 |
+| P1 | 多实例项目写入 | 已落地两级互斥（线程 RLock＋OS 文件锁，instance_lock.project_lock）；告警日志已接线（1c81986，s1011-03：stale 接管 logging.warning 三要素）；回退策略已细化（434b6e6，s1023-05：提示明确化 holder+since＋接管计数 takeover_count＋门禁 s922-130 回写行为断言）；现余留＝锁粒度方案 B 项目级收窄（需两锁分层＋门禁重写，影响面清单见 s1023-05 result）。限定：feed 侧 `lock_manager._alert_once`（d914-19）与 `tests/test_lock_alert_log.py` 是**另一把锁**，勿混为抵账 |
 | P1 | 大工作区快照 | 已按方案 B 后台化（a02626c）＋「返回＝受理」语义与换案阈值已入码（h912-06，实测阈值=序列化 CSV 10MB≈worker 2s/内存峰值≈52MB）；残留：超阈值需评估方案 A 增量资产化 |
-| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，标记面＝**25 个标记用例＋1 条模块级 `pytest.importorskip`＝26 skip 条目**（e2e∪playwright 实测 2026-09-25：`-rs` 26 skipped、`--collect-only` 25 项，第 26 条无 nodeid——它不是被 skipif 遮住的用例而是模块收集期抛 Skipped，整件 11 例连 collect 都不进＝0 item，两数不可互换；2026-09-17／09-21／09-25 三次复核同为 26）；模块级 skip 归因＝`tests/test_playwright_e2e.py:24`，由 `097a657`（2026-07-14 12:25，checkpoint 笔；`git log -S importorskip -- tests/` 唯一命中，同笔一并带进 v52／golden 两侧的 skipif 文案）引入；**补装后待重跑 36 例＝25＋11**（句式出处 `docs/insights/psy-e2e-skip26-roster-20260922.md` §四；≠旧档 `docs/insights/psy-e2e-count-caliber-20260917.md:18` 对 25/26 之差的归因「playwright-only 有 1 项不在 e2e 内」——2026-09-25 复测 `-m "playwright and not e2e"` 仍是 no tests collected，真因只有上面那条模块级 importorskip；旧档不回改，勘误以本行为准）；复现：.venv/Scripts/python.exe -m pytest -q -rs -m "playwright or e2e"；发布认证环境补装后重跑（安装后本行及 :138 行作废） |
+| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，标记面＝**25 个标记用例＋1 条模块级 `pytest.importorskip`＝26 skip 条目**（e2e∪playwright 实测 2026-09-25：`-rs` 26 skipped、`--collect-only` 25 项，第 26 条无 nodeid——它不是被 skipif 遮住的用例而是模块收集期抛 Skipped，整件 11 例连 collect 都不进＝0 item，两数不可互换；2026-09-17／09-21／09-25 三次复核同为 26）；模块级 skip 归因＝`tests/test_playwright_e2e.py:24`，由 `097a657`（2026-07-14 12:25，checkpoint 笔；`git log -S importorskip -- tests/` 唯一命中，同笔一并带进 v52／golden 两侧的 skipif 文案）引入；**补装后待重跑 36 例＝25＋11**（句式出处 `docs/insights/psy-e2e-skip26-roster-20260922.md` §四；≠旧档 `docs/insights/psy-e2e-count-caliber-20260917.md:18` 对 25/26 之差的归因「playwright-only 有 1 项不在 e2e 内」——2026-09-25 复测 `-m "playwright and not e2e"` 仍是 no tests collected，真因只有上面那条模块级 importorskip；旧档不回改，勘误以本行为准）；复现：.venv/Scripts/python.exe -m pytest -q -rs -m "playwright or e2e"；发布认证环境补装后重跑（安装后本行及环境边界表 Playwright 行〔2026-10-24 行号刷新：原记 :138，现 :147〕作废） |
 | P2 | 交付入口收敛 | 正式交付已统一硬门禁；草稿、作业包与正式交付仍需统一入口语义 |
 | P2 | 编排层拆分 | `app.py` 保持兼容但体量较大；按页面控制器渐进拆分 |
 
-> 📌 2026-09-13 状态（p912-30 设计稿结论落地，d913b-46/a-42）——上表「P1 多实例项目写入」与本注同源，s922-08 合并后**以表为唯一事实源**（余留口径见表行含防混淆限定，本注不再复述状态）；设计稿出处（方案 A＝现状自研零依赖）：`docs/insights/psy-multiprocess-lock-design-20260912.md`。
+> 📌 2026-09-13 状态（p912-30 设计稿结论落地，d913b-46/a-42）——上表「P1 多实例项目写入」与本注同源，s922-08 合并后**以表为唯一事实源**（余留口径见表行含防混淆限定，本注不再复述状态）；设计稿出处：原 `docs/insights/psy-multiprocess-lock-design-20260912.md` 已不在盘（2026-10-24 s1023-07 实查，指针漂移订正），现档＝`docs/insights/psy-lock-granularity-design-20260918.md`（粒度与回退，s918-04）。
+
+### 近批对账登记（2026-10-24 追加，s1023-07；近两批＝gen1012/gen1014，只录遗留原文不扩写）
+
+- **统计链第 4 口子（mean_imputation 越界列进均值）未闭合**——s1012-02 定谳「第 4 口子在统计分析链未闭合（评分链已闭）」；修复面 ≈ data_quality.py 一处拦截（s1014-04 遗留 2「与 s1007-19 遗留 2 同源登记」）；s1014-04 预授权分支待复用（s1014-04 遗留 1）。
+- **裸调 reverse_score／哨兵列级分桶缝两条残余面已闭**——s1004-54 登记、s1012-02 遗留 3 维持；s1023-02 收口（e889e81：transforms.py reverse_score/recode_bins 越界校验＋4 测试；计分链面经决议#17 案 a 前置校验已闭，s1004-54「案 a 未采」登记漂移一并订正）。
+- **SRMR good 档 0.05/0.08 双源冲突维持主班闸**——s1014-01 遗留 2 原文「决议#21 未裁数值口径，维持主班闸（钉桩测试 test_cfa_thresholds_unified_s1007_37.py 双侧在位）」；双源证据材料已备（s1023-04，`artifacts/s-srmr-dualsource.md`；连带发现 renderers.py:264 第三内联面未引单源）。
+- **SRM 占位展示标签冒充面待裁**——s1014-01 遗留 1「命名面收敛到 result_card 展示标签一处」；解锁条件已达成（s1023-03 出材 `artifacts/s-srm-naming.md` 三案：占位注记/隐值保名/隐行），待主班裁案后实施。
+- **决议链材料指针漂移**——s1014-01 遗留 3 原文「决议链材料指针第二次漂移（#21 四点中 s930-31/s1007-37 两个指针均与盘面不符）：建议晨报点名，gen1011/1014 批任务书生成器引用材料前先 rg 校验」；同链 s1014-02 遗留 1（s930-31 误指，真锚 s1006-01 步 3）。
+- **题间相关散文指导带非常量**——s1014-02 遗留 2「psychometrics.py:46/:48『题目冗余度 0.3-0.7』为题间相关散文指导带，非注册阈值档位（thresholds.py 无对应常量），维持散文形态」；如需常量化属新案需材料。
+- **experiment 域分半/α 判据文案无待办**——s1014-02 遗留 3 原维持原遗留；s1023-06（6721b1b）收编 reasoning.py split_half 面并定谳「experiment 域零分半判据文案、α 值均为文献报告值非判据档位不动」，该面自此闭。
+- **全量红名集为登记在册环境面**——s1014-05 遗留 2「37F+13E 为登记在册环境面（playwright/streamlit/v52 路径），归属他班在途件，维持 s1008-01 遗留 3 的点名」；n1011-36 六仓红基线未出件（s1014-05 遗留 1）。
 
 ---
 
