@@ -7,6 +7,7 @@
 消费方：
   - src/analysis/reliability.py（分半/ω 判据，s1006-01 迁移步 2）
   - src/questionnaire/psychometrics.py（指南文案插值，迁移步 3）
+  - src/output/reasoning.py（split_half 指南插值，s1023-06 分半文案收编）
 
 域外参照（**不入本模块**）：undergrad_wizard.py 向导阈值 >= 0.4（文献相关性，非心理测量判据）。
 """

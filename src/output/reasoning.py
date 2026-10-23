@@ -10,6 +10,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from src.output.learning_card import generate_learning_card
+from src.analysis import thresholds
 from src.analysis.reliability_bands import (ACCEPTABLE, EXCELLENT, EXPLORATORY, GOOD, UNACCEPTABLE)
 
 
@@ -290,7 +291,8 @@ TEST_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "计算两半总分之间的Pearson相关",
             "Spearman-Brown校正：r_full = 2r / (1+r)",
         ],
-        "guide": "分半信度 ≥ 0.70 为可接受。不同分半方式得到不同估计，Cronbach's α更稳定。",
+        "guide": (f"分半信度 ≥ {thresholds.SPLIT_HALF.acceptable} 为可接受。"
+                  "不同分半方式得到不同估计，Cronbach's α更稳定。"),
         "alts": ["Cronbach's α — 更全面的内部一致性指标"],
     },
     "mann_whitney": {
