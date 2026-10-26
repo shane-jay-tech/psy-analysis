@@ -43,6 +43,8 @@
 > - `-m "not (e2e or playwright)"`：**5600**（deselect 36——浏览器 11 例在 `.venv` 侧不收集，见 tests/test_interpreter_collect_gap_s93007.py 钉；`-m "not slow"` 已成**空口径**：`pytest.mark.slow` 注册与使用均零命中，任何「全量 = not slow」引用属陈旧）
 > - 沙盒环境要求：playwright 仅系统侧安装（`D:\ms-playwright`），纯 `.venv` 侧不收集浏览器族。
 > 三数并列**勿混用**（旧 3306 系 09-21 单口径时点值，与现值差＝s922 之后的测试增量+e2e 面）。
+>
+> **📊 现值再刷（2026-10-26，s1025-05；系统侧 python 实测）**：三读 **5798 / 5798 / 5762**（全量 / `not online` deselect 0＝online 围栏清空维持〔pytest.ini s1007-24 改标〕/ `not (e2e or playwright)` deselect 36 维持）。上列 5636/5606/5600@10-02 与 5792/5792/5756@10-24（s1023-10 对账读数）均转**历史时点值**；K1 漂移自此闭合。
 
 ---
 
@@ -60,7 +62,7 @@
 
 ### 🟡 #L2 F1 论文写作两入口合并
 
-- **影响**：`paper_writing_ui.py` (678 行独立 mode，2026-09-21 复测) 和 `undergrad_wizard.py` 第 7 步「写方法+结果」**功能重叠**：两条最终都调 `PaperEngine` 生成论文，差别只是独立入口要重填一遍信息，wizard 入口已有数据。
+- **影响**：`paper_writing_ui.py` (682 行独立 mode，2026-10-26 复测；s1023-10 对账 K2：原记 678@09-21) 和 `undergrad_wizard.py` 第 7 步「写方法+结果」**功能重叠**：两条最终都调 `PaperEngine` 生成论文，差别只是独立入口要重填一遍信息，wizard 入口已有数据。
 - **决策**：v4.6 redundancy 时跳过（用户表态可能保留独立模式作为高级用户入口）。v4.7 重启评估，决定是否真合并、降级、或保留双入口加埋点观测使用率。
 - **预期产出**：合并 → 省 ~600 行 UI；保留 → 至少加埋点。
 
@@ -107,7 +109,7 @@
 |---|---|---|
 | P1 | 多实例项目写入 | 已落地两级互斥（线程 RLock＋OS 文件锁，instance_lock.project_lock）；告警日志已接线（1c81986，s1011-03：stale 接管 logging.warning 三要素）；回退策略已细化（434b6e6，s1023-05：提示明确化 holder+since＋接管计数 takeover_count＋门禁 s922-130 回写行为断言）；现余留＝锁粒度方案 B 项目级收窄（需两锁分层＋门禁重写，影响面清单见 s1023-05 result）。限定：feed 侧 `lock_manager._alert_once`（d914-19）与 `tests/test_lock_alert_log.py` 是**另一把锁**，勿混为抵账 |
 | P1 | 大工作区快照 | 已按方案 B 后台化（a02626c）＋「返回＝受理」语义与换案阈值已入码（h912-06，实测阈值=序列化 CSV 10MB≈worker 2s/内存峰值≈52MB）；残留：超阈值需评估方案 A 增量资产化 |
-| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，标记面＝**25 个标记用例＋1 条模块级 `pytest.importorskip`＝26 skip 条目**（e2e∪playwright 实测 2026-09-25：`-rs` 26 skipped、`--collect-only` 25 项，第 26 条无 nodeid——它不是被 skipif 遮住的用例而是模块收集期抛 Skipped，整件 11 例连 collect 都不进＝0 item，两数不可互换；2026-09-17／09-21／09-25 三次复核同为 26）；模块级 skip 归因＝`tests/test_playwright_e2e.py:24`，由 `097a657`（2026-07-14 12:25，checkpoint 笔；`git log -S importorskip -- tests/` 唯一命中，同笔一并带进 v52／golden 两侧的 skipif 文案）引入；**补装后待重跑 36 例＝25＋11**（句式出处 `docs/insights/psy-e2e-skip26-roster-20260922.md` §四；≠旧档 `docs/insights/psy-e2e-count-caliber-20260917.md:18` 对 25/26 之差的归因「playwright-only 有 1 项不在 e2e 内」——2026-09-25 复测 `-m "playwright and not e2e"` 仍是 no tests collected，真因只有上面那条模块级 importorskip；旧档不回改，勘误以本行为准）；复现：.venv/Scripts/python.exe -m pytest -q -rs -m "playwright or e2e"；发布认证环境补装后重跑（安装后本行及环境边界表 Playwright 行〔2026-10-24 行号刷新：原记 :138，现 :147〕作废） |
+| P1 | 浏览器 E2E | 当前 `.venv` 未安装 Playwright，标记面＝**25 个标记用例＋1 条模块级 `pytest.importorskip`＝26 skip 条目**（e2e∪playwright 实测 2026-09-25：`-rs` 26 skipped、`--collect-only` 25 项，第 26 条无 nodeid——它不是被 skipif 遮住的用例而是模块收集期抛 Skipped，整件 11 例连 collect 都不进＝0 item，两数不可互换；2026-09-17／09-21／09-25 三次复核同为 26）；模块级 skip 归因＝`tests/test_playwright_e2e.py:24`，由 `097a657`（2026-07-14 12:25，checkpoint 笔；`git log -S importorskip -- tests/` 唯一命中，同笔一并带进 v52／golden 两侧的 skipif 文案）引入；**补装后待重跑 36 例＝25＋11**（句式出处 `docs/insights/psy-e2e-skip26-roster-20260922.md` §四；≠旧档 `docs/insights/psy-e2e-count-caliber-20260917.md:18` 对 25/26 之差的归因「playwright-only 有 1 项不在 e2e 内」——2026-09-25 复测 `-m "playwright and not e2e"` 仍是 no tests collected，真因只有上面那条模块级 importorskip；旧档不回改，勘误以本行为准）；复现：.venv/Scripts/python.exe -m pytest -q -rs -m "playwright or e2e"；发布认证环境补装后重跑（安装后本行及环境边界表 Playwright 行〔行号指针：2026-10-24 刷 :147→2026-10-26 s1025-05 再刷现 :166〕作废） |
 | P2 | 交付入口收敛 | 正式交付已统一硬门禁；草稿、作业包与正式交付仍需统一入口语义 |
 | P2 | 编排层拆分 | `app.py` 保持兼容但体量较大；按页面控制器渐进拆分 |
 
@@ -115,14 +117,20 @@
 
 ### 近批对账登记（2026-10-24 追加，s1023-07；近两批＝gen1012/gen1014，只录遗留原文不扩写）
 
-- **统计链第 4 口子（mean_imputation 越界列进均值）未闭合**——s1012-02 定谳「第 4 口子在统计分析链未闭合（评分链已闭）」；修复面 ≈ data_quality.py 一处拦截（s1014-04 遗留 2「与 s1007-19 遗留 2 同源登记」）；s1014-04 预授权分支待复用（s1014-04 遗留 1）。
-- **裸调 reverse_score／哨兵列级分桶缝两条残余面已闭**——s1004-54 登记、s1012-02 遗留 3 维持；s1023-02 收口（e889e81：transforms.py reverse_score/recode_bins 越界校验＋4 测试；计分链面经决议#17 案 a 前置校验已闭，s1004-54「案 a 未采」登记漂移一并订正）。
+- **统计链第 4 口子（mean_imputation 越界列进均值）已闭**——s1023-01 落地（commit **218ec6c**：handle_missing 可选 item_ranges 参＋AnalysisPlan 可选域声明字段＋runner.py:930 透传，meta.oob_intercepted 留痕；s1012-02 复现用例转绿）；s1025-02 端到端回归两径 PASS（with-ranges 拦 {'B':1}＋域内均值／no-ranges 零行为变更 334.0）＋boundary/golden/contracts 三族 237 绿复验。统计链 plan 域声明生产面接线（现零生产面）另见 2026-10-26 二版登记。
+- **裸调 reverse_score／哨兵列级分桶缝两条残余面已闭**——s1004-54 登记、s1012-02 遗留 3 维持；s1023-02 收口（e889e81：transforms.py reverse_score/recode_bins 越界校验＋4 测试；计分链面经决议#17 案 a 前置校验已闭，s1004-54「案 a 未采」登记漂移一并订正）；s1025-04 盘面复扫裸调现值 **0 处**（生产调用唯一 import_cleaning.py:148 护住＋transforms 版自带校验零生产调用方），收口维持。
 - **SRMR good 档 0.05/0.08 双源冲突维持主班闸**——s1014-01 遗留 2 原文「决议#21 未裁数值口径，维持主班闸（钉桩测试 test_cfa_thresholds_unified_s1007_37.py 双侧在位）」；双源证据材料已备（s1023-04，`artifacts/s-srmr-dualsource.md`；连带发现 renderers.py:264 第三内联面未引单源）。
-- **SRM 占位展示标签冒充面待裁**——s1014-01 遗留 1「命名面收敛到 result_card 展示标签一处」；解锁条件已达成（s1023-03 出材 `artifacts/s-srm-naming.md` 三案：占位注记/隐值保名/隐行），待主班裁案后实施。
+- **SRM 占位展示标签冒充面已闭（数值口径仍主班闸）**——s1014-01 遗留 1 命名面收敛项：主班选案 D1025-nod#10（2026-10-25，材料推荐案 A）→ s1025-01 实施（commit **36200b7**：result_card.py :1163/:1227 两处展示标签占位 0.0 加注「（占位值：semopy 未提供 SRMR，不参与拟合判读）」，真实非零值不误标，effect_sizes 收录零数值变更，钉桩 4 例）；SRMR good 档 0.05/0.08 数值口径维持主班闸（决议#21 未裁，见上行）。
 - **决议链材料指针漂移**——s1014-01 遗留 3 原文「决议链材料指针第二次漂移（#21 四点中 s930-31/s1007-37 两个指针均与盘面不符）：建议晨报点名，gen1011/1014 批任务书生成器引用材料前先 rg 校验」；同链 s1014-02 遗留 1（s930-31 误指，真锚 s1006-01 步 3）。
 - **题间相关散文指导带非常量**——s1014-02 遗留 2「psychometrics.py:46/:48『题目冗余度 0.3-0.7』为题间相关散文指导带，非注册阈值档位（thresholds.py 无对应常量），维持散文形态」；如需常量化属新案需材料。
 - **experiment 域分半/α 判据文案无待办**——s1014-02 遗留 3 原维持原遗留；s1023-06（6721b1b）收编 reasoning.py split_half 面并定谳「experiment 域零分半判据文案、α 值均为文献报告值非判据档位不动」，该面自此闭。
-- **全量红名集为登记在册环境面**——s1014-05 遗留 2「37F+13E 为登记在册环境面（playwright/streamlit/v52 路径），归属他班在途件，维持 s1008-01 遗留 3 的点名」；n1011-36 六仓红基线未出件（s1014-05 遗留 1）。
+- **全量红名集为登记在册环境面（现值 28F+13E 三型分账）**——s1014-05 遗留 2 原读数 37F+13E 已被 s1023-08 更正（commit **6ab7a92**，`artifacts/s-env-reds.md`：实测 28F/5732P/13E＝A 环境缺依赖 15F＋B 真缺陷 6F+13E〔project_panel.py:73/:98/:116 三处 e/exc NameError＋playwright 钩子定义于测试模块内不被注册，test_playwright_golden_research_flow.py:417/:431〕＋C 路径漂移 7F；F 侧 11 名转绿属代码侧降级链路收口非装依赖，kaleido 仍缺实测）；安装清单两条（kaleido、chromium）只列未装；n1011-36 六仓红基线未出件（s1014-05 遗留 1）维持。
+
+### 近批对账登记二版（2026-10-26 追加，s1025-05；s1023 批销项＋gen1025 后新条目）
+
+- **统计链 plan.item_ranges 域声明零生产面**——s1025-03 盘点（`artifacts/s-itemranges-rollout.md`，零改码材料件）：问卷导入清洗→计分链域声明运行时从维度定义现取已全量覆盖；统计链 AnalysisPlan.item_ranges 字段就位（218ec6c）但生产路径恒 None（跨链交接断点，C3/C4 现仅测试路径生效）；`src/utils/workspace.py` 序列化白名单双侧缺 item_ranges 字段（带域 plan 保存→载入即丢域）。补齐工单草稿 4 张（交接桥/序列化补字段/快捷录入可选面/自然语言面有意不接登记）在材料档，待主班立项。
+- **rg 盘点对 src/data/ 域存在系统性盲区**——.gitignore:42 `data/` 使 rg 默认跳过 src/data/（s1025-04 实证：首轮 rg 漏 transforms.py:98 reverse_score，grep 兜底补面）；后续盘点/巡检类工单对该域须 grep 兜底或 `rg --no-ignore` 双跑，否则「全仓零命中」类结论不可靠。
+- **SRM 三案命名施工的原理性边界**——s1025-01 落地面：占位 0.0 与真实测得 0.0 在展示标签上不可分（注记判据 srmr==0）；若上游未来提供真实 SRMR，判据需随上游改造重审（材料档 s-srm-naming.md 已登记同款边界）。
 
 ---
 

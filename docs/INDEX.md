@@ -1,7 +1,7 @@
 # psy-analysis docs/ 索引（INDEX）
 
-- 生成：2026-10-24T00:06（s1023-12 汇编单；复跑脚本 tmp/s1023-12/build_index.py）
-- 覆盖：docs/ 全树 **325** 文件（insights 284 / history 29 / 其他子目录 12）
+- 生成：2026-10-26T19:54（s1023-12 汇编单；复跑脚本 tmp/s1023-12/build_index.py）
+- 覆盖：docs/ 全树 **326** 文件（insights 284 / history 29 / 其他子目录 13）
 - 字段：日期（文件名后缀>文中 ISO>git 首提）；关联 result＝文件名/标题/前 15 行中的单号；主题＝H1 标题（无则从略）。
 - 维护口径：新 insights 件按「<主题>-<yyyymmdd>」命名落 docs/insights/ 后，重跑脚本刷新本档。
 
@@ -11,7 +11,7 @@
 |---|---|
 | psy-其他 | 63 |
 | s927 裁决批 | 55 |
-| 其他 | 47 |
+| 其他 | 48 |
 | census普查 | 29 |
 | history升级报告 | 25 |
 | s930 批 | 19 |
@@ -373,7 +373,7 @@
 | `docs/insights/psy-reliability-template-gaps-20261006.md` | 2026-10-06 | s1002-37 s920-06 | ReliabilityResult 指南模板缺口裁决材料（s1002-37，2026-10-06，报告型零文案落码） |
 | `docs/insights/psy-thresholds-module-design-20261006.md` | 2026-10-06 | s1002-36 s920-05 | psychometrics 效度/信度阈值族集中常量化设计稿（s1002-36，2026-10-06，零数值改动） |
 
-## 其他（47 件）
+## 其他（48 件）
 
 | 文件 | 日期 | 关联 result | 主题（H1） |
 |---|---|---|---|
@@ -424,3 +424,4 @@
 | `docs/insights/switch-2options-final-20261008.md` | 2026-10-08 | s1004-05 s1007-36 s930-05 | required_n→n_total 彻底切两案材料·终版（s1007-36，零改码） |
 | `docs/insights/variables-families-collision-registry-20261008.md` | 2026-10-08 | s1007-02 s1007-27 s924-64 | variables 字段族分案防撞登记（s1007-27） |
 | `docs/insights/p-sample-table-holm-bh-20261009.md` | 2026-10-09 | s1008-01 s1014-03 | p-sample-table-holm-bh-20261009 —— 校正前后 p 样例表（决议#21） |
+| `docs/INDEX.md` | 2026-10-24 | s1023-12 | psy-analysis docs/ 索引（INDEX） |
