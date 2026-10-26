@@ -1160,7 +1160,13 @@ def _build_cfa(card: AnalysisResultCard, output: dict):
         parts.append(f"RMSEA = {rmsea:.3f}")
         card.effect_sizes.append({"name": "RMSEA", "value": float(rmsea)})
     if srmr is not None:
-        parts.append(f"SRMR = {srmr:.3f}")
+        if srmr == 0:
+            # s1025-01 案A占位注记（s-srm-naming.md·D1025-nod#10选案）：
+            # semopy 无 SRMR 键时上游 cfa.py 恒回退 0.0（s930-17 定谳），
+            # 显式标注占位身份，不冒充"完美拟合"实测；真实非零值原样展示。
+            parts.append(f"SRMR = {srmr:.3f}（占位值：semopy 未提供 SRMR，不参与拟合判读）")
+        else:
+            parts.append(f"SRMR = {srmr:.3f}")
         card.effect_sizes.append({"name": "SRMR", "value": float(srmr)})
 
     card.apa_text = "，".join(parts) + "。"
@@ -1224,7 +1230,11 @@ def _build_sem(card: AnalysisResultCard, output: dict):
             fit_parts.append(f"RMSEA = {rmsea:.3f}")
             card.effect_sizes.append({"name": "RMSEA", "value": float(rmsea)})
         if srmr is not None:
-            fit_parts.append(f"SRMR = {srmr:.3f}")
+            if srmr == 0:
+                # s1025-01 案A占位注记（同 CFA 卡）：占位 0.0 显式身份标注
+                fit_parts.append(f"SRMR = {srmr:.3f}（占位值：semopy 未提供 SRMR，不参与拟合判读）")
+            else:
+                fit_parts.append(f"SRMR = {srmr:.3f}")
             card.effect_sizes.append({"name": "SRMR", "value": float(srmr)})
 
         if fit_parts:
