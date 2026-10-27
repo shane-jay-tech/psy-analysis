@@ -57,6 +57,8 @@ class CleaningResult:
     invalid_mask: Optional[pd.Series] = None
     log: list[CleaningLogEntry] = field(default_factory=list)
     summary: dict = field(default_factory=dict)
+    # s1025-03 工单-1：域声明随清洗结果出门（r5 B1 已现取的 item_ranges，原为局部变量）
+    item_ranges: Optional[dict] = None
 
 
 def classify_columns(df: pd.DataFrame) -> ColumnClassification:
@@ -326,7 +328,24 @@ def run_questionnaire_cleaning(
         invalid_mask=invalid_mask,
         log=log,
         summary=summary,
+        item_ranges=dict(item_ranges) if item_ranges else None,
     )
+
+
+def bridge_item_ranges_to_plan(plan, cleaned_result, df) -> None:
+    """s1025-03 工单-1：问卷→统计链交接桥——域声明跟着数据走。
+
+    仅当清洗结果带域且题项键均为当前 df 列时才附挂到 plan.item_ranges
+    （防错域传播：df 不是该份问卷时零行为变更）。无域/无清洗结果同样零变更。
+    """
+    if plan is None or cleaned_result is None or df is None:
+        return
+    ranges = getattr(cleaned_result, "item_ranges", None)
+    if not ranges:
+        return
+    if not set(ranges).issubset(set(map(str, df.columns))):
+        return
+    plan.item_ranges = dict(ranges)
 
 
 def export_cleaning_log(log: list[CleaningLogEntry], format: str = "markdown") -> str:

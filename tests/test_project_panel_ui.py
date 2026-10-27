@@ -263,7 +263,9 @@ def test_lock_on_empty_state_create_shows_the_banner_and_writes_nothing():
     _click(at, "➕ 新建项目")
 
     assert not at.exception
-    assert _errors(at) == [_locked_prompt()]
+    # s1023-05 起横幅带 since 段；真异常 args 恒长 1 ⇒ 无持有者段，期望按锁文件实写内容构造
+    _since_txt = (pm.PROJECTS_DIR / instance_lock.LOCK_FILENAME).read_text(encoding="ascii").split(" ", 1)[1].strip()
+    assert _errors(at) == [_visible(instance_lock.locked_user_prompt("项目", "", since=_since_txt))]
     assert _warnings(at) == [_visible(_SRC_NO_ACTIVE)]          # 仍停在空态
     assert pm.list_projects() == [] and "_active_project_id" not in at.session_state
 
@@ -335,7 +337,8 @@ def test_banner_has_no_holder_because_the_exception_carries_only_one_arg():
 
     at = _at(_BANNER.replace("__BUILD__", "exc = instance_lock.ProjectLockedError('/tmp/x.lock', 4242, '2026-01-01T00:00:00')"))
     assert not at.exception
-    assert _errors(at) == [_locked_prompt()]
+    # s1023-05 起横幅带 since 段（holder_since 接线）；holder 仍缺（args 恒长 1）
+    assert _errors(at) == [_visible(instance_lock.locked_user_prompt("项目", "", since="2026-01-01T00:00:00"))]
     assert "持有者" not in _errors(at)[0]
 
     with_holder = _at(_BANNER.replace("__BUILD__", "exc = instance_lock.ProjectLockedError('/tmp/x.lock', 4242)\nexc.args = ('locked', 77)"))

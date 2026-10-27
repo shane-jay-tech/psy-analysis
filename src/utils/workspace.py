@@ -154,6 +154,12 @@ def _serialize_plan(plan: Any) -> Optional[Dict]:
             "parsed_keywords": plan.parsed_keywords,
             "ambiguity_score": plan.ambiguity_score,
             "suggested_followups": plan.suggested_followups,
+            # s1025-03 工单-2：域声明随工作区往返（r6 决议#21）；JSON 面存 [lo, hi] 列表
+            "item_ranges": (
+                {k: [v[0], v[1]] for k, v in plan.item_ranges.items()}
+                if plan.item_ranges
+                else None
+            ),
         }
     if isinstance(plan, dict):
         return {"__type__": "dict", "data": plan}
@@ -181,6 +187,15 @@ def _deserialize_plan(data: Dict) -> Any:
             parsed_keywords=data.get("parsed_keywords", []),
             ambiguity_score=data.get("ambiguity_score", 0.0),
             suggested_followups=data.get("suggested_followups", []),
+            # s1025-03 工单-2：JSON 往返把 tuple 变 list，载入侧转回 (lo, hi)；
+            # 旧工作区文件无该键 ⇒ None＝零行为变更
+            item_ranges=(
+                {
+                    k: (float(v[0]), float(v[1]))
+                    for k, v in (data.get("item_ranges") or {}).items()
+                }
+                or None
+            ),
         )
     if t == "dict":
         return data.get("data", {})

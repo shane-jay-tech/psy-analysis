@@ -28,6 +28,7 @@ WHITELIST_EXPORTS = {
     "src/ui/evidence_table_panel.py": "文献证据表导出（Markdown/CSV/BibTeX/RIS，中间产物供整理用）",
     "src/ui/questionnaire_import_panel.py": "问卷清洗日志导出（中间产物，供数据处理追溯）",
     "src/ui/app_pages_text.py": "课程作业包导出（自 app.py 片 2 迁出；调用侧已有效应量检查，非正式论文交付）",
+    "src/ui/questionnaire_panel.py": "问卷设计报告 Word/PDF 导出（生成文档非研究数据，无隐私预检面，s1028-06 翻正补登）",
 }
 
 GATED_EXPORTS = {

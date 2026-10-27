@@ -119,16 +119,19 @@ def test_mutation_revert_to_pass_turns_banner_assertions_red(monkeypatch, tmp_pa
     mutated_hits = 0
     while i < len(src_lines):
         line = src_lines[i]
-        if "except Exception as e:" in line and i + 1 < len(src_lines) and "s1002-16" in src_lines[i + 1]:
+        if (
+            "except Exception as exc:" in line
+            and i + 5 < len(src_lines)
+            and "logger.debug" in src_lines[i + 1]
+            and "s1002-16" in src_lines[i + 2]
+            and "st.error" in src_lines[i + 5]
+        ):
             indent = line[: len(line) - len(line.lstrip())]
-            # 跳过注释行与 st.error 行，压成 pass
-            j = i + 1
-            while j < len(src_lines) and ("#" in src_lines[j] or "st.error" in src_lines[j]):
-                j += 1
+            # 横幅点固定六行：except→logger.debug→s1002-16 注记→两行注释→st.error，整块压成 pass
             out.append(indent + "except Exception:" + "\n")
             out.append(indent + "    pass" + "\n")
             mutated_hits += 1
-            i = j
+            i += 6
             continue
         out.append(line)
         i += 1

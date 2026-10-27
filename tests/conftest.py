@@ -28,6 +28,8 @@ _APP_TEST_FILES = {
     "test_playwright_golden_research_flow.py",
     "test_questionnaire_import_panel_render.py",  # s924-01: 本件升级为真 AppTest，未登记＝零隔离
     "test_lr_rerun_apptest.py",  # s924-59: LR 漏斗修订 `_lr_pending_rescore` 真 AppTest 端到端
+    "test_project_panel_banner_s1002_16.py",  # s1028-06: 真 AppTest 横幅件补登记（加严非豁免）
+    "test_qimport_cleaned_key_q1002_09.py",  # s1028-06: 同上，drift 普查点名补齐
 }
 
 

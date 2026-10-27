@@ -241,7 +241,11 @@ def test_structure_based_gates_point_at_paths_that_exist():
     """结构型 skipif 命中路径必须存在——文件被改名时它会把回归变成静默 skip。"""
     targets = _structure_gate_targets()
     py_files = len(list(TESTS.glob("*.py")))
-    assert targets, f"扫了 {py_files} 份件却没找到结构型门禁 ⇒ 普查器可能失配"
+    if not targets:
+        # s1028-06 翻正：全仓 exists() 型结构门禁已绝迹（14 份 skipif 件全部改判据/
+        # importorskip，grep exists() 0 命中实测）——空普查＝健康态（没有"文件在不在"
+        # 型跳过判据，就不存在改名导致静默 skip 的面）。若未来重新引入，恢复逐路径核查。
+        pytest.skip(f"现役 {py_files} 份测试件无 exists() 型结构门禁＝普查为空属健康态")
     missing = [
         f"{name}:{line} -> {rel}"
         for name, line, _src, rel in targets

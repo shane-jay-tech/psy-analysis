@@ -215,8 +215,10 @@ def test_pending_flag_reset_is_second_statement_with_no_try_guard():
 
     fn = next(n for n in ast.walk(ast.parse(src))
               if isinstance(n, ast.FunctionDef) and n.name == "render_literature_review")
-    assert sum(1 for n in ast.walk(fn) if isinstance(n, ast.Try)) == 1, (
-        "s922-05 证据 3 的现状读数「主入口 0 个 try」已翻正为 1；多于 1 枚说明有人加戏")
+    assert sum(1 for n in ast.walk(fn) if isinstance(n, ast.Try)) == 6, (
+        "s1028-06 翻正：s922-05 读数 1 之后，s1004-19（ingest/themes/gaps/export 四向包 try）"
+        "与 s1007-07（完成度徽章+materialize 两处包 try）正向隔离批合计 +5 ⇒ 6；"
+        "再增须逐个过正向隔离评审，不许裸加")
 
 
 class _RecordingSt:

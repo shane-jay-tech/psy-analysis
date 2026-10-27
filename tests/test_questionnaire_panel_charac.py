@@ -275,7 +275,8 @@ def test_page_is_still_one_monster_function():
     fn = funcs[-1]
     assert fn is tree.body[-1]                                   # 页面函数之后不许再有顶层语句
     consts = [n for n in tree.body if isinstance(n, ast.Assign)]
-    assert [ast.unparse(c.targets[0]) for c in consts] == ["CLOCK_ANOMALY_WARNING_TEXT"]
+    # s1028-06 翻正：面板抽出时模块带 logger（logging.getLogger 顶层赋值，与 project_panel 同型）
+    assert [ast.unparse(c.targets[0]) for c in consts] == ["logger", "CLOCK_ANOMALY_WARNING_TEXT"]
     # s921-07 后 51/767；s922-02 加 pending_clock_anomaly 后 64/774；
     # s922-138 反向刷齐（顶部 import html 占 1 行＋三处渲染/下载面按 app.py 加长）后 65/807；
     # s922-139 premium 分支补 anomaly 警示（+7 行）后 65/814；
@@ -326,7 +327,7 @@ def test_session_state_touches_are_20_and_three_keys_dominate():
     """20 处 `st.session_state.` 引用（设计稿口径），其中 language/questionnaire_design/_q_design_pending 是主写键。"""
     n = sum(1 for _ in BODY.splitlines() if "st.session_state" in _)
 
-    assert len(BODY.splitlines()) == 881                 # s921-06 后 805；s921-07 后 817；s922-02 加 anomaly 与负秒钉后 837；s922-138 反向刷齐后 871；s922-139 premium 分支补 anomaly 警示后 878；s924-37 常量化（模块常量 +9、两调用点各 4 行收成 1 行 −6）后 881
+    assert len(BODY.splitlines()) == 883                 # s921-06 后 805；s921-07 后 817；s922-02 加 anomaly 与负秒钉后 837；s922-138 反向刷齐后 871；s922-139 premium 分支补 anomaly 警示后 878；s924-37 常量化（模块常量 +9、两调用点各 4 行收成 1 行 −6）后 881；s1028-06 面板带 logger（import logging+getLogger +2）后 883
     assert BODY.count("st.session_state.") >= 20
     for key in ("language", "questionnaire_design", "_q_design_pending", "_q_premium_mode"):
         assert key in BODY

@@ -3020,6 +3020,10 @@ def render_undergrad_wizard():
                         request_text = f"对 {selected_dv} 进行 {recommended}"
 
                     plan = resolve_intent(df, request_text, col_info=inspector)
+                    # s1025-03 工单-1：问卷清洗带域时随数据附挂（键⊆列才挂，防错域传播）
+                    from src.questionnaire.import_cleaning import bridge_item_ranges_to_plan
+                    from src.ui.questionnaire_import_panel import _CLEANED_KEY
+                    bridge_item_ranges_to_plan(plan, st.session_state.get(_CLEANED_KEY), df)
                     wiz.plan = plan
                     output = run_analysis(df, plan)
                     wiz.analysis_output = output
