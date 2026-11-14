@@ -24,9 +24,18 @@ def find_local_chromium() -> Optional[Path]:
         Path(os.environ.get("PROGRAMFILES", "")) / "Google/Chrome/Application/chrome.exe",
         Path(os.environ.get("PROGRAMFILES(X86)", "")) / "Google/Chrome/Application/chrome.exe",
     ]
+    # s1114：Playwright 浏览器根有两形态——默认 LOCALAPPDATA\ms-playwright 与
+    # PLAYWRIGHT_BROWSERS_PATH 自定义根（如 D:\ms-playwright）。只认默认根时，
+    # 自定义根环境下探测返回 None ⇒ kaleido 有包无浏览器运行时（导出族 10F 根因，
+    # s1004-32「探测契约须覆盖浏览器运行时层」的覆盖缺口）。
+    playwright_roots = []
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
-        playwright_root = Path(local_app_data) / "ms-playwright"
+        playwright_roots.append(Path(local_app_data) / "ms-playwright")
+    custom_root = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if custom_root:
+        playwright_roots.append(Path(custom_root))
+    for playwright_root in playwright_roots:
         if playwright_root.is_dir():
             candidates.extend(
                 sorted(

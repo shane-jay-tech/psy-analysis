@@ -427,22 +427,42 @@ def page(browser, request):
     context.close()
 
 
-@pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    """记录测试结果供 page fixture 判断是否截图。"""
-    import pluggy
-    outcome = yield
-    rep = outcome.get_result()
-    setattr(item, f"rep_{rep.when}", rep)
+# s1114（B3）：pytest_runtest_makereport 钩子已迁 tests/conftest.py——
+# pytest 不从测试模块注册钩子，模块内定义属死代码（rep_call 永不落位 ⇒ teardown AttributeError）。
 
 
 def _dismiss_privacy(page):
-    """关闭隐私声明弹窗（如有）。"""
+    """关闭隐私声明弹窗（如有）。
+
+    s1114：原版 goto 后立即查按钮——Streamlit 水合未完成时 count==0 静默不点，
+    弹窗全程遮挡页面（sidebar/导航多名 assert 0>0 的真因）。改为有界等待按钮出现再点；
+    server 侧 prefs 已持久化时弹窗不再出现，等不到（主界面/引导页已现）即返回。
+    """
     try:
-        agree = page.locator("button:has-text('同意')")
-        if agree.count() > 0:
-            agree.first.click()
+        already_up = (
+            page.locator('[data-testid="stSidebar"]').count() > 0
+            or page.locator("button:has-text('直接开始我的研究')").count() > 0
+        )
+        if already_up:
+            return
+        btn = page.wait_for_selector("button:has-text('同意')", timeout=10_000)
+        if btn:
+            btn.click()
             page.wait_for_timeout(1000)
+    except Exception:
+        pass
+
+
+def _skip_onboarding(page):
+    """跳过 v5.x 首启引导欢迎页（出现才点；不出现说明已完成/已跳过）。
+
+    欢迎页会替换整个主界面（无侧栏/无上传/无导航），浏览器测试须先越过它。
+    """
+    try:
+        btn = page.wait_for_selector("button:has-text('直接开始我的研究')", timeout=8_000)
+        if btn:
+            btn.click()
+            page.wait_for_timeout(2000)
     except Exception:
         pass
 
@@ -469,17 +489,19 @@ class TestBrowserGoldenPath:
         assert "ok" in body.lower()
 
     def test_sidebar_exists(self, page):
-        """侧边栏可见。"""
+        """侧边栏可见（s1114：需越过隐私弹窗+首启引导页，欢迎页无侧栏）。"""
         page.goto(BASE_URL, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         page.wait_for_timeout(2000)
         sidebar = page.locator('[data-testid="stSidebar"]')
         assert sidebar.count() > 0
 
     def test_file_upload_visible(self, page):
-        """文件上传组件存在。"""
+        """文件上传组件存在（s1114：上传入口在主区顶部「数据上传」，越过欢迎页后可见）。"""
         page.goto(BASE_URL, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         page.wait_for_timeout(2000)
         file_input = page.locator('input[type="file"]')
         assert file_input.count() > 0
@@ -518,25 +540,46 @@ class TestBrowserGoldenPath:
         assert len(critical_errors) == 0, f"JS errors: {critical_errors}"
 
     def test_method_recommender_route_exists(self, page):
-        """方法推荐导航项可见。"""
+        """方法推荐入口可见。
+
+        s1114（IA 漂移翻正）：v5.x 信息架构重组（PAGE_MODES，s924-38）后方法推荐
+        不再是顶级导航项，入口改为「📈 数据分析」页上传数据后的
+        「🎯 不知道用什么方法？点击这里」方法选择助手折叠卡——上传演示数据后断言该入口。
+        """
         page.goto(BASE_URL, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         page.wait_for_timeout(2000)
-        nav = page.locator("text=方法推荐")
-        assert nav.count() > 0
+        demo_csv = str(DEMO_DIR / "data.csv")
+        file_input = page.locator('input[type="file"]').first
+        if file_input.count() > 0:
+            file_input.set_input_files(demo_csv)
+            page.wait_for_timeout(3000)
+        entry = page.locator("text=不知道用什么方法")
+        assert entry.count() > 0
 
     def test_evidence_table_route_exists(self, page):
-        """证据表导航项可见。"""
+        """证据表入口可见。
+
+        s1114（IA 漂移翻正）：证据表面板并入「📝 论文写作」页的「📚 证据表」标签页
+        （app.py 论文写作 tabs），不再是顶级导航项——导航到论文写作页后断言标签可见。
+        """
         page.goto(BASE_URL, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         page.wait_for_timeout(2000)
-        nav = page.locator("text=证据表")
-        assert nav.count() > 0
+        nav = page.locator("text=论文写作")
+        if nav.count() > 0:
+            nav.first.click()
+            page.wait_for_timeout(2000)
+        tab = page.locator("text=证据表")
+        assert tab.count() > 0
 
     def test_deliverable_export_route_exists(self, page):
-        """交付包导出导航项可见。"""
+        """交付包导出导航项可见（s1114：越过欢迎页后侧栏 PAGE_MODES 含「📦 交付包导出」）。"""
         page.goto(BASE_URL, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         page.wait_for_timeout(2000)
         nav = page.locator("text=交付包导出")
         assert nav.count() > 0

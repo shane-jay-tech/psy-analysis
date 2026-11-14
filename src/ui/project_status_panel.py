@@ -1,12 +1,17 @@
 """项目状态面板 v5.1 — 论文就绪度评分和进度可视化。"""
 
 import streamlit as st
+from src.utils.privacy_ethics import NON_DIAGNOSTIC_DISCLAIMER
 from src.utils.readiness_scorer import compute_readiness, ReadinessReport
 
 
 def render_project_status_panel(session_state: dict):
     """渲染论文就绪度评分面板。"""
     report = compute_readiness(session_state)
+
+    # s1114：恢复非诊断免责声明渲染——v5.x IA 重组后 NON_DIAGNOSTIC_DISCLAIMER 变成
+    # 零渲染方的悬空常量（e2e_v52 隐私声明确权的根因），研究工具的合规元素不应缺席。
+    st.info(NON_DIAGNOSTIC_DISCLAIMER)
 
     _render_score_header(report)
     _render_dimension_breakdown(report)

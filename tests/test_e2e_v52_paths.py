@@ -17,6 +17,7 @@ Playwright E2E — v5.2 新路径覆盖。
 import pytest
 import zipfile
 import json
+import pandas as pd
 from pathlib import Path
 
 
@@ -126,6 +127,21 @@ def _dismiss_privacy(page):
         pass
 
 
+def _skip_onboarding(page):
+    """跳过 v5.x 首启引导欢迎页（出现才点；不出现说明已完成/已跳过）。
+
+    s1114：欢迎页替换整个主界面（无侧栏/无导航），v52 测试须先越过它
+    （IA 漂移翻正，同 test_playwright_golden_research_flow 的处理）。
+    """
+    try:
+        btn = page.wait_for_selector("button:has-text('直接开始我的研究')", timeout=8_000)
+        if btn:
+            btn.click()
+            page.wait_for_timeout(2000)
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # 1. 页面加载基础检查
 # ---------------------------------------------------------------------------
@@ -138,6 +154,7 @@ class TestV52PageLoading:
         page.goto(app_url, timeout=30_000)
         page.wait_for_load_state("networkidle")
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         # 检查无 Streamlit 异常弹窗
         errors = page.locator(".stException")
         assert errors.count() == 0, (
@@ -146,9 +163,16 @@ class TestV52PageLoading:
         )
 
     def test_privacy_disclaimer_visible(self, page, app_url):
-        """非诊断免责声明在项目状态页可见。"""
+        """非诊断免责声明可见（s1114：v5.x 起常驻侧栏 caption，任意页可达）。"""
         page.goto(app_url, timeout=30_000)
+        # s1114：等待主界面真实渲染（侧栏挂载）再取 content——原 1s 固定等待在
+        # 首渲染未完成时取到空壳 HTML（portal 空 div），四词断言必红。
+        try:
+            page.wait_for_selector('[data-testid="stSidebar"]', timeout=20_000)
+        except Exception:
+            pass
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         # 导航到项目状态页
         try:
             page.locator("text=📊 项目状态").click()
@@ -165,6 +189,7 @@ class TestV52PageLoading:
         page.goto(app_url, timeout=30_000)
         page.wait_for_load_state("networkidle")
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         page.wait_for_timeout(1000)
         # stException 是 Streamlit 报错的 class
         assert page.locator(".stException").count() == 0
@@ -184,6 +209,7 @@ class TestV52NextStepRecommendation:
         """项目状态页显示下一步推荐卡片。"""
         page.goto(app_url, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         try:
             page.locator("text=📊 项目状态").click()
             page.wait_for_load_state("networkidle")
@@ -206,6 +232,7 @@ class TestV52PrivacyPrecheck:
         """导出页面包含隐私预检相关元素。"""
         page.goto(app_url, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         try:
             page.locator("text=📦 交付包导出").click()
             page.wait_for_load_state("networkidle")
@@ -219,6 +246,7 @@ class TestV52PrivacyPrecheck:
         """高风险敏感信息场景有阻断/警告提示。"""
         page.goto(app_url, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         try:
             page.locator("text=📦 交付包导出").click()
             page.wait_for_load_state("networkidle")
@@ -247,6 +275,7 @@ class TestV52ExportButtons:
         """Word 导出按钮在导出页可见。"""
         page.goto(app_url, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         try:
             page.locator("text=📦 交付包导出").click()
             page.wait_for_load_state("networkidle")
@@ -260,6 +289,7 @@ class TestV52ExportButtons:
         """ZIP 导出按钮在导出页可见。"""
         page.goto(app_url, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         try:
             page.locator("text=📦 交付包导出").click()
             page.wait_for_load_state("networkidle")
@@ -281,6 +311,7 @@ class TestV52CacheManagement:
         """侧栏有缓存清理入口。"""
         page.goto(app_url, timeout=30_000)
         _dismiss_privacy(page)
+        _skip_onboarding(page)
         page.wait_for_timeout(1000)
         content = page.content()
         assert "缓存清理" in content or "缓存" in content or "清理" in content
@@ -330,6 +361,9 @@ class TestV52ZipStructure:
                 "method": "pearson_correlation",
                 "apa_text": "r = .42, p < .001",
                 "variables": ["x", "y"],
+                # s1114：generate_tables_from_card 的输入契约要原始 df（v5.x 起从 matrix 直传演进为 df 重算），
+                # 旧形状只传 matrix 时静默 0 表——补 df 使 tables/ 导出链恢复被测语义。
+                "df": pd.DataFrame({"x": range(100), "y": [i * 0.42 for i in range(100)]}),
                 "correlation_matrix": [[1.0, 0.42], [0.42, 1.0]],
                 "p_matrix": [[0.0, 0.001], [0.001, 0.0]],
                 "n": 100,
@@ -345,10 +379,12 @@ class TestV52ZipStructure:
             # 验证 tables/ 目录存在
             table_files = [n for n in names if n.startswith("tables/")]
             assert len(table_files) > 0, f"ZIP should contain tables/ directory, got: {names}"
-            # 验证 manifest
+            # 验证 manifest（s1114：v5.x 起 manifest 从 list 演进为带元信息头的 dict——
+            # project_id/title/mode/created_at/file_count/files/pdf_status，files 为条目表）
             assert "manifest.json" in names
             manifest = json.loads(zf.read("manifest.json"))
-            assert isinstance(manifest, list)
+            assert isinstance(manifest, dict)
+            assert {"project_id", "files"} <= set(manifest)
 
     @pytest.mark.skipif(
         not _zip_exporter_importable(),
@@ -373,6 +409,9 @@ class TestV52ZipStructure:
                 "method": "descriptive",
                 "apa_text": "M=3.5, SD=1.2",
                 "stats": {"mean": 3.5, "std": 1.2, "n": 50, "min": 1, "max": 5},
+                # s1114：同上，descriptive 分支的契约是 df+variables（descriptive_stats_table 输入）。
+                "df": pd.DataFrame({"score": [3.5] * 50}),
+                "variables": ["score"],
             }],
         )
         zip_bytes = build_deliverable_zip(bundle, mode="standard")

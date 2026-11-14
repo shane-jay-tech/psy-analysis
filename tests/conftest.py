@@ -111,6 +111,20 @@ def isolate_streamlit_app_test_storage(request, monkeypatch, tmp_path):
             monkeypatch.setattr(_mod, _attr, _val, raising=False)
 
 
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """记录每阶段测试报告到 item（rep_setup/rep_call/rep_teardown）。
+
+    s1114（B3 迁移）：原钩子定义在 tests/test_playwright_golden_research_flow.py 模块内，
+    pytest 不从测试模块注册钩子 ⇒ request.node.rep_call 永不落位 ⇒ page fixture teardown
+    AttributeError（s-env-reds.md B3 根因）。钩子属全局测试基建，正位是 conftest；
+    测试模块内同名钩子已删（本钩子对所有测试零副作用：仅 setattr 三个属性）。
+    """
+    outcome = yield
+    rep = outcome.get_result()
+    setattr(item, f"rep_{rep.when}", rep)
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-benchmark",

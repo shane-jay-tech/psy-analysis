@@ -213,6 +213,11 @@ if render_onboarding_card():
 with st.sidebar:
     st.title("📊 心理学研究工具")
 
+    # s1114：非诊断免责声明恢复常驻（v5.x IA 重组后 NON_DIAGNOSTIC_DISCLAIMER 一度零渲染方；
+    # 研究工具合规元素，侧栏常驻使任意页可见——e2e_v52 隐私声明确权口径）。
+    from src.utils.privacy_ethics import NON_DIAGNOSTIC_DISCLAIMER
+    st.caption(NON_DIAGNOSTIC_DISCLAIMER)
+
     # ── v4.3 快捷模型选择器（一键切换 4 个预设模型）──
     try:
         from src.llm_gateway.quick_models import list_available_quick_models
@@ -774,6 +779,13 @@ if mode == "📈 数据分析":
     )
     st.title("📈 数据分析")
     st.caption("上传研究数据，选择分析任务，并获得可核查的统计结果与 APA7 输出。")
+
+    # s1114：方法推荐向导恢复挂载——v5.x IA 重组后 render_method_recommender_panel 一度
+    # 悬空零调用方（golden 流 method_recommender 入口确权的根因，同批断链还有
+    # project_status_panel / NON_DIAGNOSTIC_DISCLAIMER）。上传数据前后均可达。
+    with st.expander("🎯 不知道用什么方法？点击这里（方法推荐向导）", expanded=False):
+        from src.ui.method_recommender_panel import render_method_recommender_panel
+        render_method_recommender_panel()
 
     # ── 数据上传与状态信息（页面顶部，路由 stop() 前必须先渲染） ──
     # 之前在 sidebar；v3.7.x 移到主区，因为只有数据分析页才需要上传，

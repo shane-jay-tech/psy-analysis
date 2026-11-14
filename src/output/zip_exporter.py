@@ -56,6 +56,16 @@ def build_deliverable_zip(bundle, mode: str = "standard") -> bytes:
         if bundle.analysis_cards:
             for i, card in enumerate(bundle.analysis_cards):
                 card_data = card if isinstance(card, dict) else (card.to_dict() if hasattr(card, "to_dict") else str(card))
+                # s1114：df 等 pandas 对象不可 JSON 序列化——card 带 df 时此处 TypeError 曾使整包导出炸裂
+                # （tables 分支用原始 card 独立循环，不受此剥离影响）。DataFrame 以 to_csv 摘要代替。
+                if isinstance(card_data, dict):
+                    _json_safe = {}
+                    for _k, _v in card_data.items():
+                        if hasattr(_v, "to_csv") and hasattr(_v, "shape"):
+                            _json_safe[_k] = f"<DataFrame shape={_v.shape}>"
+                        else:
+                            _json_safe[_k] = _v
+                    card_data = _json_safe
                 card_json = json.dumps(card_data, ensure_ascii=False, indent=2)
                 card_path = f"analysis_cards/card_{i + 1}.json"
                 zf.writestr(card_path, card_json)
