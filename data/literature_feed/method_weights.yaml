@@ -1,0 +1,28 @@
+# 心理学研究方法加权配置（2026-05-30 加，I/O 专业方向 Round 2）
+# 用户研究方向：People Analytics / 工业与组织心理学 / HRBP — 因果识别强的方法应优先看
+# 命中以下任一同义词（标题/摘要/关键词）的论文，在 priority_score 计算时获得额外乘子：
+#   priority = decay × confidence × (1 + domain_score) × (1 + method_score)
+# 每命中一个 unique canonical 累加 (method_multiplier - default_weight)，默认配置下 = 0.5。
+# 与 domain_weights.yaml 的设计完全平行；method 不分子族（不像 IO/HR/OB 三域），保持扁平。
+
+version: 1
+default_weight: 1.0
+method_multiplier: 1.5
+
+methods:
+  - canonical: 纵向设计
+    synonyms: [longitudinal design, longitudinal study, longitudinal, 纵向研究, 追踪研究]
+  - canonical: 多层模型
+    synonyms: [HLM, multilevel model, multilevel modeling, hierarchical linear model, 多层线性模型, 跨层次, 嵌套数据]
+  - canonical: 多源设计
+    synonyms: [multi-source, multi-source design, multisource, 多源数据, 多评分者, 多源评分]
+  - canonical: 经验取样
+    synonyms: [experience sampling, ESM, ecological momentary assessment, EMA, 经验取样法, 日记研究, daily diary]
+  - canonical: 时间滞后设计
+    synonyms: [time-lagged design, time lag, time-lagged, 时滞设计, 时间滞后]
+  - canonical: 配对分析
+    synonyms: [dyadic analysis, APIM, actor-partner interdependence, 主客体互依模型, 上下级配对]
+  - canonical: 元分析
+    synonyms: [meta-analysis, meta analysis, 元分析, 整合分析]
+  - canonical: 准实验
+    synonyms: [quasi-experiment, quasi experiment, 准实验设计, 准实验研究]

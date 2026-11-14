@@ -111,7 +111,9 @@ def test_foreign_holder_blocks_with_pid(lock_dir, tmp_path):
         HOLDER_TEMPLATE.format(repo=str(REPO), lock_dir=str(lock_dir)),
         encoding="utf-8",
     )
-    venv_py = str(REPO / ".venv" / "Scripts" / "python.exe")
+    # s1114：CI runner 无仓库 .venv（锁测试的语义是"另一个 Python 进程"），
+    # 用当前解释器 sys.executable 等价替代——本机仍解析到 venv，CI 解析到 runner Python。
+    venv_py = str((REPO / ".venv" / "Scripts" / "python.exe")) if (REPO / ".venv" / "Scripts" / "python.exe").exists() else __import__("sys").executable
     proc = subprocess.Popen([venv_py, str(holder)], stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True)
     assert proc.stdout is not None
@@ -135,7 +137,9 @@ def test_concurrent_subprocesses_exactly_one_wins(lock_dir, tmp_path):
         WORKER_TEMPLATE.format(repo=str(REPO), lock_dir=str(lock_dir)),
         encoding="utf-8",
     )
-    venv_py = str(REPO / ".venv" / "Scripts" / "python.exe")
+    # s1114：CI runner 无仓库 .venv（锁测试的语义是"另一个 Python 进程"），
+    # 用当前解释器 sys.executable 等价替代——本机仍解析到 venv，CI 解析到 runner Python。
+    venv_py = str((REPO / ".venv" / "Scripts" / "python.exe")) if (REPO / ".venv" / "Scripts" / "python.exe").exists() else __import__("sys").executable
     procs = [
         subprocess.Popen([venv_py, str(worker)], stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, text=True)

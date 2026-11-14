@@ -1,0 +1,12 @@
+# trending weights - auto-generated
+# generated: 2026-08-24T04:34:39+00:00
+
+version: 1
+generated_at: '2026-08-24T04:34:39+00:00'
+window_days: 30
+baseline_days: 90
+multiplier_cap: 1.3
+ignored: []
+promoted: []
+promoted_log: []
+trends: []

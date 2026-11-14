@@ -1,0 +1,77 @@
+# 心理学构念 IO / HR / OB 加权配置
+# 用户研究方向：工业与管理心理学 + 人力资源 + 组织行为学
+# 命中以下任一同义词的构念，在打分时获得 domain_multiplier 加权（默认 1.5×）。
+# 其他构念默认权重 1.0，不加权但仍会被追踪。
+# 词表可通过 UI 设置页编辑。
+
+version: 1
+default_weight: 1.0
+domain_multiplier: 1.5
+
+domains:
+  IO:    # 工业心理学 / 管理心理学
+    concepts:
+      - canonical: 变革型领导
+        synonyms: [transformational leadership, 变革型]
+      - canonical: 真诚领导
+        synonyms: [authentic leadership, 真诚型]
+      - canonical: 工作满意度
+        synonyms: [job satisfaction, 工作满意]
+      - canonical: 心理资本
+        synonyms: [psychological capital, PsyCap]
+      - canonical: 组织公正
+        synonyms: [organizational justice, 程序公正, 分配公正]
+      - canonical: 工作压力
+        synonyms: [work stress, 工作压力源]
+      - canonical: 工作家庭冲突
+        synonyms: [work-family conflict, 工作家庭]
+      - canonical: 工作重塑
+        synonyms: [job crafting]
+      - canonical: 家长式领导
+        synonyms: [paternalistic leadership, 威权领导, 仁慈领导, 德行领导]
+      - canonical: 伦理型领导
+        synonyms: [ethical leadership, 道德型领导]
+      - canonical: 工作旺盛感
+        synonyms: [thriving at work, 工作活力, 旺盛感]
+
+  HR:    # 人力资源管理
+    concepts:
+      - canonical: 员工敬业度
+        synonyms: [employee engagement, work engagement, 工作敬业度, 敬业度]
+      - canonical: 绩效管理
+        synonyms: [performance management, 绩效评价, 绩效考核]
+      - canonical: 员工幸福感
+        synonyms: [employee well-being, 员工幸福]
+      - canonical: 离职意向
+        synonyms: [turnover intention, 离职倾向]
+      - canonical: 培训迁移
+        synonyms: [training transfer, 培训效果]
+      - canonical: 高绩效工作系统
+        synonyms: [high-performance work system, HPWS]
+      - canonical: 人岗匹配
+        synonyms: [person-job fit]
+      - canonical: 心理契约
+        synonyms: [psychological contract]
+
+  OB:    # 组织行为学
+    concepts:
+      - canonical: 组织公民行为
+        synonyms: [organizational citizenship behavior, OCB, 组织公民]
+      - canonical: 组织承诺
+        synonyms: [organizational commitment, 情感承诺, 持续承诺]
+      - canonical: 反生产行为
+        synonyms: [counterproductive work behavior, CWB]
+      - canonical: 建言行为
+        synonyms: [voice behavior, 员工建言]
+      - canonical: 团队效能
+        synonyms: [team effectiveness, 团队绩效]
+      - canonical: 心理安全感
+        synonyms: [psychological safety, 心理安全]
+      - canonical: 组织认同
+        synonyms: [organizational identification]
+      - canonical: 工作场所偏差
+        synonyms: [workplace deviance, 偏差行为]
+      - canonical: 职业倦怠
+        synonyms: [burnout, 工作倦怠, 职业耗竭]
+      - canonical: 领导-成员交换
+        synonyms: [leader-member exchange, LMX, LMX-7, 上下级交换, 领导成员交换]
