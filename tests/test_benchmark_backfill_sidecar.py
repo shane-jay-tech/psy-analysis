@@ -17,7 +17,12 @@ BENCH = _REPO / "data" / "benchmark_history" / "socratic_benchmark_20260909T1921
 
 _spec = importlib.util.spec_from_file_location("backfill_draft", SCRIPT)
 mod = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(mod)
+try:
+    _spec.loader.exec_module(mod)
+except FileNotFoundError as _e:
+    # s1114：fixture 草案是从桥侧 tmp 逐字转正的历史文档（sha256 锁定不可改内容），
+    # 其内部含本机绝对路径引用——裸 CI 环境按本机集成测试口径跳过（同 kaoyan backup-gate SkipTest 治理）。
+    pytest.skip(f"fixture 草案依赖本机路径（CI 环境跳过）：{_e}", allow_module_level=True)
 
 
 def _sha(path: Path) -> str:
